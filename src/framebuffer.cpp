@@ -1,6 +1,22 @@
-#pragma once
 #include "framebuffer.hpp"
 #include <glad/glad.h>
+
+Framebuffer::Framebuffer(Framebuffer&& o) noexcept
+    : fbo(o.fbo), tex(o.tex), width(o.width), height(o.height) {
+    o.fbo = o.tex = o.width = o.height = 0;
+}
+
+Framebuffer& Framebuffer::operator=(Framebuffer&& o) noexcept {
+    if (this != &o) {
+        Destroy();
+        fbo = o.fbo;
+        tex = o.tex;
+        width = o.width;
+        height = o.height;
+        o.fbo = o.tex = o.width = o.height = 0;
+    }
+    return *this;
+}
 
 bool Framebuffer::Create(int w, int h, GLenum internalFormat) {
     width = w; height = h;

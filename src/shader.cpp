@@ -62,22 +62,22 @@ Shader::Shader(const char* v, const char* f) {
     glDeleteShader(frag);
 }
 
-void Shader::use() const { glUseProgram(id); }
+void Shader::Use() const { glUseProgram(id); }
 
-void Shader::setInt(const std::string& name, int value) const {
+void Shader::SetInt(const std::string& name, int value) const {
     glUniform1i(glGetUniformLocation(id, name.c_str()), value);
 }
 
-void Shader::setFloat(const std::string& name, float value) const {
+void Shader::SetFloat(const std::string& name, float value) const {
     glUniform1f(glGetUniformLocation(id, name.c_str()), value);
 }
 
-void Shader::setVec2(const std::string& name, const glm::vec2& v) const {
+void Shader::SetVec2(const std::string& name, const glm::vec2& v) const {
     glUniform2f(glGetUniformLocation(id, name.c_str()), v.x, v.y);
 }
 
-void Shader::setTexture2D(const std::string& name, GLuint texture, unsigned unit) const {
+void Shader::SetTexture2D(const std::string& name, GLuint texture, unsigned unit) const {
     glActiveTexture(GL_TEXTURE0 + (GLenum)unit);
     glBindTexture(GL_TEXTURE_2D, texture);
-    setInt(name, (int)unit);
+    SetInt(name, (int)unit);
 }

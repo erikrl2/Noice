@@ -12,9 +12,9 @@ struct SimpleMesh {
 
     SimpleMesh(const SimpleMesh&) = delete;
     SimpleMesh& operator=(const SimpleMesh&) = delete;
-    SimpleMesh& operator=(SimpleMesh&&) = delete;
 
     SimpleMesh(SimpleMesh&& o) noexcept;
+    SimpleMesh& operator=(SimpleMesh&& o) noexcept;
 
     void UploadIndexed(const void* vertexData, size_t vertexBytes, const unsigned int* indices, size_t indexCount_);
     void UploadArrays(const void* vertexData, size_t vertexBytes, size_t vertexCount_);

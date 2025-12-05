@@ -9,6 +9,20 @@ SimpleMesh::SimpleMesh(SimpleMesh&& o) noexcept
     o.indexCount = o.vertexCount = 0;
 }
 
+SimpleMesh& SimpleMesh::operator=(SimpleMesh&& o) noexcept {
+    if (this != &o) {
+        Destroy();
+        vao = o.vao;
+        vbo = o.vbo;
+        ebo = o.ebo;
+        indexCount = o.indexCount;
+        vertexCount = o.vertexCount;
+        o.vao = o.vbo = o.ebo = 0;
+        o.indexCount = o.vertexCount = 0;
+    }
+    return *this;
+}
+
 void SimpleMesh::UploadIndexed(const void* vertexData, size_t vertexBytes, const unsigned int* indices, size_t indexCount_) {
     indexCount = indexCount_;
     vertexCount = 0;
