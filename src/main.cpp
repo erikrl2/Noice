@@ -1,4 +1,6 @@
 #include "shader.hpp"
+#include "framebuffer.hpp"
+#include "mesh.hpp"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -8,24 +10,25 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <algorithm>
 #include <iostream>
-
-float quadVertices[] = {
-    -1.0f,-1.0f, 0.0f,0.0f,
-     1.0f,-1.0f, 1.0f,0.0f,
-     1.0f, 1.0f, 1.0f,1.0f,
-    -1.0f, 1.0f, 0.0f,1.0f
-};
-unsigned int quadIdx[] = { 0,1,2,2,3,0 };
-
-float triVertices[] = {
-    -0.5f,-0.5f,0.0f,
-     0.5f,-0.5f,0.0f,
-     0.0f, 0.5f,0.0f
-};
 
 float updatesPerSecond = 10.0f;
 double updateAccumulator = 0.0;
+
+struct AppState {
+    int width = 0;
+    int height = 0;
+    bool resized = false;
+};
+
+static void framebuffer_size_callback(GLFWwindow* window, int w, int h) {
+    AppState* s = reinterpret_cast<AppState*>(glfwGetWindowUserPointer(window));
+    if (!s) return;
+    s->width = w;
+    s->height = h;
+    s->resized = true;
+}
 
 int main() {
     glfwInit();
@@ -33,7 +36,9 @@ int main() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* win = glfwCreateWindow(800, 600, "Noice", nullptr, nullptr);
+    int windowWidth = 800;
+    int windowHeight = 600;
+    GLFWwindow* win = glfwCreateWindow(windowWidth, windowHeight, "Noice", nullptr, nullptr);
     glfwMakeContextCurrent(win);
 
     glfwSwapInterval(1);
@@ -42,6 +47,10 @@ int main() {
         std::cerr << "glad load failed\n";
         return -1;
     }
+
+    float lineWidth = 10.0f;
+    glLineWidth(lineWidth);
+    glClearColor(0, 0, 0, 1);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -56,74 +65,31 @@ int main() {
     Shader xorShader("shaders/post.vert.glsl", "shaders/xor.frag.glsl");
     Shader noiseInit("shaders/post.vert.glsl", "shaders/noise_init.frag.glsl");
 
-    GLuint triVAO, vbo;
-    glGenVertexArrays(1, &triVAO);
-    glBindVertexArray(triVAO);
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(triVertices), triVertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
+    SimpleMesh triMesh = SimpleMesh::CreateTriangle();
+    SimpleMesh quadMesh = SimpleMesh::CreateFullscreenQuad();
 
-    GLuint quadVAO, qvbo, qebo;
-    glGenVertexArrays(1, &quadVAO);
-    glBindVertexArray(quadVAO);
-    glGenBuffers(1, &qvbo);
-    glBindBuffer(GL_ARRAY_BUFFER, qvbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    glGenBuffers(1, &qebo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, qebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(quadIdx), quadIdx, GL_STATIC_DRAW);
+    Framebuffer objectFB;
+    objectFB.Create(windowWidth, windowHeight);
 
-    // create object FBO
-    GLuint objectFBO, objectTex;
-    glGenFramebuffers(1, &objectFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, objectFBO);
+    int downscaleFactor = 1;
+    int accumW = std::max(1, windowWidth / downscaleFactor);
+    int accumH = std::max(1, windowHeight / downscaleFactor);
 
-    glGenTextures(1, &objectTex);
-    glBindTexture(GL_TEXTURE_2D, objectTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 800, 600, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, objectTex, 0);
+    Framebuffer accumA, accumB;
+    accumA.Create(accumW, accumH);
+    accumB.Create(accumW, accumH);
 
-    // create accumulation ping-pong FBOs
-    GLuint accumFBO_A, accumFBO_B;
-    GLuint accumTex_A, accumTex_B;
+    AppState state{windowWidth, windowHeight, false};
+    glfwSetWindowUserPointer(win, &state);
+    glfwSetFramebufferSizeCallback(win, framebuffer_size_callback);
 
-    auto createAccumTex = [&](GLuint& tex) {
-        glGenTextures(1, &tex);
-        glBindTexture(GL_TEXTURE_2D, tex);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 800, 600, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        };
-
-    createAccumTex(accumTex_A);
-    createAccumTex(accumTex_B);
-
-    glGenFramebuffers(1, &accumFBO_A);
-    glBindFramebuffer(GL_FRAMEBUFFER, accumFBO_A);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, accumTex_A, 0);
-
-    glGenFramebuffers(1, &accumFBO_B);
-    glBindFramebuffer(GL_FRAMEBUFFER, accumFBO_B);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, accumTex_B, 0);
-
-    // initialize noise into accumTex_A
-    glBindFramebuffer(GL_FRAMEBUFFER, accumFBO_A);
-    glViewport(0, 0, 800, 600);
+    accumA.Bind();
     noiseInit.use();
-    glBindVertexArray(quadVAO);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+    quadMesh.Draw();
+    Framebuffer::Unbind();
 
-    // make accumTex_A the active buffer
-    GLuint prevTex = accumTex_A;
-    GLuint nextTex = accumTex_B;
+    Framebuffer* prev = &accumA;
+    Framebuffer* next = &accumB;
 
     while (!glfwWindowShouldClose(win)) {
         static double lastTime = glfwGetTime();
@@ -131,11 +97,32 @@ int main() {
         double delta = now - lastTime;
         lastTime = now;
 
+        if (state.resized) {
+            windowWidth = std::max(1, state.width);
+            windowHeight = std::max(1, state.height);
+            accumW = std::max(1, windowWidth / downscaleFactor);
+            accumH = std::max(1, windowHeight / downscaleFactor);
+
+            objectFB.Resize(windowWidth, windowHeight);
+            accumA.Resize(accumW, accumH);
+            accumB.Resize(accumW, accumH);
+
+            accumA.Bind();
+            noiseInit.use();
+            quadMesh.Draw();
+            Framebuffer::Unbind();
+
+            prev = &accumA;
+            next = &accumB;
+
+            state.resized = false;
+        }
+
         updateAccumulator += delta;
         double updateInterval = 1.0 / updatesPerSecond;
         bool doXor = false;
         if (updateAccumulator >= updateInterval) {
-            updateAccumulator -= updateInterval;
+            updateAccumulator = 0.0;
             doXor = true;
         }
 
@@ -145,53 +132,39 @@ int main() {
 
         ImGui::Begin("Settings");
         ImGui::SliderFloat("Speed", &updatesPerSecond, 1.0f, 60.0f);
+
+        if (ImGui::SliderInt("Downscale", &downscaleFactor, 1, 8)) state.resized = true;
+
+        static bool wireframeOn = true;
+        ImGui::Checkbox("Wireframe", &wireframeOn);
+        if (wireframeOn && ImGui::SliderFloat("Line Width", &lineWidth, 1.0f, 10.0f)) glLineWidth(lineWidth);
+
+        ImGui::Text("Window: %dx%d", windowWidth, windowHeight);
+        ImGui::Text("Noise: %dx%d", accumW, accumH);
         ImGui::End();
 
-        // render object into objectTex
-        glBindFramebuffer(GL_FRAMEBUFFER, objectFBO);
-        glViewport(0, 0, 800, 600);
-        glClearColor(0, 0, 0, 1);
+        objectFB.Bind();
         glClear(GL_COLOR_BUFFER_BIT);
-
         basic.use();
-        glBindVertexArray(triVAO);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glLineWidth(10.0f);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        triMesh.Draw(wireframeOn);
+        Framebuffer::Unbind();
 
         if (doXor) {
-            // XOR combine: prevTex + objectTex -> nextTex
-            glBindFramebuffer(GL_FRAMEBUFFER, (nextTex == accumTex_A) ? accumFBO_A : accumFBO_B);
-            glViewport(0, 0, 800, 600);
-
+            next->Bind();
             xorShader.use();
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, prevTex);
-            xorShader.setInt("prevTex", 0);
+            xorShader.setTexture2D("prevTex", prev->Texture(), 0);
+            xorShader.setTexture2D("objectTex", objectFB.Texture(), 1);
+            quadMesh.Draw();
+            Framebuffer::Unbind();
 
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, objectTex);
-            xorShader.setInt("objectTex", 1);
-
-            glBindVertexArray(quadVAO);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-            std::swap(prevTex, nextTex);
+            std::swap(prev, next);
         }
 
-        // render final accum result to screen
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glViewport(0, 0, 800, 600);
-        glClear(GL_COLOR_BUFFER_BIT);
-
+        glViewport(0, 0, windowWidth, windowHeight);
         post.use();
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, prevTex);
-        post.setInt("screenTex", 0);
-
-        glBindVertexArray(quadVAO);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        post.setTexture2D("screenTex", prev->Texture());
+        quadMesh.Draw();
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -199,6 +172,7 @@ int main() {
         glfwSwapBuffers(win);
         glfwPollEvents();
     }
+
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();

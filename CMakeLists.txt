@@ -50,14 +50,18 @@ target_include_directories(imgui PUBLIC
 add_library(glad STATIC external/glad/src/glad.c)
 target_include_directories(glad PUBLIC external/glad/include)
 
-add_executable(Noice
-    src/main.cpp
-    src/shader.cpp
+file(GLOB SRC
+    "src/*.cpp"
+    "src/*.hpp"
 )
+add_executable(Noice ${SRC})
 
 target_include_directories(Noice PRIVATE src)
 
 target_link_libraries(Noice PRIVATE glfw glad imgui glm)
 
-file(COPY shaders DESTINATION ${CMAKE_BINARY_DIR})
+add_custom_command(TARGET Noice POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/shaders ${CMAKE_BINARY_DIR}/shaders
+)
 
