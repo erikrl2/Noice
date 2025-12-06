@@ -1,6 +1,7 @@
 #include "shader.hpp"
 #include "framebuffer.hpp"
 #include "mesh.hpp"
+#include "camera.hpp"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -12,8 +13,77 @@
 
 #include <iostream>
 
-float updatesPerSecond = 10.0f;
-double updateAccumulator = 0.0;
+static Camera camera;
+static bool mouseDown = false;
+
+static float updatesPerSecond = 10.0f;
+static int downscaleFactor = 1;
+static float lineWidth = 10.0f;
+static bool wireframeOn = true;
+static bool pauseFlicker = false;
+static bool disableEffect = false;
+static glm::vec3 color{ 1, 1, 1 };
+
+static void OnMouseMoved(GLFWwindow* window, double xpos, double ypos) {
+    if (ImGui::GetIO().WantCaptureMouse) return;
+
+    static bool firstMouse = true;
+    static double lastX, lastY;
+
+    if (!mouseDown) {
+        firstMouse = true;
+        return;
+    }
+    if (firstMouse) {
+        lastX = xpos;
+        lastY = ypos;
+        firstMouse = false;
+    }
+
+    double dx = xpos - lastX;
+    double dy = lastY - ypos;
+    lastX = xpos;
+    lastY = ypos;
+
+    float mouseSensitivity = 0.12f;
+    camera.ProcessMouseDelta((float)dx, (float)dy, mouseSensitivity);
+}
+
+static void OnMouseClicked(GLFWwindow* window, int button, int action, int mods) {
+    if (button != GLFW_MOUSE_BUTTON_LEFT) return;
+    if (ImGui::GetIO().WantCaptureMouse) return;
+
+    if (action == GLFW_PRESS) {
+        mouseDown = true;
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    }
+    else if (action == GLFW_RELEASE) {
+        mouseDown = false;
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
+}
+
+static void HandleCameraMovement(GLFWwindow* win, float delta) {
+    if (ImGui::GetIO().WantCaptureKeyboard) return;
+
+    float camSpeed = 5.0f * delta;
+    glm::vec3 front = camera.GetFront();
+    glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+    glm::vec3 right = glm::normalize(glm::cross(front, worldUp));
+
+    glm::vec3 moveDir(0.0f);
+    if (glfwGetKey(win, GLFW_KEY_W) == GLFW_PRESS) moveDir += front;
+    if (glfwGetKey(win, GLFW_KEY_S) == GLFW_PRESS) moveDir -= front;
+    if (glfwGetKey(win, GLFW_KEY_A) == GLFW_PRESS) moveDir -= right;
+    if (glfwGetKey(win, GLFW_KEY_D) == GLFW_PRESS) moveDir += right;
+    if (glfwGetKey(win, GLFW_KEY_SPACE) == GLFW_PRESS) moveDir += worldUp;
+    if (glfwGetKey(win, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) moveDir -= worldUp;
+
+    if (glm::length(moveDir) > 0.001f) {
+        moveDir = glm::normalize(moveDir);
+        camera.ProcessKeyboard(moveDir, camSpeed);
+    }
+}
 
 struct WindowState {
     int width = 0;
@@ -21,35 +91,41 @@ struct WindowState {
     bool resized = false;
 };
 
-static void framebuffer_size_callback(GLFWwindow* window, int w, int h) {
-    WindowState* s = reinterpret_cast<WindowState*>(glfwGetWindowUserPointer(window));
+static void OnFramebufferResized(GLFWwindow* window, int w, int h) {
+    WindowState* s = (WindowState*)glfwGetWindowUserPointer(window);
     if (!s) return;
     s->width = w;
     s->height = h;
     s->resized = true;
 }
 
-static GLFWwindow* InitWindow(int width, int height, const char* title) {
+static GLFWwindow* InitWindow(WindowState& ws, const char* title) {
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    GLFWwindow* win = glfwCreateWindow(width, height, title, nullptr, nullptr);
+    GLFWwindow* win = glfwCreateWindow(ws.width, ws.height, title, nullptr, nullptr);
     if (!win) {
         std::cerr << "Failed to create GLFW window\n";
         return nullptr;
     }
     glfwMakeContextCurrent(win);
     glfwSwapInterval(1);
+
+    glfwSetWindowUserPointer(win, &ws);
+    glfwSetFramebufferSizeCallback(win, OnFramebufferResized);
+    glfwSetCursorPosCallback(win, OnMouseMoved);
+    glfwSetMouseButtonCallback(win, OnMouseClicked);
     return win;
 }
 
-static bool InitGlad() {
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-        std::cerr << "glad load failed\n";
-        return false;
-    }
-    return true;
+static void InitOpenGL() {
+    gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+
+    glClearColor(0, 0, 0, 1);
+    glLineWidth(lineWidth);
+    glDisable(GL_DEPTH_TEST);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
 static void InitImGui(GLFWwindow* win) {
@@ -70,16 +146,9 @@ struct Resources {
     Framebuffer objectFB;
     Framebuffer noiseFB1;
     Framebuffer noiseFB2;
-    int downscaleFactor = 1;
-    int scaledWidth = 1;
-    int scaledHeight = 1;
-    float lineWidth = 10.0f;
-    bool wireframeOn = true;
-    Framebuffer* prevFB = nullptr;
-    Framebuffer* nextFB = nullptr;
 };
 
-static Resources SetupResources(int windowWidth, int windowHeight) {
+static Resources SetupResources(WindowState& windowState) {
     Resources r;
     r.objectShader = Shader("shaders/basic.vert.glsl", "shaders/basic.frag.glsl");
     r.postShader = Shader("shaders/post.vert.glsl", "shaders/post.frag.glsl");
@@ -89,130 +158,145 @@ static Resources SetupResources(int windowWidth, int windowHeight) {
     r.triMesh = SimpleMesh::CreateTriangle();
     r.quadMesh = SimpleMesh::CreateFullscreenQuad();
 
-    r.objectFB.Create(windowWidth, windowHeight);
-
-    r.downscaleFactor = 1;
-    r.scaledWidth = windowWidth / r.downscaleFactor;
-    r.scaledHeight = windowHeight / r.downscaleFactor;
-
-    r.noiseFB1.Create(r.scaledWidth, r.scaledHeight);
-    r.noiseFB2.Create(r.scaledWidth, r.scaledHeight);
-
-    r.noiseFB1.Bind();
-    r.noiseInitShader.Use();
-    r.quadMesh.Draw();
-    Framebuffer::Unbind();
-
-    glLineWidth(r.lineWidth);
-    glClearColor(0, 0, 0, 1);
-
+    r.objectFB.Create(windowState.width, windowState.height, true);
     return r;
 }
 
-static void HandleResizeIfNeeded(WindowState& state, Resources& r) {
-    if (!state.resized) return;
-
-    r.scaledWidth = state.width / r.downscaleFactor;
-    r.scaledHeight = state.height / r.downscaleFactor;
+static void ResetFramebuffers(WindowState& state, Resources& r) {
+    int scaledWidth = state.width / downscaleFactor;
+    int scaledHeight = state.height / downscaleFactor;
 
     r.objectFB.Resize(state.width, state.height);
-    r.noiseFB1.Resize(r.scaledWidth, r.scaledHeight);
-    r.noiseFB2.Resize(r.scaledWidth, r.scaledHeight);
+    r.noiseFB1.Resize(scaledWidth, scaledHeight);
+    r.noiseFB2.Resize(scaledWidth, scaledHeight);
 
     r.noiseFB1.Bind();
     r.noiseInitShader.Use();
     r.quadMesh.Draw();
     Framebuffer::Unbind();
-
-    r.prevFB = &r.noiseFB1;
-    r.nextFB = &r.noiseFB2;
-
-    state.resized = false;
 }
 
-static bool ShouldPerformXor(double delta) {
-    updateAccumulator += delta;
-    double updateInterval = 1.0 / updatesPerSecond;
-    if (updateAccumulator >= updateInterval) {
-        updateAccumulator = 0.0;
-        return true;
-    }
-    return false;
-}
-
-static void RenderGui(WindowState& state, Resources& r) {
+static void RenderUI(WindowState& state, Resources& r) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
     ImGui::Begin("Settings");
     ImGui::SliderFloat("Speed", &updatesPerSecond, 1.0f, 60.0f);
+    if (ImGui::SliderInt("Downscale", &downscaleFactor, 1, 8)) state.resized = true;
+    if (ImGui::SliderFloat("Line Width", &lineWidth, 1.0f, 10.0f)) glLineWidth(lineWidth);
 
-    if (ImGui::SliderInt("Downscale", &r.downscaleFactor, 1, 8)) {
-        state.resized = true;
-    }
+    ImGui::ColorEdit3("Color", &color[0]);
 
-    ImGui::Checkbox("Wireframe", &r.wireframeOn);
-    if (r.wireframeOn && ImGui::SliderFloat("Line Width", &r.lineWidth, 1.0f, 10.0f)) {
-        glLineWidth(r.lineWidth);
-    }
+    ImGui::Checkbox("Wireframe", &wireframeOn);
+    ImGui::Checkbox("Disable Effect", &disableEffect);
+    ImGui::Checkbox("Pause Flicker", &pauseFlicker);
 
+    ImGui::Separator();
     ImGui::Text("Window: %dx%d", state.width, state.height);
-    ImGui::Text("Noise: %dx%d", r.scaledWidth, r.scaledHeight);
+    ImGui::Text("Noise: %dx%d", state.width / downscaleFactor, state.height / downscaleFactor);
+
     ImGui::End();
 }
 
-static void DoXorPass(Resources& r) {
-    r.nextFB->Bind();
+static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
+    float aspect = (ws.height > 0) ? ((float)ws.width / (float)ws.height) : 1.0f;
+    glm::mat4 vp = camera.GetProjection(aspect) * camera.GetView();
+
+    static glm::vec3 pos1 = glm::vec3(0.0f, 0.0f, 0.0f);
+    static glm::vec3 pos2 = glm::vec3(0.0f, 1.0f, 0.5f);
+    static float angle1 = 0.0f;
+    static float angle2 = 0.0f;
+
+    angle1 += 30.0f * delta;
+
+    glm::mat4 m1 = glm::mat4(1.0f);
+    m1 = glm::translate(m1, pos1);
+    m1 = glm::rotate(m1, glm::radians(angle1), glm::vec3(0.0f, 0.0f, 1.0f));
+
+    glm::mat4 m2 = glm::mat4(1.0f);
+    m2 = glm::translate(m2, pos2);
+    //m2 = glm::rotate(m2, glm::radians(angle2), glm::vec3(0.0f, 0.0f, 1.0f));
+
+    r.objectFB.Bind();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // TODO: move clear to other place?
+    bool depthTestOn = true;
+    r.objectShader.Use();
+    r.objectShader.SetVec3("color", color);
+
+    r.objectShader.SetMat4("mvp", vp * m1);
+    r.triMesh.Draw(wireframeOn, depthTestOn);
+
+    r.objectShader.SetMat4("mvp", vp * m2);
+    r.triMesh.Draw(wireframeOn, depthTestOn);
+    Framebuffer::Unbind();
+}
+
+static bool ShouldApplyEffect(float delta) {
+    if (pauseFlicker) return false;
+    static float updateAccumulator = 0.0;
+    updateAccumulator += delta;
+    float updateInterval = 1.0f / updatesPerSecond;
+    if (updateAccumulator >= updateInterval) {
+        updateAccumulator = 0.0f;
+        return true;
+    }
+    return false;
+}
+
+static void RenderNoiseEffect(Resources& r, Framebuffer& prev, Framebuffer& next) {
+    next.Bind();
     r.xorShader.Use();
-    r.xorShader.SetTexture2D("prevTex", r.prevFB->Texture(), 0);
+    r.xorShader.SetTexture2D("prevTex", prev.Texture(), 0);
     r.xorShader.SetTexture2D("objectTex", r.objectFB.Texture(), 1);
     r.quadMesh.Draw();
     Framebuffer::Unbind();
+}
 
-    std::swap(r.prevFB, r.nextFB);
+static void PresentScene(WindowState& state, Resources& r, Framebuffer& src) {
+    Framebuffer::BindDefault(state.width, state.height);
+    r.postShader.Use();
+    r.postShader.SetTexture2D("screenTex", src.Texture());
+    r.quadMesh.Draw();
 }
 
 int main() {
     WindowState windowState{ 800, 600 };
 
-    GLFWwindow* win = InitWindow(windowState.width, windowState.height, "Noice");
+    GLFWwindow* win = InitWindow(windowState, "Noice");
     if (!win) return -1;
 
-    if (!InitGlad()) return -1;
+    InitOpenGL();
 
     InitImGui(win);
 
-    Resources res = SetupResources(windowState.width, windowState.height);
-    res.prevFB = &res.noiseFB1;
-    res.nextFB = &res.noiseFB2;
+    Resources res = SetupResources(windowState);
 
-    glfwSetWindowUserPointer(win, &windowState);
-    glfwSetFramebufferSizeCallback(win, framebuffer_size_callback);
+    Framebuffer* prevFB, * nextFB; // ping-pong framebuffers
+    windowState.resized = true; // triggers fb reset
 
     while (!glfwWindowShouldClose(win)) {
-        static double lastTime = glfwGetTime();
-        double now = glfwGetTime();
-        double delta = now - lastTime;
-        lastTime = now;
+        float delta = ImGui::GetIO().DeltaTime;
 
-        HandleResizeIfNeeded(windowState, res);
+        HandleCameraMovement(win, delta);
 
-        RenderGui(windowState, res);
+        if (windowState.resized) {
+            ResetFramebuffers(windowState, res);
+            prevFB = &res.noiseFB1;
+            nextFB = &res.noiseFB2;
+            windowState.resized = false;
+        }
 
-        res.objectFB.Bind();
-        glClear(GL_COLOR_BUFFER_BIT);
-        res.objectShader.Use();
-        res.triMesh.Draw(res.wireframeOn);
-        Framebuffer::Unbind();
+        RenderUI(windowState, res);
 
-        if (ShouldPerformXor(delta)) DoXorPass(res);
+        UpdateAndRenderObjects(windowState, res, delta);
 
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glViewport(0, 0, windowState.width, windowState.height);
-        res.postShader.Use();
-        res.postShader.SetTexture2D("screenTex", res.prevFB->Texture());
-        res.quadMesh.Draw();
+        if (ShouldApplyEffect(delta)) {
+            RenderNoiseEffect(res, *prevFB, *nextFB);
+            std::swap(prevFB, nextFB);
+        }
+
+        PresentScene(windowState, res, !disableEffect ? *prevFB : res.objectFB);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

@@ -11,6 +11,10 @@ struct Camera {
     glm::mat4 GetView() const;
     glm::mat4 GetProjection(float aspect) const;
 
+    // Liefert die Blickrichtung (normalisiert)
+    glm::vec3 GetFront() const;
+
+    // dir wird als Richtungsvektor interpretiert (lokal in Weltkoordinaten)
     void ProcessKeyboard(const glm::vec3& dir, float speed);
     void ProcessMouseDelta(float dx, float dy, float sensitivity);
 };

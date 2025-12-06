@@ -76,6 +76,16 @@ void Shader::SetVec2(const std::string& name, const glm::vec2& v) const {
     glUniform2f(glGetUniformLocation(id, name.c_str()), v.x, v.y);
 }
 
+void Shader::SetVec3(const std::string& name, const glm::vec3& v) const
+{
+    glUniform3f(glGetUniformLocation(id, name.c_str()), v.x, v.y, v.z);
+}
+
+void Shader::SetMat4(const std::string& name, const glm::mat4& m) const
+{
+    glUniformMatrix4fv(glGetUniformLocation(id, name.c_str()), 1, GL_FALSE, &m[0][0]);
+}
+
 void Shader::SetTexture2D(const std::string& name, GLuint texture, unsigned unit) const {
     glActiveTexture(GL_TEXTURE0 + (GLenum)unit);
     glBindTexture(GL_TEXTURE_2D, texture);
