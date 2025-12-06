@@ -1,6 +1,7 @@
 #pragma once
 #include <glad/glad.h>
-#include <vector>
+
+#include <string>
 
 struct SimpleMesh {
     GLuint vao = 0, vbo = 0, ebo = 0;
@@ -23,4 +24,7 @@ struct SimpleMesh {
 
     static SimpleMesh CreateFullscreenQuad();
     static SimpleMesh CreateTriangle();
+
+    // Neue Factory: lädt eine OBJ-Datei (interleaved pos(3), normal(3), uv(2))
+    static SimpleMesh LoadFromOBJ(const std::string& path);
 };

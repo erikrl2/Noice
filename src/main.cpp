@@ -18,11 +18,12 @@ static bool mouseDown = false;
 
 static float updatesPerSecond = 10.0f;
 static int downscaleFactor = 1;
-static float lineWidth = 10.0f;
+static float lineWidth = 5.0f;
 static bool wireframeOn = true;
 static bool pauseFlicker = false;
 static bool disableEffect = false;
 static glm::vec3 color{ 1, 1, 1 };
+static int meshSelect = 0;
 
 static void OnMouseMoved(GLFWwindow* window, double xpos, double ypos) {
     if (ImGui::GetIO().WantCaptureMouse) return;
@@ -141,8 +142,10 @@ struct Resources {
     Shader postShader{};
     Shader xorShader{};
     Shader noiseInitShader{};
-    SimpleMesh triMesh;
     SimpleMesh quadMesh;
+    SimpleMesh triMesh;
+    SimpleMesh carMesh;
+    SimpleMesh icosaMesh;
     Framebuffer objectFB;
     Framebuffer noiseFB1;
     Framebuffer noiseFB2;
@@ -155,8 +158,10 @@ static Resources SetupResources(WindowState& windowState) {
     r.xorShader = Shader("shaders/post.vert.glsl", "shaders/xor.frag.glsl");
     r.noiseInitShader = Shader("shaders/post.vert.glsl", "shaders/noise_init.frag.glsl");
 
-    r.triMesh = SimpleMesh::CreateTriangle();
     r.quadMesh = SimpleMesh::CreateFullscreenQuad();
+    r.triMesh = SimpleMesh::CreateTriangle();
+    r.carMesh = SimpleMesh::LoadFromOBJ("models/car.obj");
+    r.icosaMesh = SimpleMesh::LoadFromOBJ("models/icosahedron.obj");
 
     r.objectFB.Create(windowState.width, windowState.height, true);
     return r;
@@ -176,21 +181,29 @@ static void ResetFramebuffers(WindowState& state, Resources& r) {
     Framebuffer::Unbind();
 }
 
-static void RenderUI(WindowState& state, Resources& r) {
+static void RenderSettingsWindow(WindowState& state, Resources& r) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    ImGui::Begin("Settings");
-    ImGui::SliderFloat("Speed", &updatesPerSecond, 1.0f, 60.0f);
+    if (!ImGui::Begin("Settings", 0, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::End();
+        return;
+    }
+
     if (ImGui::SliderInt("Downscale", &downscaleFactor, 1, 8)) state.resized = true;
-    if (ImGui::SliderFloat("Line Width", &lineWidth, 1.0f, 10.0f)) glLineWidth(lineWidth);
-
-    ImGui::ColorEdit3("Color", &color[0]);
-
-    ImGui::Checkbox("Wireframe", &wireframeOn);
-    ImGui::Checkbox("Disable Effect", &disableEffect);
+    ImGui::SliderFloat("Speed", &updatesPerSecond, 1.0f, 60.0f, "%.2f");
     ImGui::Checkbox("Pause Flicker", &pauseFlicker);
+    ImGui::Checkbox("Disable Effect", &disableEffect);
+
+    ImGui::Separator();
+    ImGui::Text("Mesh:");
+    ImGui::RadioButton("Triangle", &meshSelect, 0); ImGui::SameLine();
+    ImGui::RadioButton("Icosahedron", &meshSelect, 1); ImGui::SameLine();
+    ImGui::RadioButton("Car", &meshSelect, 2);
+    ImGui::Checkbox("Wireframe", &wireframeOn);
+    if (ImGui::SliderFloat("Line Width", &lineWidth, 1.0f, 10.0f, "%.1f")) glLineWidth(lineWidth);
+    ImGui::ColorEdit3("Color", &color[0]);
 
     ImGui::Separator();
     ImGui::Text("Window: %dx%d", state.width, state.height);
@@ -203,32 +216,21 @@ static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
     float aspect = (ws.height > 0) ? ((float)ws.width / (float)ws.height) : 1.0f;
     glm::mat4 vp = camera.GetProjection(aspect) * camera.GetView();
 
-    static glm::vec3 pos1 = glm::vec3(0.0f, 0.0f, 0.0f);
-    static glm::vec3 pos2 = glm::vec3(0.0f, 1.0f, 0.5f);
-    static float angle1 = 0.0f;
-    static float angle2 = 0.0f;
+    static float angle = 90.0f;
+    angle += 20.0f * delta;
 
-    angle1 += 30.0f * delta;
-
-    glm::mat4 m1 = glm::mat4(1.0f);
-    m1 = glm::translate(m1, pos1);
-    m1 = glm::rotate(m1, glm::radians(angle1), glm::vec3(0.0f, 0.0f, 1.0f));
-
-    glm::mat4 m2 = glm::mat4(1.0f);
-    m2 = glm::translate(m2, pos2);
-    //m2 = glm::rotate(m2, glm::radians(angle2), glm::vec3(0.0f, 0.0f, 1.0f));
+    glm::mat4 m = glm::mat4(1.0f);
+    if (meshSelect == 2) m = glm::translate(m, glm::vec3(0.0f, -1.0f, -3.0f));
+    m = glm::rotate(m, glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
 
     r.objectFB.Bind();
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // TODO: move clear to other place?
-    bool depthTestOn = true;
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // TODO: move to better place?
     r.objectShader.Use();
     r.objectShader.SetVec3("color", color);
-
-    r.objectShader.SetMat4("mvp", vp * m1);
-    r.triMesh.Draw(wireframeOn, depthTestOn);
-
-    r.objectShader.SetMat4("mvp", vp * m2);
-    r.triMesh.Draw(wireframeOn, depthTestOn);
+    r.objectShader.SetMat4("mvp", vp * m);
+    if (meshSelect == 0) r.triMesh.Draw(wireframeOn, true);
+    else if (meshSelect == 1) r.icosaMesh.Draw(wireframeOn, true);
+    else if (meshSelect == 2) r.carMesh.Draw(wireframeOn, true);
     Framebuffer::Unbind();
 }
 
@@ -287,7 +289,7 @@ int main() {
             windowState.resized = false;
         }
 
-        RenderUI(windowState, res);
+        RenderSettingsWindow(windowState, res);
 
         UpdateAndRenderObjects(windowState, res, delta);
 
