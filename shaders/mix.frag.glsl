@@ -6,7 +6,7 @@ uniform sampler2D prevTex;
 uniform sampler2D objectTex;
 
 uniform float doXor;
-uniform vec2 scrollDir;
+uniform vec2 scrollOffset;
 uniform float rand;
 
 float rng() {
@@ -22,22 +22,24 @@ float rng() {
 }
 
 void main() {
-    vec2 texSize = vec2(textureSize(prevTex, 0));
-    vec2 uv = gl_FragCoord.xy / texSize;
-    vec3 objColor = texture(objectTex, uv).rgb;
+    ivec2 texSize = textureSize(prevTex, 0);
+    ivec2 fragPx = ivec2(gl_FragCoord.xy);
 
-    if (objColor != vec3(1, 0, 0)) { // flicker wireframe
-        vec3 noiseColor = texture(prevTex, uv).rgb;
+    vec3 objColor = texture(objectTex, gl_FragCoord.xy / vec2(texSize)).rgb;
+    if (objColor != vec3(1, 0, 0)) { // xor (flickers wireframe)
+        vec3 noiseColor = texelFetch(prevTex, fragPx, 0).rgb;
         FragColor = vec4(doXor == 1.0 ? abs(objColor - noiseColor) : noiseColor, 1);
     }
     else { // scroll faces
-        vec2 nextUV = (gl_FragCoord.xy - scrollDir) / texSize;
+        ivec2 off = ivec2(scrollOffset);
+        ivec2 nextPx = fragPx - off;
+        ivec2 wrappedPx = ivec2(((nextPx.x % texSize.x) + texSize.x) % texSize.x, ((nextPx.y % texSize.y) + texSize.y) % texSize.y);
 
-        if (texture(objectTex, nextUV).rgb != vec3(1, 0, 0)) {
+        vec3 objColorAtNext = texture(objectTex, (vec2(nextPx) + 0.5) / vec2(texSize)).rgb;
+        if (objColorAtNext != vec3(1, 0, 0)) {
             FragColor = vec4(vec3(step(0.5, rng())), 1);
         } else {
-            FragColor = vec4(texture(prevTex, nextUV).rgb, 1);
+            FragColor = vec4(texelFetch(prevTex, wrappedPx, 0).rgb, 1);
         }
     }
 }
-

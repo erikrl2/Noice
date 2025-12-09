@@ -17,6 +17,7 @@
 enum class MeshType { Triangle = 0, Icosahedron, Car, Count };
 enum class EffectType { Flicker = 0, Scroll, Count };
 
+// TODO: sort a bit
 static float updatesPerSecond = 10.0f;
 static int downscaleFactor = 1;
 static float lineWidth = 5.0f;
@@ -25,9 +26,11 @@ static bool pauseFlicker = false;
 static bool disableEffect = false;
 static glm::vec3 color{ 1, 1, 1 };
 static bool rotateOn = false;
-static float scrollSpeed = 1.0f;
+static float scrollSpeed = 100.0f;
 static MeshType meshSelect = MeshType::Triangle;
 static EffectType effectSelect = EffectType::Scroll;
+static glm::vec2 scrollDir{ 0, -1 };
+static glm::vec2 scrollAccumulator{ 0.0f, 0.0f };
 
 static Camera camera;
 static bool mouseDown = false;
@@ -165,8 +168,6 @@ struct Resources {
     Framebuffer noiseFB2;
 };
 
-static glm::vec2 scrollDir{ 0, -1 }; // TEMP FOR TESTING
-
 static Resources SetupResources(WindowState& windowState) {
     Resources r;
     r.objectShader = Shader("shaders/basic.vert.glsl", "shaders/basic.frag.glsl");
@@ -212,7 +213,7 @@ static void RenderSettingsWindow(WindowState& state, Resources& r) {
     ImGui::RadioButton("Flicker", (int*)&effectSelect, 0); ImGui::SameLine();
     ImGui::RadioButton("Scroll", (int*)&effectSelect, 1);
     ImGui::SliderFloat("Flicker Speed", &updatesPerSecond, 1.0f, 60.0f, "%.2f");
-    ImGui::SliderFloat("Scroll Speed", &scrollSpeed, 0.0f, 10.0f, "%.0f");
+    ImGui::SliderFloat("Scroll Speed", &scrollSpeed, 0.0f, 200.0f, "%.0f");
     if (ImGui::SliderInt("Downscale", &downscaleFactor, 1, 8)) state.resized = true;
     ImGui::Checkbox("Pause", &pauseFlicker); ImGui::SameLine();
     ImGui::Checkbox("Disable", &disableEffect);
@@ -253,19 +254,7 @@ static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
     static float angle = 90.0f;
     angle += 20.0f * delta;
 
-    // TEMP FOR TESTING
-    static float x = 0.0f;
-    static bool movingRight = true;
-    // if (movingRight) {
-    //     x += 1.0f * delta;
-    //     scrollDir = { 1, 0 };
-    //     if (x >= 2.0f) movingRight = false;
-    // }
-    // else {
-    //     x -= 1.0f * delta;
-    //     scrollDir = { -1, 0 };
-    //     if (x <= -2.0f) movingRight = true;
-    // }
+    static float x = 0.0f; // for testing
 
     glm::mat4 m = glm::mat4(1.0f);
     m = glm::translate(m, glm::vec3(x, 0.0f, 0.0f));
@@ -298,7 +287,7 @@ static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
     }
     case EffectType::Scroll: {
         if (wireframeOn) {
-            r.objectShader.SetVec3("color", glm::vec3(1));
+            r.objectShader.SetVec3("color", color);
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
             glEnable(GL_POLYGON_OFFSET_LINE);
             mesh.Draw();
@@ -344,7 +333,16 @@ static void RenderNoiseEffect(Resources& r, Framebuffer& prev, Framebuffer& next
     shader.SetFloat("doXor", ShouldApplyEffect(delta) ? 1.0f : 0.0f);
     if (effectSelect == EffectType::Scroll)
     {
-        shader.SetVec2("scrollDir", !pauseFlicker ? scrollDir * scrollSpeed : glm::vec2(0));
+        glm::vec2 dir(0.0f);
+        if (glm::length(scrollDir) > 0.0001f) dir = glm::normalize(scrollDir);
+
+        glm::vec2 deltaPixels = !pauseFlicker ? dir * scrollSpeed * delta : glm::vec2(0.0f);
+
+        scrollAccumulator += deltaPixels;
+        glm::ivec2 intStep = glm::ivec2(glm::floor(scrollAccumulator));
+        scrollAccumulator -= glm::vec2(intStep);
+
+        shader.SetVec2("scrollOffset", glm::vec2(intStep.x, intStep.y));
         shader.SetFloat("rand", (float)rand());
     }
     r.quadMesh.Draw();
