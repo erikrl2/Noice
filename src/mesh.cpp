@@ -1,4 +1,3 @@
-#pragma once
 #include "mesh.hpp"
 
 #include <glad/glad.h>
@@ -74,23 +73,21 @@ void SimpleMesh::Destroy() {
 // Convenience factory: fullscreen quad (pos.xy, uv.xy)
 SimpleMesh SimpleMesh::CreateFullscreenQuad() {
     static const float quadVerts[] = {
-        -1.0f, -1.0f, 0.0f, 0.0f,
-         1.0f, -1.0f, 1.0f, 0.0f,
-         1.0f,  1.0f, 1.0f, 1.0f,
-        -1.0f,  1.0f, 0.0f, 1.0f
+        -1.0f, -1.0f,
+         1.0f, -1.0f,
+         1.0f,  1.0f,
+        -1.0f,  1.0f
     };
     static const unsigned int quadIdx[] = { 0,1,2, 2,3,0 };
 
     SimpleMesh m;
     m.UploadIndexed(quadVerts, sizeof(quadVerts), quadIdx, 6);
 
-    // setup attribute pointers: layout(location=0) vec2 pos, layout(location=1) vec2 uv
+    // setup attribute pointers: layout(location=0) vec2 pos
     glBindVertexArray(m.vao);
     glBindBuffer(GL_ARRAY_BUFFER, m.vbo);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-    glEnableVertexAttribArray(1);
     glBindVertexArray(0);
 
     return m;

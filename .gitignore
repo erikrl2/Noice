@@ -2,3 +2,5 @@
 /.vs
 /build
 TODO.md
+/.cache/
+/compile_commands.json

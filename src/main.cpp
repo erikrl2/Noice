@@ -240,7 +240,7 @@ static SimpleMesh& GetMesh(MeshType meshSelect, Resources& r) {
     }
 }
 
-static glm::vec2 scrollDir{ 1, 0 }; // TEMP FOR TESTING
+static glm::vec2 scrollDir{ 0, -1 }; // TEMP FOR TESTING
 
 static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
     float aspect = (ws.height > 0) ? ((float)ws.width / (float)ws.height) : 1.0f;
@@ -252,21 +252,21 @@ static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
     // TEMP FOR TESTING
     static float x = 0.0f;
     static bool movingRight = true;
-    if (movingRight) {
-        x += 1.0f * delta;
-        scrollDir = { 1, 0 };
-        if (x >= 2.0f) movingRight = false;
-    }
-    else {
-        x -= 1.0f * delta;
-        scrollDir = { -1, 0 };
-        if (x <= -2.0f) movingRight = true;
-    }
+    // if (movingRight) {
+    //     x += 1.0f * delta;
+    //     scrollDir = { 1, 0 };
+    //     if (x >= 2.0f) movingRight = false;
+    // }
+    // else {
+    //     x -= 1.0f * delta;
+    //     scrollDir = { -1, 0 };
+    //     if (x <= -2.0f) movingRight = true;
+    // }
 
     glm::mat4 m = glm::mat4(1.0f);
+    m = glm::translate(m, glm::vec3(x, 0.0f, 0.0f));
     if (meshSelect == MeshType::Car) m = glm::translate(m, glm::vec3(0.0f, -1.0f, 0.0f));
     if (rotateOn) m = glm::rotate(m, glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
-    m = glm::translate(m, glm::vec3(x, 0.0f, 0.0f));
 
     // --------------
 
@@ -351,6 +351,7 @@ static void PresentScene(WindowState& state, Resources& r, Framebuffer& src) {
     Framebuffer::BindDefault(state.width, state.height);
     r.postShader.Use();
     r.postShader.SetTexture2D("screenTex", src.Texture());
+    r.postShader.SetVec2("resolution", glm::vec2(state.width, state.height));
     r.quadMesh.Draw();
 }
 

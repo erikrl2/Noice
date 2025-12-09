@@ -1,7 +1,5 @@
 #version 330 core
 
-in vec2 uv;
-
 out vec4 FragColor;
 
 uniform sampler2D prevTex;
@@ -10,6 +8,9 @@ uniform sampler2D objectTex;
 uniform float doXor;
 
 void main() {
+    vec2 texSize = vec2(textureSize(prevTex, 0));
+    vec2 uv = gl_FragCoord.xy / texSize;
+
     vec3 a = texture(prevTex, uv).rgb;
     vec3 b = texture(objectTex, uv).rgb;
 
