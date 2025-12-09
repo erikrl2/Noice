@@ -2,6 +2,7 @@
 #include "framebuffer.hpp"
 #include "mesh.hpp"
 #include "camera.hpp"
+#include "util.hpp"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -19,7 +20,7 @@ enum class EffectType { Flicker = 0, Scroll, Count };
 static float updatesPerSecond = 10.0f;
 static int downscaleFactor = 1;
 static float lineWidth = 5.0f;
-static bool wireframeOn = true;
+static bool wireframeOn = false;
 static bool pauseFlicker = false;
 static bool disableEffect = false;
 static glm::vec3 color{ 1, 1, 1 };
@@ -164,6 +165,8 @@ struct Resources {
     Framebuffer noiseFB2;
 };
 
+static glm::vec2 scrollDir{ 0, -1 }; // TEMP FOR TESTING
+
 static Resources SetupResources(WindowState& windowState) {
     Resources r;
     r.objectShader = Shader("shaders/basic.vert.glsl", "shaders/basic.frag.glsl");
@@ -228,6 +231,9 @@ static void RenderSettingsWindow(WindowState& state, Resources& r) {
     ImGui::Text("Window: %dx%d", state.width, state.height);
     ImGui::Text("Noise: %dx%d", state.width / downscaleFactor, state.height / downscaleFactor);
 
+    ImGui::Separator();
+    ImGuiDirection2D("Scroll Direction", scrollDir, 30.0f);
+
     ImGui::End();
 }
 
@@ -239,8 +245,6 @@ static SimpleMesh& GetMesh(MeshType meshSelect, Resources& r) {
     default: assert(false); return r.triMesh;
     }
 }
-
-static glm::vec2 scrollDir{ 0, -1 }; // TEMP FOR TESTING
 
 static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
     float aspect = (ws.height > 0) ? ((float)ws.width / (float)ws.height) : 1.0f;
