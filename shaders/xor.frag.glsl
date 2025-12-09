@@ -7,15 +7,20 @@ out vec4 FragColor;
 uniform sampler2D prevTex;
 uniform sampler2D objectTex;
 
-vec4 texture_nearest_texel(sampler2D tex, vec2 uv) {
-    ivec2 ts = textureSize(tex, 0);
-    vec2 coord = (floor(uv * vec2(ts)) + vec2(0.5)) / vec2(ts);
-    return texture(tex, coord);
-}
+uniform float doXor;
 
 void main() {
-    vec3 a = texture_nearest_texel(prevTex, uv).rgb;
-    vec3 b = texture_nearest_texel(objectTex, uv).rgb;
+    vec3 a = texture(prevTex, uv).rgb;
+    vec3 b = texture(objectTex, uv).rgb;
 
+    if (doXor == 0.0) {
+        FragColor = vec4(a, 1);
+        return;
+    }
+#if 1
     FragColor = vec4(abs(a - b), 1);
+#else
+    uvec3 r = uvec3(a * 255.0) ^ uvec3(b * 255.0);
+    FragColor = vec4(vec3(r), 1);
+#endif
 }

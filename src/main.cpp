@@ -13,8 +13,8 @@
 
 #include <iostream>
 
-static Camera camera;
-static bool mouseDown = false;
+enum class MeshType { Triangle = 0, Icosahedron, Car, Count };
+enum class EffectType { Flicker = 0, Scroll, Count };
 
 static float updatesPerSecond = 10.0f;
 static int downscaleFactor = 1;
@@ -23,7 +23,13 @@ static bool wireframeOn = true;
 static bool pauseFlicker = false;
 static bool disableEffect = false;
 static glm::vec3 color{ 1, 1, 1 };
-static int meshSelect = 0;
+static bool rotateOn = false;
+static float scrollSpeed = 1.0f;
+static MeshType meshSelect = MeshType::Triangle;
+static EffectType effectSelect = EffectType::Scroll;
+
+static Camera camera;
+static bool mouseDown = false;
 
 static void OnMouseMoved(GLFWwindow* window, double xpos, double ypos) {
     if (ImGui::GetIO().WantCaptureMouse) return;
@@ -124,28 +130,35 @@ static void InitOpenGL() {
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
     glClearColor(0, 0, 0, 1);
-    glLineWidth(lineWidth);
     glDisable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
+    glDisable(GL_CULL_FACE);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    glPolygonOffset(-1.0, -1.0);
+    glLineWidth(lineWidth);
 }
 
 static void InitImGui(GLFWwindow* win) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+
     ImGui::StyleColorsDark();
+    ImGui::GetIO().IniFilename = nullptr;
+
     ImGui_ImplGlfw_InitForOpenGL(win, true);
     ImGui_ImplOpenGL3_Init("#version 330 core");
 }
 
 struct Resources {
     Shader objectShader{};
-    Shader postShader{};
-    Shader xorShader{};
     Shader noiseInitShader{};
+    Shader xorShader{};
+    Shader scrollShader{};
+    Shader postShader{};
     SimpleMesh quadMesh;
     SimpleMesh triMesh;
-    SimpleMesh carMesh;
     SimpleMesh icosaMesh;
+    SimpleMesh carMesh;
     Framebuffer objectFB;
     Framebuffer noiseFB1;
     Framebuffer noiseFB2;
@@ -154,9 +167,10 @@ struct Resources {
 static Resources SetupResources(WindowState& windowState) {
     Resources r;
     r.objectShader = Shader("shaders/basic.vert.glsl", "shaders/basic.frag.glsl");
-    r.postShader = Shader("shaders/post.vert.glsl", "shaders/post.frag.glsl");
-    r.xorShader = Shader("shaders/post.vert.glsl", "shaders/xor.frag.glsl");
     r.noiseInitShader = Shader("shaders/post.vert.glsl", "shaders/noise_init.frag.glsl");
+    r.xorShader = Shader("shaders/post.vert.glsl", "shaders/xor.frag.glsl");
+    r.scrollShader = Shader("shaders/post.vert.glsl", "shaders/mix.frag.glsl");
+    r.postShader = Shader("shaders/post.vert.glsl", "shaders/post.frag.glsl");
 
     r.quadMesh = SimpleMesh::CreateFullscreenQuad();
     r.triMesh = SimpleMesh::CreateTriangle();
@@ -191,19 +205,24 @@ static void RenderSettingsWindow(WindowState& state, Resources& r) {
         return;
     }
 
+    ImGui::Text("Effect:");
+    ImGui::RadioButton("Flicker", (int*)&effectSelect, 0); ImGui::SameLine();
+    ImGui::RadioButton("Scroll", (int*)&effectSelect, 1);
+    ImGui::SliderFloat("Flicker Speed", &updatesPerSecond, 1.0f, 60.0f, "%.2f");
+    ImGui::SliderFloat("Scroll Speed", &scrollSpeed, 0.0f, 10.0f, "%.0f");
     if (ImGui::SliderInt("Downscale", &downscaleFactor, 1, 8)) state.resized = true;
-    ImGui::SliderFloat("Speed", &updatesPerSecond, 1.0f, 60.0f, "%.2f");
-    ImGui::Checkbox("Pause Flicker", &pauseFlicker);
-    ImGui::Checkbox("Disable Effect", &disableEffect);
+    ImGui::Checkbox("Pause", &pauseFlicker); ImGui::SameLine();
+    ImGui::Checkbox("Disable", &disableEffect);
 
     ImGui::Separator();
     ImGui::Text("Mesh:");
-    ImGui::RadioButton("Triangle", &meshSelect, 0); ImGui::SameLine();
-    ImGui::RadioButton("Icosahedron", &meshSelect, 1); ImGui::SameLine();
-    ImGui::RadioButton("Car", &meshSelect, 2);
+    ImGui::RadioButton("Triangle", (int*)&meshSelect, 0); ImGui::SameLine();
+    ImGui::RadioButton("Icosahedron", (int*)&meshSelect, 1); ImGui::SameLine();
+    ImGui::RadioButton("Car", (int*)&meshSelect, 2);
     ImGui::Checkbox("Wireframe", &wireframeOn);
     if (ImGui::SliderFloat("Line Width", &lineWidth, 1.0f, 10.0f, "%.1f")) glLineWidth(lineWidth);
     ImGui::ColorEdit3("Color", &color[0]);
+    ImGui::Checkbox("Rotate", &rotateOn);
 
     ImGui::Separator();
     ImGui::Text("Window: %dx%d", state.width, state.height);
@@ -212,6 +231,17 @@ static void RenderSettingsWindow(WindowState& state, Resources& r) {
     ImGui::End();
 }
 
+static SimpleMesh& GetMesh(MeshType meshSelect, Resources& r) {
+    switch (meshSelect) {
+    case MeshType::Triangle: return r.triMesh;
+    case MeshType::Icosahedron: return r.icosaMesh;
+    case MeshType::Car: return r.carMesh;
+    default: assert(false); return r.triMesh;
+    }
+}
+
+static glm::vec2 scrollDir{ 1, 0 }; // TEMP FOR TESTING
+
 static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
     float aspect = (ws.height > 0) ? ((float)ws.width / (float)ws.height) : 1.0f;
     glm::mat4 vp = camera.GetProjection(aspect) * camera.GetView();
@@ -219,18 +249,66 @@ static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
     static float angle = 90.0f;
     angle += 20.0f * delta;
 
+    // TEMP FOR TESTING
+    static float x = 0.0f;
+    static bool movingRight = true;
+    if (movingRight) {
+        x += 1.0f * delta;
+        scrollDir = { 1, 0 };
+        if (x >= 2.0f) movingRight = false;
+    }
+    else {
+        x -= 1.0f * delta;
+        scrollDir = { -1, 0 };
+        if (x <= -2.0f) movingRight = true;
+    }
+
     glm::mat4 m = glm::mat4(1.0f);
-    if (meshSelect == 2) m = glm::translate(m, glm::vec3(0.0f, -1.0f, -3.0f));
-    m = glm::rotate(m, glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
+    if (meshSelect == MeshType::Car) m = glm::translate(m, glm::vec3(0.0f, -1.0f, 0.0f));
+    if (rotateOn) m = glm::rotate(m, glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
+    m = glm::translate(m, glm::vec3(x, 0.0f, 0.0f));
+
+    // --------------
 
     r.objectFB.Bind();
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // TODO: move to better place?
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+
     r.objectShader.Use();
-    r.objectShader.SetVec3("color", color);
     r.objectShader.SetMat4("mvp", vp * m);
-    if (meshSelect == 0) r.triMesh.Draw(wireframeOn, true);
-    else if (meshSelect == 1) r.icosaMesh.Draw(wireframeOn, true);
-    else if (meshSelect == 2) r.carMesh.Draw(wireframeOn, true);
+
+    SimpleMesh& mesh = GetMesh(meshSelect, r);
+
+    switch (effectSelect) {
+    case EffectType::Flicker: {
+        r.objectShader.SetVec3("color", color);
+        if (wireframeOn) {
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            mesh.Draw();
+        }
+        else {
+            mesh.Draw();
+        }
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        break;
+    }
+    case EffectType::Scroll: {
+        if (wireframeOn) {
+            r.objectShader.SetVec3("color", glm::vec3(1));
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            glEnable(GL_POLYGON_OFFSET_LINE);
+            mesh.Draw();
+        }
+        r.objectShader.SetVec3("color", glm::vec3(1, 0, 0));
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        glDisable(GL_POLYGON_OFFSET_LINE);
+        mesh.Draw();
+        break;
+    }
+    default: assert(false);
+    }
+
+    glDisable(GL_DEPTH_TEST);
     Framebuffer::Unbind();
 }
 
@@ -238,19 +316,33 @@ static bool ShouldApplyEffect(float delta) {
     if (pauseFlicker) return false;
     static float updateAccumulator = 0.0;
     updateAccumulator += delta;
-    float updateInterval = 1.0f / updatesPerSecond;
-    if (updateAccumulator >= updateInterval) {
+    if (updateAccumulator >= 1.0f / updatesPerSecond) {
         updateAccumulator = 0.0f;
         return true;
     }
     return false;
 }
 
-static void RenderNoiseEffect(Resources& r, Framebuffer& prev, Framebuffer& next) {
+static Shader& GetEffectShader(EffectType effectSelect, Resources& r) {
+    switch (effectSelect) {
+    case EffectType::Flicker: return r.xorShader;
+    case EffectType::Scroll: return r.scrollShader;
+    default: assert(false); return r.xorShader;
+    }
+}
+
+static void RenderNoiseEffect(Resources& r, Framebuffer& prev, Framebuffer& next, float delta) {
     next.Bind();
-    r.xorShader.Use();
-    r.xorShader.SetTexture2D("prevTex", prev.Texture(), 0);
-    r.xorShader.SetTexture2D("objectTex", r.objectFB.Texture(), 1);
+    Shader& shader = GetEffectShader(effectSelect, r);
+    shader.Use();
+    shader.SetTexture2D("prevTex", prev.Texture(), 0);
+    shader.SetTexture2D("objectTex", r.objectFB.Texture(), 1);
+    shader.SetFloat("doXor", ShouldApplyEffect(delta) ? 1.0f : 0.0f);
+    if (effectSelect == EffectType::Scroll)
+    {
+        shader.SetVec2("scrollDir", !pauseFlicker ? scrollDir * scrollSpeed : glm::vec2(0));
+        shader.SetFloat("rand", (float)rand());
+    }
     r.quadMesh.Draw();
     Framebuffer::Unbind();
 }
@@ -293,10 +385,8 @@ int main() {
 
         UpdateAndRenderObjects(windowState, res, delta);
 
-        if (ShouldApplyEffect(delta)) {
-            RenderNoiseEffect(res, *prevFB, *nextFB);
-            std::swap(prevFB, nextFB);
-        }
+        RenderNoiseEffect(res, *prevFB, *nextFB, delta);
+        std::swap(prevFB, nextFB);
 
         PresentScene(windowState, res, !disableEffect ? *prevFB : res.objectFB);
 

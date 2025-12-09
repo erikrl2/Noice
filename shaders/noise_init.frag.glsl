@@ -11,3 +11,4 @@ void main() {
     float b = step(0.5, rand(p));
     FragColor = vec4(vec3(b), 1.0);
 }
+

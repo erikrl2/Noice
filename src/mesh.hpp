@@ -19,7 +19,7 @@ struct SimpleMesh {
 
     void UploadIndexed(const void* vertexData, size_t vertexBytes, const unsigned int* indices, size_t indexCount_);
     void UploadArrays(const void* vertexData, size_t vertexBytes, size_t vertexCount_);
-    void Draw(bool wireframe = false, bool depthTest = false) const;
+    void Draw() const;
     void Destroy();
 
     static SimpleMesh CreateFullscreenQuad();

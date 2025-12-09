@@ -53,18 +53,16 @@ void SimpleMesh::UploadArrays(const void* vertexData, size_t vertexBytes, size_t
     glBindVertexArray(0);
 }
 
-void SimpleMesh::Draw(bool wireframe, bool depthTest) const {
+void SimpleMesh::Draw() const {
     if (!vao) return;
     glBindVertexArray(vao);
 
-    if (wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    if (depthTest) glEnable(GL_DEPTH_TEST);
-
-    if (indexCount > 0) glDrawElements(GL_TRIANGLES, (GLsizei)indexCount, GL_UNSIGNED_INT, 0);
-    else glDrawArrays(GL_TRIANGLES, 0, (GLsizei)vertexCount);
-
-    if (depthTest) glDisable(GL_DEPTH_TEST);
-    if (wireframe) glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    if (indexCount > 0) {
+        glDrawElements(GL_TRIANGLES, (GLsizei)indexCount, GL_UNSIGNED_INT, 0);
+    }
+    else {
+        glDrawArrays(GL_TRIANGLES, 0, (GLsizei)vertexCount);
+    }
 }
 
 void SimpleMesh::Destroy() {
