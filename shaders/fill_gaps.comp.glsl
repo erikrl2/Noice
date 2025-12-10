@@ -14,11 +14,13 @@ uint hash(uint x) {
     return x;
 }
 
-float rng(ivec2 px, uint seed) {
+float rng(ivec2 px, float seed) {
     uint x = uint(px.x);
     uint y = uint(px.y);
-    uint n = x * 1664525u + y * 1013904223u + seed * 1103515245u;
-    return float(hash(n)) * 2.3283064365386963e-10;
+    uint s = floatBitsToUint(seed);
+    uint n = x * 1664525u + y * 1013904223u + s * 1103515245u;
+    n = hash(n);
+    return float(n) * 2.3283064365386963e-10;
 }
 
 void main() {
@@ -31,13 +33,23 @@ void main() {
     
     vec4 currentValue = imageLoad(noiseTex, px);
     
-    // NUR wenn Pixel leer ist (Alpha < 0.5)
+    // Prüfe ob Pixel leer ist (Alpha < 0.5 = wurde nicht von Forward Scatter geschrieben)
     if (currentValue.a < 0.5) {
-        // Generiere neues Noise
-        uint seed = floatBitsToUint(rand);
-        float r = rng(px, seed);
-        vec3 newNoise = vec3(step(0.5, r));
-        imageStore(noiseTex, px, vec4(newNoise, 1.0));
+        // Prüfe ob hier ein Objekt sein sollte
+        vec3 objColor = texture(objectTex, (vec2(px) + 0.5) / vec2(noiseSize)).rgb;
+        
+        if (objColor == vec3(1.0, 0.0, 0.0)) {
+            // Lücke auf Objekt  Erzeuge neues Noise
+            float r = rng(px, rand);
+            vec3 newNoise = vec3(step(0.5, r));
+            imageStore(noiseTex, px, vec4(newNoise, 1.0));
+        }
+        else {
+            // Hintergrund oder Wireframe  Kopiere vom vorherigen Frame
+            // Oder erzeuge neues Noise (je nach gewünschtem Verhalten)
+            float r = rng(px, rand);
+            vec3 newNoise = vec3(step(0.5, r));
+            imageStore(noiseTex, px, vec4(newNoise, 1.0));
+        }
     }
-    // SONST: NICHTS tun! Pixel bleibt unverändert
 }

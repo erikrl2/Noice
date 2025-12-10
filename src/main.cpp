@@ -36,8 +36,10 @@ static glm::mat4 prevViewProj = glm::mat4(1.0f);
 static glm::mat4 currViewProj = glm::mat4(1.0f);
 static glm::mat4 currProj = glm::mat4(1.0f);
 static glm::mat4 currView = glm::mat4(1.0f);
-static glm::mat4 prevProj = glm::mat4(1.0f);  // NEU
-static glm::mat4 prevView = glm::mat4(1.0f);  // NEU
+static glm::mat4 prevProj = glm::mat4(1.0f);
+static glm::mat4 prevView = glm::mat4(1.0f);
+static glm::mat4 currModel = glm::mat4(1.0f);  // NEU: Current Model Matrix
+static glm::mat4 prevModel = glm::mat4(1.0f);  // NEU: Previous Model Matrix
 static bool havePrevViewProj = false;
 
 static Camera camera;
@@ -303,7 +305,6 @@ static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
     glm::mat4 view = camera.GetView();
     glm::mat4 vp = proj * view;
 
-    // TODO
     currProj = proj;
     currView = view;
     currViewProj = vp;
@@ -312,11 +313,23 @@ static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
     angle += 20.0f * delta;
 
     static float x = 0.0f; // for testing
+    // move left and right
+    static bool movingRight = true;
+    if (movingRight) {
+        x += 1.0f * delta;
+        if (x >= 2.0f) movingRight = false;
+    } else {
+        x -= 1.0f * delta;
+        if (x <= -2.0f) movingRight = true;
+    }
 
     glm::mat4 m = glm::mat4(1.0f);
     m = glm::translate(m, glm::vec3(x, 0.0f, 0.0f));
     if (meshSelect == MeshType::Car) m = glm::translate(m, glm::vec3(0.0f, -1.0f, 0.0f));
     if (rotateOn) m = glm::rotate(m, glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
+
+    // NEU: Speichere Model-Matrix
+    currModel = m;
 
     // --------------
 
@@ -361,7 +374,7 @@ static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
     }
 
     glDisable(GL_DEPTH_TEST);
-    //glDepthMask(GL_FALSE); // TODO: Fix
+    //glDepthMask(GL_FALSE); //TODO: Fix
     Framebuffer::Unbind();
 }
 
@@ -411,18 +424,20 @@ static void RenderNoiseEffect(Resources& r, Framebuffer& prev, Framebuffer& next
     }
     case EffectType::AdaptScroll: {
         shader.SetTexture2D("objectDepthTex", r.objectFB.DepthTexture(), 2);
+        shader.SetTexture2D("prevDepthTex", r.prevDepthFB.DepthTexture(), 3); // NEU!
 
-        if (havePrevViewProj) shader.SetMat4("prevViewProj", prevViewProj);
-        else shader.SetMat4("prevViewProj", currViewProj); // fallback first frame
+        if (havePrevViewProj) {
+            shader.SetMat4("prevViewProj", prevViewProj);
+        }
+        else {
+            shader.SetMat4("prevViewProj", currViewProj);
+        }
 
-        shader.SetMat4("invProj", glm::inverse(currProj));
-        shader.SetMat4("invView", glm::inverse(currView));
+        shader.SetMat4("invCurrProj", glm::inverse(currProj));
+        shader.SetMat4("invCurrView", glm::inverse(currView));
         shader.SetVec2("fullResolution", glm::vec2(r.objectFB.width, r.objectFB.height));
         shader.SetInt("downscaleFactor", downscaleFactor);
         shader.SetFloat("rand", (float)rand());
-
-        prevViewProj = currViewProj;
-        havePrevViewProj = true;
         break;
     }
     }
@@ -438,6 +453,7 @@ static void RenderNoiseEffectForward(Resources& r, Framebuffer& prev, Framebuffe
     }
 
     if (!havePrevViewProj) {
+        // Beim ersten Frame: Einfach vorheriges kopieren
         next.Bind();
         r.postShader.Use();
         r.postShader.SetTexture2D("screenTex", prev.Texture());
@@ -447,28 +463,30 @@ static void RenderNoiseEffectForward(Resources& r, Framebuffer& prev, Framebuffe
         return;
     }
 
-    // --- PASS 1: Clear next buffer ---
+    // --- PASS 0: Clear next buffer (Alpha = 0 für Lücken) ---
     next.Bind();
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT);
-    Framebuffer::Unbind();  // WICHTIG!
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    Framebuffer::Unbind();
 
-    // KRITISCH: Unbind ALLE Framebuffers vor Compute Shader!
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    // --- PASS 2: Forward Scatter ---
+    // --- PASS 1: Forward Scatter ---
     r.forwardScatterShader.Use();
 
-    // Bind Textures als Images
     r.forwardScatterShader.SetImage2D("prevNoiseTex", prev.Texture(), 0, GL_READ_ONLY);
-    r.forwardScatterShader.SetImage2D("currNoiseTex", next.Texture(), 1, GL_WRITE_ONLY);
+    r.forwardScatterShader.SetImage2D("currNoiseTex", next.Texture(), 1, GL_READ_WRITE);
 
-    // Bind regular Textures
     r.forwardScatterShader.SetTexture2D("prevDepthTex", r.prevDepthFB.DepthTexture(), 2);
-    r.forwardScatterShader.SetTexture2D("objectTex", r.objectFB.Texture(), 3);
+    r.forwardScatterShader.SetTexture2D("currDepthTex", r.objectFB.DepthTexture(), 3);
+    r.forwardScatterShader.SetTexture2D("objectTex", r.objectFB.Texture(), 4);
 
-    // Set Uniforms
+    // NEU: Sende Model-Matrizen
+    r.forwardScatterShader.SetMat4("prevModel", prevModel);
+    r.forwardScatterShader.SetMat4("currModel", currModel);
+    r.forwardScatterShader.SetMat4("invPrevModel", glm::inverse(prevModel));
+    r.forwardScatterShader.SetMat4("invCurrModel", glm::inverse(currModel));
+
     r.forwardScatterShader.SetMat4("prevViewProj", prevViewProj);
     r.forwardScatterShader.SetMat4("invPrevProj", glm::inverse(prevProj));
     r.forwardScatterShader.SetMat4("invPrevView", glm::inverse(prevView));
@@ -476,11 +494,6 @@ static void RenderNoiseEffectForward(Resources& r, Framebuffer& prev, Framebuffe
     r.forwardScatterShader.SetVec2("fullResolution", glm::vec2(r.objectFB.width, r.objectFB.height));
     r.forwardScatterShader.SetInt("downscaleFactor", downscaleFactor);
 
-    //In RenderNoiseEffectForward, nach den SetMat4 Aufrufen:
-    //std::cout << "Frame with havePrevViewProj=" << havePrevViewProj << "\n";
-    //std::cout << "prevViewProj == currViewProj: " << (prevViewProj == currViewProj ? "YES" : "NO") << "\n";
-
-    // Dispatch Compute Shader
     int noiseWidth = prev.width;
     int noiseHeight = prev.height;
     unsigned int numGroupsX = (noiseWidth + 15) / 16;
@@ -489,10 +502,9 @@ static void RenderNoiseEffectForward(Resources& r, Framebuffer& prev, Framebuffe
     r.forwardScatterShader.Dispatch(numGroupsX, numGroupsY, 1);
     CheckGLError("After forward scatter");
 
-    // Memory Barrier
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 
-    // --- PASS 3: Fill Gaps ---
+    // --- PASS 2: Fill Gaps ---
     r.fillGapsShader.Use();
     r.fillGapsShader.SetImage2D("noiseTex", next.Texture(), 0, GL_READ_WRITE);
     r.fillGapsShader.SetTexture2D("objectTex", r.objectFB.Texture(), 1);
@@ -537,15 +549,57 @@ int main() {
             nextFB = &res.noiseFB2;
             windowState.resized = false;
             havePrevViewProj = false;
+
+            // WICHTIG: Initialisiere prev* mit aktuellen Werten
+            float aspect = (windowState.height > 0) ? ((float)windowState.width / (float)windowState.height) : 1.0f;
+            prevProj = currProj = camera.GetProjection(aspect);
+            prevView = currView = camera.GetView();
+            prevViewProj = currViewProj = prevProj * prevView;
+            prevModel = currModel = glm::mat4(1.0f);
         }
 
         RenderSettingsWindow(windowState, res);
 
-        // WICHTIG: Update View/Proj BEVOR wir rendern
-        // So haben prev* die Werte vom LETZTEN Frame
+        // ======== FIX: Update Previous Matrizen VOR dem Rendering! ========
+        // So gehören prev* Matrizen und prevDepthFB zum GLEICHEN Frame
+
+        // 1. Speichere Current -> Previous (BEVOR wir neue Werte berechnen)
+        if (havePrevViewProj) {
+            prevViewProj = currViewProj;
+            prevView = currView;
+            prevProj = currProj;
+            prevModel = currModel;
+        }
+
+        // 2. Update View/Proj/Model für AKTUELLEN Frame
         UpdateAndRenderObjects(windowState, res, delta);
 
-        // Render Noise Effect (verwendet prevViewProj vom LETZTEN Frame)
+        // 3. Kopiere Depth NACH dem Rendering, BEVOR wir das Noise rendern
+        // Jetzt ist prevDepthFB synchron mit prevModel/prevViewProj!
+        if (havePrevViewProj) {
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, res.objectFB.fbo);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, res.prevDepthFB.fbo);
+            glBlitFramebuffer(
+                0, 0, res.objectFB.width, res.objectFB.height,
+                0, 0, res.prevDepthFB.width, res.prevDepthFB.height,
+                GL_DEPTH_BUFFER_BIT, GL_NEAREST
+            );
+            Framebuffer::Unbind();
+        }
+        else {
+            // Beim ersten Frame: Initialisiere prevDepthFB
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, res.objectFB.fbo);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, res.prevDepthFB.fbo);
+            glBlitFramebuffer(
+                0, 0, res.objectFB.width, res.objectFB.height,
+                0, 0, res.prevDepthFB.width, res.prevDepthFB.height,
+                GL_DEPTH_BUFFER_BIT, GL_NEAREST
+            );
+            Framebuffer::Unbind();
+            havePrevViewProj = true;
+        }
+
+        // 4. Render Noise Effect (verwendet prev* vom LETZTEN Frame)
         if (effectSelect == EffectType::AdaptScroll) {
             RenderNoiseEffectForward(res, *prevFB, *nextFB, delta);
         }
@@ -561,38 +615,6 @@ int main() {
 
         glfwSwapBuffers(win);
         glfwPollEvents();
-
-        // ======== KRITISCH: Erst JETZT updaten wir prev* für NÄCHSTES Frame ========
-
-        // 1. Kopiere Depth vom aktuellen Frame
-        if (havePrevViewProj) {
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, res.objectFB.fbo);
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, res.prevDepthFB.fbo);
-            glBlitFramebuffer(
-                0, 0, res.objectFB.width, res.objectFB.height,
-                0, 0, res.prevDepthFB.width, res.prevDepthFB.height,
-                GL_DEPTH_BUFFER_BIT, GL_NEAREST
-            );
-            Framebuffer::Unbind();
-        }
-
-        // 2. Update Previous Matrizen (NACH dem Rendering!)
-        prevViewProj = currViewProj;
-        prevView = currView;
-        prevProj = currProj;
-
-        // 3. Beim ersten Frame: Depth initial kopieren
-        if (!havePrevViewProj) {
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, res.objectFB.fbo);
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, res.prevDepthFB.fbo);
-            glBlitFramebuffer(
-                0, 0, res.objectFB.width, res.objectFB.height,
-                0, 0, res.prevDepthFB.width, res.prevDepthFB.height,
-                GL_DEPTH_BUFFER_BIT, GL_NEAREST
-            );
-            Framebuffer::Unbind();
-            havePrevViewProj = true;
-        }
     }
 
     ImGui_ImplOpenGL3_Shutdown();
