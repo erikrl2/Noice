@@ -5,6 +5,7 @@ struct Framebuffer {
     GLuint fbo = 0;
     GLuint tex = 0;
     GLuint rbo = 0;
+    GLuint depthTex = 0;
     int width = 0;
     int height = 0;
     bool hasDepth = false;
@@ -30,4 +31,5 @@ struct Framebuffer {
     }
 
     GLuint Texture() const { return tex; }
+    GLuint DepthTexture() const { return depthTex; }
 };

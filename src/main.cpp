@@ -15,22 +15,27 @@
 #include <iostream>
 
 enum class MeshType { Triangle = 0, Icosahedron, Car, Count };
-enum class EffectType { Flicker = 0, Scroll, Count };
+enum class EffectType { Flicker = 0, Scroll, AdaptScroll, Count };
 
-// TODO: sort a bit
-static float updatesPerSecond = 10.0f;
+// TODO: sort 
+static float flickerSpeed = 30.0f;
 static int downscaleFactor = 1;
 static float lineWidth = 5.0f;
-static bool wireframeOn = false;
+static bool wireframeOn = true;
 static bool pauseFlicker = false;
 static bool disableEffect = false;
 static glm::vec3 color{ 1, 1, 1 };
 static bool rotateOn = false;
 static float scrollSpeed = 100.0f;
 static MeshType meshSelect = MeshType::Triangle;
-static EffectType effectSelect = EffectType::Scroll;
+static EffectType effectSelect = EffectType::AdaptScroll;
 static glm::vec2 scrollDir{ 0, -1 };
 static glm::vec2 scrollAccumulator{ 0.0f, 0.0f };
+static glm::mat4 prevViewProj = glm::mat4(1.0f);
+static glm::mat4 currViewProj = glm::mat4(1.0f);
+static glm::mat4 currProj = glm::mat4(1.0f);
+static glm::mat4 currView = glm::mat4(1.0f);
+static bool havePrevViewProj = false;
 
 static Camera camera;
 static bool mouseDown = false;
@@ -135,7 +140,7 @@ static void InitOpenGL() {
 
     glClearColor(0, 0, 0, 1);
     glDisable(GL_DEPTH_TEST);
-    glDepthMask(GL_TRUE);
+    glDepthMask(GL_TRUE); // TODO: make false and fix
     glDisable(GL_CULL_FACE);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     glPolygonOffset(-1.0, -1.0);
@@ -150,7 +155,7 @@ static void InitImGui(GLFWwindow* win) {
     ImGui::GetIO().IniFilename = nullptr;
 
     ImGui_ImplGlfw_InitForOpenGL(win, true);
-    ImGui_ImplOpenGL3_Init("#version 330 core");
+    ImGui_ImplOpenGL3_Init("#version 420 core");
 }
 
 struct Resources {
@@ -158,6 +163,7 @@ struct Resources {
     Shader noiseInitShader{};
     Shader xorShader{};
     Shader scrollShader{};
+    Shader adaptScrollShader{};
     Shader postShader{};
     SimpleMesh quadMesh;
     SimpleMesh triMesh;
@@ -174,12 +180,13 @@ static Resources SetupResources(WindowState& windowState) {
     r.noiseInitShader = Shader("shaders/post.vert.glsl", "shaders/noise_init.frag.glsl");
     r.xorShader = Shader("shaders/post.vert.glsl", "shaders/xor.frag.glsl");
     r.scrollShader = Shader("shaders/post.vert.glsl", "shaders/mix.frag.glsl");
+    r.adaptScrollShader = Shader("shaders/post.vert.glsl", "shaders/fix.frag.glsl");
     r.postShader = Shader("shaders/post.vert.glsl", "shaders/post.frag.glsl");
 
     r.quadMesh = SimpleMesh::CreateFullscreenQuad();
     r.triMesh = SimpleMesh::CreateTriangle();
-    r.carMesh = SimpleMesh::LoadFromOBJ("models/car.obj");
     r.icosaMesh = SimpleMesh::LoadFromOBJ("models/icosahedron.obj");
+    r.carMesh = SimpleMesh::LoadFromOBJ("models/car.obj");
 
     r.objectFB.Create(windowState.width, windowState.height, true);
     return r;
@@ -211,8 +218,9 @@ static void RenderSettingsWindow(WindowState& state, Resources& r) {
 
     ImGui::Text("Effect:");
     ImGui::RadioButton("Flicker", (int*)&effectSelect, 0); ImGui::SameLine();
-    ImGui::RadioButton("Scroll", (int*)&effectSelect, 1);
-    ImGui::SliderFloat("Flicker Speed", &updatesPerSecond, 1.0f, 60.0f, "%.2f");
+    ImGui::RadioButton("Scroll", (int*)&effectSelect, 1); ImGui::SameLine();
+    ImGui::RadioButton("Adapt Scroll", (int*)&effectSelect, 2);
+    ImGui::SliderFloat("Flicker Speed", &flickerSpeed, 1.0f, 60.0f, "%.2f");
     ImGui::SliderFloat("Scroll Speed", &scrollSpeed, 0.0f, 200.0f, "%.0f");
     if (ImGui::SliderInt("Downscale", &downscaleFactor, 1, 8)) state.resized = true;
     ImGui::Checkbox("Pause", &pauseFlicker); ImGui::SameLine();
@@ -232,8 +240,10 @@ static void RenderSettingsWindow(WindowState& state, Resources& r) {
     ImGui::Text("Window: %dx%d", state.width, state.height);
     ImGui::Text("Noise: %dx%d", state.width / downscaleFactor, state.height / downscaleFactor);
 
-    ImGui::Separator();
-    ImGuiDirection2D("Scroll Direction", scrollDir, 30.0f);
+    if (effectSelect == EffectType::Scroll) {
+        ImGui::Separator();
+        ImGuiDirection2D("Scroll Direction", scrollDir, 30.0f);
+    }
 
     ImGui::End();
 }
@@ -249,7 +259,14 @@ static SimpleMesh& GetMesh(MeshType meshSelect, Resources& r) {
 
 static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
     float aspect = (ws.height > 0) ? ((float)ws.width / (float)ws.height) : 1.0f;
-    glm::mat4 vp = camera.GetProjection(aspect) * camera.GetView();
+    glm::mat4 proj = camera.GetProjection(aspect);
+    glm::mat4 view = camera.GetView();
+    glm::mat4 vp = proj * view;
+
+    // TODO
+    currProj = proj;
+    currView = view;
+    currViewProj = vp;
 
     static float angle = 90.0f;
     angle += 20.0f * delta;
@@ -265,6 +282,7 @@ static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
 
     r.objectFB.Bind();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glDepthMask(GL_TRUE);
     glEnable(GL_DEPTH_TEST);
 
     r.objectShader.Use();
@@ -285,7 +303,8 @@ static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         break;
     }
-    case EffectType::Scroll: {
+    case EffectType::Scroll:
+    case EffectType::AdaptScroll: {
         if (wireframeOn) {
             r.objectShader.SetVec3("color", color);
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -302,6 +321,7 @@ static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
     }
 
     glDisable(GL_DEPTH_TEST);
+    //glDepthMask(GL_FALSE); // TODO: Fix
     Framebuffer::Unbind();
 }
 
@@ -309,7 +329,7 @@ static bool ShouldApplyEffect(float delta) {
     if (pauseFlicker) return false;
     static float updateAccumulator = 0.0;
     updateAccumulator += delta;
-    if (updateAccumulator >= 1.0f / updatesPerSecond) {
+    if (updateAccumulator >= 1.0f / flickerSpeed) {
         updateAccumulator = 0.0f;
         return true;
     }
@@ -320,19 +340,22 @@ static Shader& GetEffectShader(EffectType effectSelect, Resources& r) {
     switch (effectSelect) {
     case EffectType::Flicker: return r.xorShader;
     case EffectType::Scroll: return r.scrollShader;
+    case EffectType::AdaptScroll: return r.adaptScrollShader;
     default: assert(false); return r.xorShader;
     }
 }
 
 static void RenderNoiseEffect(Resources& r, Framebuffer& prev, Framebuffer& next, float delta) {
     next.Bind();
+
     Shader& shader = GetEffectShader(effectSelect, r);
     shader.Use();
     shader.SetTexture2D("prevTex", prev.Texture(), 0);
     shader.SetTexture2D("objectTex", r.objectFB.Texture(), 1);
     shader.SetFloat("doXor", ShouldApplyEffect(delta) ? 1.0f : 0.0f);
-    if (effectSelect == EffectType::Scroll)
-    {
+
+    switch (effectSelect) {
+    case EffectType::Scroll: {
         glm::vec2 dir(0.0f);
         if (glm::length(scrollDir) > 0.0001f) dir = glm::normalize(scrollDir);
 
@@ -344,7 +367,26 @@ static void RenderNoiseEffect(Resources& r, Framebuffer& prev, Framebuffer& next
 
         shader.SetVec2("scrollOffset", glm::vec2(intStep.x, intStep.y));
         shader.SetFloat("rand", (float)rand());
+        break;
     }
+    case EffectType::AdaptScroll: {
+        shader.SetTexture2D("objectDepthTex", r.objectFB.DepthTexture(), 2);
+
+        if (havePrevViewProj) shader.SetMat4("prevViewProj", prevViewProj);
+        else shader.SetMat4("prevViewProj", currViewProj); // fallback first frame
+
+        shader.SetMat4("invProj", glm::inverse(currProj));
+        shader.SetMat4("invView", glm::inverse(currView));
+        shader.SetVec2("fullResolution", glm::vec2(r.objectFB.width, r.objectFB.height));
+        shader.SetInt("downscaleFactor", downscaleFactor);
+        shader.SetFloat("rand", (float)rand());
+
+        prevViewProj = currViewProj;
+        havePrevViewProj = true;
+        break;
+    }
+    }
+
     r.quadMesh.Draw();
     Framebuffer::Unbind();
 }

@@ -3,8 +3,8 @@
 #include <iostream>
 
 Framebuffer::Framebuffer(Framebuffer&& o) noexcept
-    : fbo(o.fbo), tex(o.tex), rbo(o.rbo), width(o.width), height(o.height), hasDepth(o.hasDepth) {
-    o.fbo = o.tex = o.rbo = o.width = o.height = 0;
+    : fbo(o.fbo), tex(o.tex), rbo(o.rbo), depthTex(o.depthTex), width(o.width), height(o.height), hasDepth(o.hasDepth) {
+    o.fbo = o.tex = o.rbo = o.depthTex = o.width = o.height = 0;
     o.hasDepth = false;
 }
 
@@ -14,10 +14,11 @@ Framebuffer& Framebuffer::operator=(Framebuffer&& o) noexcept {
         fbo = o.fbo;
         tex = o.tex;
         rbo = o.rbo;
+        depthTex = o.depthTex;
         width = o.width;
         height = o.height;
         hasDepth = o.hasDepth;
-        o.fbo = o.tex = o.rbo = o.width = o.height = 0;
+        o.fbo = o.tex = o.rbo = o.depthTex = o.width = o.height = 0;
         o.hasDepth = false;
     }
     return *this;
@@ -42,11 +43,21 @@ bool Framebuffer::Create(int w, int h, bool attachDepth) {
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
 
     if (attachDepth) {
-        glGenRenderbuffers(1, &rbo);
-        glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+        glGenTextures(1, &depthTex);
+        glBindTexture(GL_TEXTURE_2D, depthTex);
+        // use a depth component internal format; 24-bit is a good tradeoff
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        GLfloat depthBorder[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, depthBorder);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTex, 0);
+        rbo = 0;
     } else {
+        depthTex = 0;
         rbo = 0;
     }
 
@@ -57,7 +68,6 @@ bool Framebuffer::Create(int w, int h, bool attachDepth) {
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
-    if (attachDepth) glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
     return ok;
 }
@@ -66,6 +76,7 @@ void Framebuffer::Destroy() {
     if (fbo) { glDeleteFramebuffers(1, &fbo); fbo = 0; }
     if (tex) { glDeleteTextures(1, &tex); tex = 0; }
     if (rbo) { glDeleteRenderbuffers(1, &rbo); rbo = 0; }
+    if (depthTex) { glDeleteTextures(1, &depthTex); depthTex = 0; }
     width = height = 0;
     hasDepth = false;
 }
