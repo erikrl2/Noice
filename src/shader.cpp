@@ -1,5 +1,7 @@
 #include "shader.hpp"
+
 #include <glad/glad.h>
+
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -91,3 +93,62 @@ void Shader::SetTexture2D(const std::string& name, GLuint texture, unsigned unit
     glBindTexture(GL_TEXTURE_2D, texture);
     SetInt(name, (int)unit);
 }
+
+
+// TODO: clean
+Shader Shader::CreateCompute(const char* computePath) {
+    std::ifstream file(computePath);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open compute shader: " << computePath << "\n";
+        return Shader();
+    }
+
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string source = buffer.str();
+    const char* code = source.c_str();
+
+    unsigned int compute = glCreateShader(GL_COMPUTE_SHADER);
+    glShaderSource(compute, 1, &code, nullptr);
+    glCompileShader(compute);
+
+    // Error checking
+    int success;
+    glGetShaderiv(compute, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        char log[512];
+        glGetShaderInfoLog(compute, 512, nullptr, log);
+        std::cerr << "Compute shader compilation failed:\n" << log << "\n";
+    }
+
+    Shader shader;
+    shader.id = glCreateProgram();
+    glAttachShader(shader.id, compute);
+    glLinkProgram(shader.id);
+
+    glGetProgramiv(shader.id, GL_LINK_STATUS, &success);
+    if (!success) {
+        char log[512];
+        glGetProgramInfoLog(shader.id, 512, nullptr, log);
+        std::cerr << "Compute shader linking failed:\n" << log << "\n";
+    }
+
+    glDeleteShader(compute);
+    return shader;
+}
+
+void Shader::Dispatch(unsigned int numGroupsX, unsigned int numGroupsY, unsigned int numGroupsZ) const {
+    //std::cout << "Dispatching compute shader " << id << ": "
+    //    << numGroupsX << "x" << numGroupsY << "x" << numGroupsZ << "\n";
+    glDispatchCompute(numGroupsX, numGroupsY, numGroupsZ);
+    GLenum err = glGetError();
+    if (err != GL_NO_ERROR) {
+        std::cerr << "glDispatchCompute error: 0x" << std::hex << err << std::dec << "\n";
+    }
+}
+
+void Shader::SetImage2D(const std::string& name, GLuint texture, unsigned unit, GLenum access) const {
+    glBindImageTexture(unit, texture, 0, GL_FALSE, 0, access, GL_RGBA8);
+    SetInt(name, unit);
+}
+

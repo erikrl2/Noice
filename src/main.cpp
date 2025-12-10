@@ -31,10 +31,13 @@ static MeshType meshSelect = MeshType::Triangle;
 static EffectType effectSelect = EffectType::AdaptScroll;
 static glm::vec2 scrollDir{ 0, -1 };
 static glm::vec2 scrollAccumulator{ 0.0f, 0.0f };
+
 static glm::mat4 prevViewProj = glm::mat4(1.0f);
 static glm::mat4 currViewProj = glm::mat4(1.0f);
 static glm::mat4 currProj = glm::mat4(1.0f);
 static glm::mat4 currView = glm::mat4(1.0f);
+static glm::mat4 prevProj = glm::mat4(1.0f);  // NEU
+static glm::mat4 prevView = glm::mat4(1.0f);  // NEU
 static bool havePrevViewProj = false;
 
 static Camera camera;
@@ -117,7 +120,7 @@ static void OnFramebufferResized(GLFWwindow* window, int w, int h) {
 
 static GLFWwindow* InitWindow(WindowState& ws, const char* title) {
     glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     GLFWwindow* win = glfwCreateWindow(ws.width, ws.height, title, nullptr, nullptr);
@@ -133,6 +136,13 @@ static GLFWwindow* InitWindow(WindowState& ws, const char* title) {
     glfwSetCursorPosCallback(win, OnMouseMoved);
     glfwSetMouseButtonCallback(win, OnMouseClicked);
     return win;
+}
+
+static void CheckGLError(const char* label) {
+    GLenum err;
+    while ((err = glGetError()) != GL_NO_ERROR) {
+        std::cerr << "OpenGL Error at " << label << ": 0x" << std::hex << err << std::dec << "\n";
+    }
 }
 
 static void InitOpenGL() {
@@ -155,7 +165,7 @@ static void InitImGui(GLFWwindow* win) {
     ImGui::GetIO().IniFilename = nullptr;
 
     ImGui_ImplGlfw_InitForOpenGL(win, true);
-    ImGui_ImplOpenGL3_Init("#version 420 core");
+    ImGui_ImplOpenGL3_Init("#version 430 core");
 }
 
 struct Resources {
@@ -164,6 +174,8 @@ struct Resources {
     Shader xorShader{};
     Shader scrollShader{};
     Shader adaptScrollShader{};
+    Shader forwardScatterShader{};  // NEU: Compute Shader
+    Shader fillGapsShader{};        // NEU: Compute Shader
     Shader postShader{};
     SimpleMesh quadMesh;
     SimpleMesh triMesh;
@@ -172,6 +184,7 @@ struct Resources {
     Framebuffer objectFB;
     Framebuffer noiseFB1;
     Framebuffer noiseFB2;
+    Framebuffer prevDepthFB;  // NEU: Speichere vorherigen Depth Buffer
 };
 
 static Resources SetupResources(WindowState& windowState) {
@@ -181,6 +194,15 @@ static Resources SetupResources(WindowState& windowState) {
     r.xorShader = Shader("shaders/post.vert.glsl", "shaders/xor.frag.glsl");
     r.scrollShader = Shader("shaders/post.vert.glsl", "shaders/mix.frag.glsl");
     r.adaptScrollShader = Shader("shaders/post.vert.glsl", "shaders/fix.frag.glsl");
+
+    std::cout << "Loading forward scatter shader...\n";
+    r.forwardScatterShader = Shader::CreateCompute("shaders/forward_scatter.comp.glsl");
+    std::cout << "Forward scatter shader ID: " << r.forwardScatterShader.id << "\n";
+
+    std::cout << "Loading fill gaps shader...\n";
+    r.fillGapsShader = Shader::CreateCompute("shaders/fill_gaps.comp.glsl");
+    std::cout << "Fill gaps shader ID: " << r.fillGapsShader.id << "\n";
+
     r.postShader = Shader("shaders/post.vert.glsl", "shaders/post.frag.glsl");
 
     r.quadMesh = SimpleMesh::CreateFullscreenQuad();
@@ -189,6 +211,13 @@ static Resources SetupResources(WindowState& windowState) {
     r.carMesh = SimpleMesh::LoadFromOBJ("models/car.obj");
 
     r.objectFB.Create(windowState.width, windowState.height, true);
+    r.prevDepthFB.Create(windowState.width, windowState.height, true);
+
+    // FIX: Setze Draw Buffer = NONE für prevDepthFB (nur Depth, kein Color)
+    glBindFramebuffer(GL_FRAMEBUFFER, r.prevDepthFB.fbo);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     return r;
 }
 
@@ -197,10 +226,21 @@ static void ResetFramebuffers(WindowState& state, Resources& r) {
     int scaledHeight = state.height / downscaleFactor;
 
     r.objectFB.Resize(state.width, state.height);
+    r.prevDepthFB.Resize(state.width, state.height);
     r.noiseFB1.Resize(scaledWidth, scaledHeight);
     r.noiseFB2.Resize(scaledWidth, scaledHeight);
 
+    // Initialisiere BEIDE Noise-Buffer mit zufälligem Noise
     r.noiseFB1.Bind();
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);  // Alpha = 1.0!
+    glClear(GL_COLOR_BUFFER_BIT);
+    r.noiseInitShader.Use();
+    r.quadMesh.Draw();
+    Framebuffer::Unbind();
+
+    r.noiseFB2.Bind();
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);  // Alpha = 1.0!
+    glClear(GL_COLOR_BUFFER_BIT);
     r.noiseInitShader.Use();
     r.quadMesh.Draw();
     Framebuffer::Unbind();
@@ -391,6 +431,79 @@ static void RenderNoiseEffect(Resources& r, Framebuffer& prev, Framebuffer& next
     Framebuffer::Unbind();
 }
 
+static void RenderNoiseEffectForward(Resources& r, Framebuffer& prev, Framebuffer& next, float delta) {
+    if (effectSelect != EffectType::AdaptScroll) {
+        RenderNoiseEffect(r, prev, next, delta);
+        return;
+    }
+
+    if (!havePrevViewProj) {
+        next.Bind();
+        r.postShader.Use();
+        r.postShader.SetTexture2D("screenTex", prev.Texture());
+        r.postShader.SetVec2("resolution", glm::vec2(prev.width, prev.height));
+        r.quadMesh.Draw();
+        Framebuffer::Unbind();
+        return;
+    }
+
+    // --- PASS 1: Clear next buffer ---
+    next.Bind();
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    Framebuffer::Unbind();  // WICHTIG!
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+    // KRITISCH: Unbind ALLE Framebuffers vor Compute Shader!
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // --- PASS 2: Forward Scatter ---
+    r.forwardScatterShader.Use();
+
+    // Bind Textures als Images
+    r.forwardScatterShader.SetImage2D("prevNoiseTex", prev.Texture(), 0, GL_READ_ONLY);
+    r.forwardScatterShader.SetImage2D("currNoiseTex", next.Texture(), 1, GL_WRITE_ONLY);
+
+    // Bind regular Textures
+    r.forwardScatterShader.SetTexture2D("prevDepthTex", r.prevDepthFB.DepthTexture(), 2);
+    r.forwardScatterShader.SetTexture2D("objectTex", r.objectFB.Texture(), 3);
+
+    // Set Uniforms
+    r.forwardScatterShader.SetMat4("prevViewProj", prevViewProj);
+    r.forwardScatterShader.SetMat4("invPrevProj", glm::inverse(prevProj));
+    r.forwardScatterShader.SetMat4("invPrevView", glm::inverse(prevView));
+    r.forwardScatterShader.SetMat4("currViewProj", currViewProj);
+    r.forwardScatterShader.SetVec2("fullResolution", glm::vec2(r.objectFB.width, r.objectFB.height));
+    r.forwardScatterShader.SetInt("downscaleFactor", downscaleFactor);
+
+    //In RenderNoiseEffectForward, nach den SetMat4 Aufrufen:
+    //std::cout << "Frame with havePrevViewProj=" << havePrevViewProj << "\n";
+    //std::cout << "prevViewProj == currViewProj: " << (prevViewProj == currViewProj ? "YES" : "NO") << "\n";
+
+    // Dispatch Compute Shader
+    int noiseWidth = prev.width;
+    int noiseHeight = prev.height;
+    unsigned int numGroupsX = (noiseWidth + 15) / 16;
+    unsigned int numGroupsY = (noiseHeight + 15) / 16;
+
+    r.forwardScatterShader.Dispatch(numGroupsX, numGroupsY, 1);
+    CheckGLError("After forward scatter");
+
+    // Memory Barrier
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+
+    // --- PASS 3: Fill Gaps ---
+    r.fillGapsShader.Use();
+    r.fillGapsShader.SetImage2D("noiseTex", next.Texture(), 0, GL_READ_WRITE);
+    r.fillGapsShader.SetTexture2D("objectTex", r.objectFB.Texture(), 1);
+    r.fillGapsShader.SetFloat("rand", (float)rand());
+
+    r.fillGapsShader.Dispatch(numGroupsX, numGroupsY, 1);
+    CheckGLError("After fill gaps");
+
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+}
+
 static void PresentScene(WindowState& state, Resources& r, Framebuffer& src) {
     Framebuffer::BindDefault(state.width, state.height);
     r.postShader.Use();
@@ -406,13 +519,12 @@ int main() {
     if (!win) return -1;
 
     InitOpenGL();
-
     InitImGui(win);
 
     Resources res = SetupResources(windowState);
 
-    Framebuffer* prevFB, * nextFB; // ping-pong framebuffers
-    windowState.resized = true; // triggers fb reset
+    Framebuffer* prevFB, * nextFB;
+    windowState.resized = true;
 
     while (!glfwWindowShouldClose(win)) {
         float delta = ImGui::GetIO().DeltaTime;
@@ -424,13 +536,22 @@ int main() {
             prevFB = &res.noiseFB1;
             nextFB = &res.noiseFB2;
             windowState.resized = false;
+            havePrevViewProj = false;
         }
 
         RenderSettingsWindow(windowState, res);
 
+        // WICHTIG: Update View/Proj BEVOR wir rendern
+        // So haben prev* die Werte vom LETZTEN Frame
         UpdateAndRenderObjects(windowState, res, delta);
 
-        RenderNoiseEffect(res, *prevFB, *nextFB, delta);
+        // Render Noise Effect (verwendet prevViewProj vom LETZTEN Frame)
+        if (effectSelect == EffectType::AdaptScroll) {
+            RenderNoiseEffectForward(res, *prevFB, *nextFB, delta);
+        }
+        else {
+            RenderNoiseEffect(res, *prevFB, *nextFB, delta);
+        }
         std::swap(prevFB, nextFB);
 
         PresentScene(windowState, res, !disableEffect ? *prevFB : res.objectFB);
@@ -440,6 +561,38 @@ int main() {
 
         glfwSwapBuffers(win);
         glfwPollEvents();
+
+        // ======== KRITISCH: Erst JETZT updaten wir prev* für NÄCHSTES Frame ========
+
+        // 1. Kopiere Depth vom aktuellen Frame
+        if (havePrevViewProj) {
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, res.objectFB.fbo);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, res.prevDepthFB.fbo);
+            glBlitFramebuffer(
+                0, 0, res.objectFB.width, res.objectFB.height,
+                0, 0, res.prevDepthFB.width, res.prevDepthFB.height,
+                GL_DEPTH_BUFFER_BIT, GL_NEAREST
+            );
+            Framebuffer::Unbind();
+        }
+
+        // 2. Update Previous Matrizen (NACH dem Rendering!)
+        prevViewProj = currViewProj;
+        prevView = currView;
+        prevProj = currProj;
+
+        // 3. Beim ersten Frame: Depth initial kopieren
+        if (!havePrevViewProj) {
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, res.objectFB.fbo);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, res.prevDepthFB.fbo);
+            glBlitFramebuffer(
+                0, 0, res.objectFB.width, res.objectFB.height,
+                0, 0, res.prevDepthFB.width, res.prevDepthFB.height,
+                GL_DEPTH_BUFFER_BIT, GL_NEAREST
+            );
+            Framebuffer::Unbind();
+            havePrevViewProj = true;
+        }
     }
 
     ImGui_ImplOpenGL3_Shutdown();

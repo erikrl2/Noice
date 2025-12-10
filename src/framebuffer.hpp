@@ -32,4 +32,8 @@ struct Framebuffer {
 
     GLuint Texture() const { return tex; }
     GLuint DepthTexture() const { return depthTex; }
+
+    void BindTextureAsImage(GLuint unit, GLenum access = GL_WRITE_ONLY) const {
+        glBindImageTexture(unit, tex, 0, GL_FALSE, 0, access, GL_RGBA8);
+    }
 };
