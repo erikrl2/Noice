@@ -187,6 +187,8 @@ struct Resources {
     Framebuffer noiseFB1;
     Framebuffer noiseFB2;
     Framebuffer prevDepthFB;  // NEU: Speichere vorherigen Depth Buffer
+    Framebuffer normalFB;       // NEU: Speichere World-Space Normalen
+    Framebuffer prevNormalFB;   // NEU: Previous Frame Normalen
 };
 
 static Resources SetupResources(WindowState& windowState) {
@@ -220,6 +222,10 @@ static Resources SetupResources(WindowState& windowState) {
     glDrawBuffer(GL_NONE);
     glReadBuffer(GL_NONE);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    r.normalFB.Create(windowState.width, windowState.height, true);  // Kein Depth
+    r.prevNormalFB.Create(windowState.width, windowState.height, true);
+
     return r;
 }
 
@@ -246,6 +252,9 @@ static void ResetFramebuffers(WindowState& state, Resources& r) {
     r.noiseInitShader.Use();
     r.quadMesh.Draw();
     Framebuffer::Unbind();
+
+    r.normalFB.Resize(state.width, state.height);
+    r.prevNormalFB.Resize(state.width, state.height);
 }
 
 static void RenderSettingsWindow(WindowState& state, Resources& r) {
@@ -315,13 +324,14 @@ static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
     static float x = 0.0f; // for testing
     // move left and right
     static bool movingRight = true;
-    if (movingRight) {
-        x += 1.0f * delta;
-        if (x >= 2.0f) movingRight = false;
-    } else {
-        x -= 1.0f * delta;
-        if (x <= -2.0f) movingRight = true;
-    }
+    //if (movingRight) {
+    //    x += 1.0f * delta;
+    //    if (x >= 2.0f) movingRight = false;
+    //}
+    //else {
+    //    x -= 1.0f * delta;
+    //    if (x <= -2.0f) movingRight = true;
+    //}
 
     glm::mat4 m = glm::mat4(1.0f);
     m = glm::translate(m, glm::vec3(x, 0.0f, 0.0f));
@@ -331,8 +341,34 @@ static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
     // NEU: Speichere Model-Matrix
     currModel = m;
 
+    // NEU: Normal Matrix (inverse transpose of model matrix)
+    glm::mat4 normalMatrix = glm::transpose(glm::inverse(m));
+
     // --------------
 
+    // === PASS 1: Render Normalen ===
+    r.normalFB.Bind();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);  // FIX: Clear auch Depth!
+    glDepthMask(GL_TRUE);  // FIX: Enable Depth Writing
+    glEnable(GL_DEPTH_TEST);  // FIX: Enable Depth Test!
+    glEnable(GL_CULL_FACE);  // FIX: Enable Backface Culling!
+    glCullFace(GL_BACK);  // Nur Vorderseiten rendern
+
+    r.objectShader.Use();
+    r.objectShader.SetMat4("mvp", vp * m);
+    r.objectShader.SetMat4("normalMatrix", normalMatrix);
+    r.objectShader.SetInt("outputNormal", true);
+
+    SimpleMesh& mesh = GetMesh(meshSelect, r);
+
+    // Nur filled geometry für Normalen
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    mesh.Draw();
+
+    glDisable(GL_CULL_FACE);  // Zurücksetzen für späteren Code
+    Framebuffer::Unbind();
+
+    // === PASS 2: Render Color (wie bisher) ===
     r.objectFB.Bind();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glDepthMask(GL_TRUE);
@@ -340,8 +376,7 @@ static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
 
     r.objectShader.Use();
     r.objectShader.SetMat4("mvp", vp * m);
-
-    SimpleMesh& mesh = GetMesh(meshSelect, r);
+    r.objectShader.SetInt("outputNormal", false);
 
     switch (effectSelect) {
     case EffectType::Flicker: {
@@ -481,11 +516,15 @@ static void RenderNoiseEffectForward(Resources& r, Framebuffer& prev, Framebuffe
     r.forwardScatterShader.SetTexture2D("currDepthTex", r.objectFB.DepthTexture(), 3);
     r.forwardScatterShader.SetTexture2D("objectTex", r.objectFB.Texture(), 4);
 
-    // NEU: Sende Model-Matrizen
+    r.forwardScatterShader.SetTexture2D("prevNormalTex", r.prevNormalFB.Texture(), 5);
+    r.forwardScatterShader.SetTexture2D("currNormalTex", r.normalFB.Texture(), 6);
+
     r.forwardScatterShader.SetMat4("prevModel", prevModel);
     r.forwardScatterShader.SetMat4("currModel", currModel);
     r.forwardScatterShader.SetMat4("invPrevModel", glm::inverse(prevModel));
     r.forwardScatterShader.SetMat4("invCurrModel", glm::inverse(currModel));
+    r.forwardScatterShader.SetMat4("invCurrProj", glm::inverse(currProj));
+    r.forwardScatterShader.SetMat4("invCurrView", glm::inverse(currView));
 
     r.forwardScatterShader.SetMat4("prevViewProj", prevViewProj);
     r.forwardScatterShader.SetMat4("invPrevProj", glm::inverse(prevProj));
@@ -597,6 +636,18 @@ int main() {
             );
             Framebuffer::Unbind();
             havePrevViewProj = true;
+        }
+
+        // NEU: Kopiere auch Normalen
+        if (havePrevViewProj) {
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, res.normalFB.fbo);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, res.prevNormalFB.fbo);
+            glBlitFramebuffer(
+                0, 0, res.normalFB.width, res.normalFB.height,
+                0, 0, res.prevNormalFB.width, res.prevNormalFB.height,
+                GL_COLOR_BUFFER_BIT, GL_NEAREST
+            );
+            Framebuffer::Unbind();
         }
 
         // 4. Render Noise Effect (verwendet prev* vom LETZTEN Frame)

@@ -5,8 +5,11 @@ layout(location=1) in vec3 normal;
 layout(location=2) in vec2 uv;
 
 uniform mat4 mvp;
+uniform mat4 normalMatrix;  // NEU: mat3 als mat4 (nur obere 3x3)
+
+out vec3 worldNormal;  // NEU
 
 void main(){
     gl_Position = mvp * vec4(pos, 1);
+    worldNormal = normalize(mat3(normalMatrix) * normal);  // Transform zu World Space
 }
-

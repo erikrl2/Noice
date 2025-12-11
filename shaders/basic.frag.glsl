@@ -1,9 +1,16 @@
 #version 430 core
 
-out vec4 FragColor;
+in vec3 worldNormal;
+out vec4 fragColor;
 
 uniform vec3 color;
+uniform bool outputNormal;  // NEU: Toggle zwischen Color und Normal Output
 
-void main() {
-    FragColor = vec4(color, 1);
+void main(){
+    if (outputNormal) {
+        // Speichere Normale in Range [0,1]
+        fragColor = vec4(worldNormal * 0.5 + 0.5, 1.0);
+    } else {
+        fragColor = vec4(color, 1.0);
+    }
 }

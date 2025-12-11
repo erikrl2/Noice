@@ -8,6 +8,9 @@ layout(rgba8, binding = 1) uniform image2D currNoiseTex;
 uniform sampler2D prevDepthTex;
 uniform sampler2D currDepthTex;
 uniform sampler2D objectTex;
+uniform sampler2D prevNormalTex;
+uniform sampler2D currNormalTex;
+
 uniform mat4 prevModel;
 uniform mat4 currModel;
 uniform mat4 invPrevModel;
@@ -27,26 +30,24 @@ void main() {
         return;
     }
     
-    // Lade Noise vom vorherigen Frame
     vec4 prevNoise = imageLoad(prevNoiseTex, prevNoisePx);
     
-    // Berechne Full-Resolution UV für diesen Noise-Pixel
     vec2 prevFullPx = (vec2(prevNoisePx) + vec2(0.5)) * float(downscaleFactor);
     vec2 prevFullUV = prevFullPx / fullResolution;
     
-    // Sample Previous Depth
     float prevDepth = texture(prevDepthTex, prevFullUV).r;
     
     // === HINTERGRUND: Behalte an gleicher Position ===
     if (prevDepth >= 1.0) {
-        // Hintergrund  Schreibe direkt an gleiche Position
         imageStore(currNoiseTex, prevNoisePx, vec4(prevNoise.rgb, 1.0));
         return;
     }
     
-    // === OBJEKT: Forward Projection MIT Model-Matrix ===
+    // === Lade Previous Normal ===
+    vec3 prevNormalEncoded = texture(prevNormalTex, prevFullUV).rgb;
+    vec3 prevNormal = normalize(prevNormalEncoded * 2.0 - 1.0);
     
-    // Schritt 1: Rekonstruiere WORLD Position vom PREVIOUS Frame
+    // === Standard Forward Projection (wie bisher) ===
     vec3 prevNDC;
     prevNDC.xy = prevFullUV * 2.0 - 1.0;
     prevNDC.z = prevDepth * 2.0 - 1.0;
@@ -56,68 +57,63 @@ void main() {
     prevViewPos /= prevViewPos.w;
     vec4 prevWorldPos = invPrevView * vec4(prevViewPos.xyz, 1.0);
     
-    // Schritt 2: Transformiere zu LOCAL Space (des PREVIOUS Objekts)
     vec4 localPos = invPrevModel * prevWorldPos;
-    
-    // Schritt 3: Transformiere zu CURRENT World Space (mit CURRENT Model)
     vec4 currWorldPos = currModel * localPos;
-    
-    // Schritt 4: Projiziere zu CURRENT Screen Space
     vec4 currClip = currViewProj * currWorldPos;
     
-    if (currClip.w <= 0.0) {
-        // Hinter der Kamera im aktuellen Frame
-        return;
-    }
+    if (currClip.w <= 0.0) return;
     
     vec3 currNDC = currClip.xyz / currClip.w;
     
-    // Außerhalb des Bildschirms
     if (abs(currNDC.x) > 1.0 || abs(currNDC.y) > 1.0 || abs(currNDC.z) > 1.0) {
         return;
     }
     
-    // Berechne Screen Position im aktuellen Frame
-    vec2 currScreenFullRes = (currNDC.xy * 0.5 + 0.5) * fullResolution;
+    // === NEU: Berechne Screen-Space Normal ===
+    // Transformiere Normale durch die gleichen Transformationen
+    vec3 localNormal = normalize(mat3(invPrevModel) * prevNormal);
+    vec3 currWorldNormal = normalize(mat3(currModel) * localNormal);
+    
+    // Projiziere Normale zu Screen Space (ohne Translation)
+    vec4 normalClip = currViewProj * vec4(currWorldNormal, 0.0);
+    vec2 screenSpaceNormal = normalize(normalClip.xy);
+    
+    // === NEU: Berechne Motion Vector ===
+    vec2 prevScreenPos = prevFullPx;
+    vec2 currScreenPos = (currNDC.xy * 0.5 + 0.5) * fullResolution;
+    vec2 motionVector = currScreenPos - prevScreenPos;
+    
+    // === NEU: Projiziere Motion auf Tangentialebene ===
+    // Tangente = senkrecht zur projizierten Normale
+    vec2 tangent = vec2(-screenSpaceNormal.y, screenSpaceNormal.x);
+    
+    // Berechne tangentiale Komponente der Bewegung
+    float tangentialMotion = dot(motionVector, tangent);
+    
+    // Finale Position: Basispunkt + tangentiale Bewegung
+    vec2 currScreenFullRes = currScreenPos + tangent * tangentialMotion * 0.5;  // 0.5 = Dämpfung
     vec2 currFullUV = currScreenFullRes / fullResolution;
     
-    // Sample Current Depth am Zielpixel
+    // === Rest wie bisher ===
     float currDepth = texture(currDepthTex, currFullUV).r;
+    if (currDepth >= 1.0) return;
     
-    // Kein Objekt im aktuellen Frame  Nicht schreiben
-    if (currDepth >= 1.0) {
-        return;
-    }
-    
-    // Depth-Vergleich: Ist das der gleiche Oberflächenpunkt?
     float depthDiff = abs(currNDC.z - (currDepth * 2.0 - 1.0));
-    if (depthDiff > 0.01) {
-        // Zu große Depth-Differenz  Wahrscheinlich Occlusion
-        return;
-    }
+    if (depthDiff > 0.01) return;
     
-    // Konvertiere zu Noise-Koordinaten
     vec2 currNoisePxFloat = currScreenFullRes / float(downscaleFactor);
     ivec2 currNoisePx = ivec2(currNoisePxFloat);
     
-    // Bounds check
     if (currNoisePx.x < 0 || currNoisePx.x >= noiseSize.x ||
         currNoisePx.y < 0 || currNoisePx.y >= noiseSize.y) {
         return;
     }
     
-    // Prüfe ob Zielpixel auf Objekt liegt (rot = gefülltes Objekt)
     vec3 objColor = texture(objectTex, (vec2(currNoisePx) + 0.5) / vec2(noiseSize)).rgb;
-    if (objColor != vec3(1.0, 0.0, 0.0)) {
-        // Wireframe oder Hintergrund
-        return;
-    }
+    if (objColor != vec3(1.0, 0.0, 0.0)) return;
     
-    // === ATOMIC WRITE: Verhindere Race Conditions ===
-    // Schreibe nur, wenn Zielpixel noch leer ist (Alpha < 0.5)
     vec4 existingValue = imageLoad(currNoiseTex, currNoisePx);
     if (existingValue.a < 0.5) {
-        // Setze Alpha = 1.0 um zu markieren, dass dieser Pixel geschrieben wurde
         imageStore(currNoiseTex, currNoisePx, vec4(prevNoise.rgb, 1.0));
     }
 }
