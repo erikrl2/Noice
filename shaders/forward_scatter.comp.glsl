@@ -22,6 +22,9 @@ uniform mat4 invPrevView;
 uniform vec2 fullResolution;
 uniform int downscaleFactor;
 
+uniform float normalScrollSpeed;
+uniform float deltaTime;
+
 void main() {
     ivec2 prevNoisePx = ivec2(gl_GlobalInvocationID.xy);
     ivec2 noiseSize = imageSize(prevNoiseTex);
@@ -47,7 +50,7 @@ void main() {
     vec3 prevNormalEncoded = texture(prevNormalTex, prevFullUV).rgb;
     vec3 prevNormal = normalize(prevNormalEncoded * 2.0 - 1.0);
     
-    // === Standard Forward Projection (wie bisher) ===
+    // === Standard Forward Projection ===
     vec3 prevNDC;
     prevNDC.xy = prevFullUV * 2.0 - 1.0;
     prevNDC.z = prevDepth * 2.0 - 1.0;
@@ -69,30 +72,38 @@ void main() {
         return;
     }
     
-    // === NEU: Berechne Screen-Space Normal ===
-    // Transformiere Normale durch die gleichen Transformationen
+    vec2 prevScreenPos = prevFullPx;
+    vec2 currScreenPos = (currNDC.xy * 0.5 + 0.5) * fullResolution;
+    
+    // === FIX: Einfache normale-basierte Scroll-Offset-Berechnung ===
+    // OHNE komplexe Screen-Space-Normal-Projektion
+    
+    // Transformiere Normale zu Current World Space
     vec3 localNormal = normalize(mat3(invPrevModel) * prevNormal);
     vec3 currWorldNormal = normalize(mat3(currModel) * localNormal);
     
-    // Projiziere Normale zu Screen Space (ohne Translation)
+    // Projiziere Normale in Screen Space (Richtungsvektor)
     vec4 normalClip = currViewProj * vec4(currWorldNormal, 0.0);
-    vec2 screenSpaceNormal = normalize(normalClip.xy);
+    vec2 screenSpaceNormal = normalClip.xy;  // NICHT normalisieren!
     
-    // === NEU: Berechne Motion Vector ===
-    vec2 prevScreenPos = prevFullPx;
-    vec2 currScreenPos = (currNDC.xy * 0.5 + 0.5) * fullResolution;
-    vec2 motionVector = currScreenPos - prevScreenPos;
-    
-    // === NEU: Projiziere Motion auf Tangentialebene ===
-    // Tangente = senkrecht zur projizierten Normale
+    // Berechne Tangente (senkrecht zur Normale in 2D)
+    // Normalisiere NUR die Tangente für gleichmäßige Richtung
     vec2 tangent = vec2(-screenSpaceNormal.y, screenSpaceNormal.x);
+    float tangentLength = length(tangent);
     
-    // Berechne tangentiale Komponente der Bewegung
-    float tangentialMotion = dot(motionVector, tangent);
+    if (tangentLength > 0.001) {
+        tangent = tangent / tangentLength;  // Normalisiere
+    } else {
+        tangent = vec2(1.0, 0.0);  // Fallback
+    }
     
-    // Finale Position: Basispunkt + tangentiale Bewegung
-    vec2 currScreenFullRes = currScreenPos + tangent * tangentialMotion * 0.5;  // 0.5 = Dämpfung
-    vec2 currFullUV = currScreenFullRes / fullResolution;
+    // Scroll-Offset: Geschwindigkeit * Zeit * Richtung
+    float scrollDistance = normalScrollSpeed * deltaTime;
+    vec2 scrollOffset = tangent * scrollDistance;
+    
+    // Finale Position
+    vec2 finalScreenPos = currScreenPos + scrollOffset;
+    vec2 currFullUV = finalScreenPos / fullResolution;
     
     // === Rest wie bisher ===
     float currDepth = texture(currDepthTex, currFullUV).r;
@@ -101,7 +112,7 @@ void main() {
     float depthDiff = abs(currNDC.z - (currDepth * 2.0 - 1.0));
     if (depthDiff > 0.01) return;
     
-    vec2 currNoisePxFloat = currScreenFullRes / float(downscaleFactor);
+    vec2 currNoisePxFloat = finalScreenPos / float(downscaleFactor);
     ivec2 currNoisePx = ivec2(currNoisePxFloat);
     
     if (currNoisePx.x < 0 || currNoisePx.x >= noiseSize.x ||

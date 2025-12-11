@@ -21,16 +21,20 @@ enum class EffectType { Flicker = 0, Scroll, AdaptScroll, Count };
 static float flickerSpeed = 30.0f;
 static int downscaleFactor = 1;
 static float lineWidth = 5.0f;
-static bool wireframeOn = true;
+static bool wireframeOn = false;
 static bool pauseFlicker = false;
 static bool disableEffect = false;
 static glm::vec3 color{ 1, 1, 1 };
 static bool rotateOn = false;
 static float scrollSpeed = 100.0f;
-static MeshType meshSelect = MeshType::Triangle;
+static MeshType meshSelect = MeshType::Car;
 static EffectType effectSelect = EffectType::AdaptScroll;
 static glm::vec2 scrollDir{ 0, -1 };
 static glm::vec2 scrollAccumulator{ 0.0f, 0.0f };
+
+static float tangentialDamping = 0.5f;  // NEU: Dämpfungsfaktor für tangentiale Bewegung
+static bool useMotionBasedScroll = true;  // NEU: Toggle zwischen Motion-Based und Normal-Based
+static float normalScrollSpeed = 50.0f;  // NEU: Geschwindigkeit für rein normal-basiertes Scrolling
 
 static glm::mat4 prevViewProj = glm::mat4(1.0f);
 static glm::mat4 currViewProj = glm::mat4(1.0f);
@@ -488,7 +492,6 @@ static void RenderNoiseEffectForward(Resources& r, Framebuffer& prev, Framebuffe
     }
 
     if (!havePrevViewProj) {
-        // Beim ersten Frame: Einfach vorheriges kopieren
         next.Bind();
         r.postShader.Use();
         r.postShader.SetTexture2D("screenTex", prev.Texture());
@@ -498,7 +501,6 @@ static void RenderNoiseEffectForward(Resources& r, Framebuffer& prev, Framebuffe
         return;
     }
 
-    // --- PASS 0: Clear next buffer (Alpha = 0 für Lücken) ---
     next.Bind();
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -506,7 +508,6 @@ static void RenderNoiseEffectForward(Resources& r, Framebuffer& prev, Framebuffe
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    // --- PASS 1: Forward Scatter ---
     r.forwardScatterShader.Use();
 
     r.forwardScatterShader.SetImage2D("prevNoiseTex", prev.Texture(), 0, GL_READ_ONLY);
@@ -533,6 +534,9 @@ static void RenderNoiseEffectForward(Resources& r, Framebuffer& prev, Framebuffe
     r.forwardScatterShader.SetVec2("fullResolution", glm::vec2(r.objectFB.width, r.objectFB.height));
     r.forwardScatterShader.SetInt("downscaleFactor", downscaleFactor);
 
+    r.forwardScatterShader.SetFloat("normalScrollSpeed", scrollSpeed + 100.0f);
+    r.forwardScatterShader.SetFloat("deltaTime", pauseFlicker ? 0.0f : delta);
+
     int noiseWidth = prev.width;
     int noiseHeight = prev.height;
     unsigned int numGroupsX = (noiseWidth + 15) / 16;
@@ -554,7 +558,6 @@ static void RenderNoiseEffectForward(Resources& r, Framebuffer& prev, Framebuffe
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 }
-
 static void PresentScene(WindowState& state, Resources& r, Framebuffer& src) {
     Framebuffer::BindDefault(state.width, state.height);
     r.postShader.Use();
