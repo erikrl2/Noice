@@ -3,8 +3,8 @@
 #include <iostream>
 
 Framebuffer::Framebuffer(Framebuffer&& o) noexcept
-    : fbo(o.fbo), tex(o.tex), rbo(o.rbo), depthTex(o.depthTex), width(o.width), height(o.height), hasDepth(o.hasDepth) {
-    o.fbo = o.tex = o.rbo = o.depthTex = o.width = o.height = 0;
+    : fbo(o.fbo), tex(o.tex), depthTex(o.depthTex), width(o.width), height(o.height), hasDepth(o.hasDepth) {
+    o.fbo = o.tex = o.depthTex = o.width = o.height = 0;
     o.hasDepth = false;
 }
 
@@ -13,12 +13,11 @@ Framebuffer& Framebuffer::operator=(Framebuffer&& o) noexcept {
         Destroy();
         fbo = o.fbo;
         tex = o.tex;
-        rbo = o.rbo;
         depthTex = o.depthTex;
         width = o.width;
         height = o.height;
         hasDepth = o.hasDepth;
-        o.fbo = o.tex = o.rbo = o.depthTex = o.width = o.height = 0;
+        o.fbo = o.tex = o.depthTex = o.width = o.height = 0;
         o.hasDepth = false;
     }
     return *this;
@@ -45,7 +44,6 @@ bool Framebuffer::Create(int w, int h, bool attachDepth) {
     if (attachDepth) {
         glGenTextures(1, &depthTex);
         glBindTexture(GL_TEXTURE_2D, depthTex);
-        // use a depth component internal format; 24-bit is a good tradeoff
         glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -55,10 +53,8 @@ bool Framebuffer::Create(int w, int h, bool attachDepth) {
         glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, depthBorder);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTex, 0);
-        rbo = 0;
     } else {
         depthTex = 0;
-        rbo = 0;
     }
 
     bool ok = (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
@@ -75,7 +71,6 @@ bool Framebuffer::Create(int w, int h, bool attachDepth) {
 void Framebuffer::Destroy() {
     if (fbo) { glDeleteFramebuffers(1, &fbo); fbo = 0; }
     if (tex) { glDeleteTextures(1, &tex); tex = 0; }
-    if (rbo) { glDeleteRenderbuffers(1, &rbo); rbo = 0; }
     if (depthTex) { glDeleteTextures(1, &depthTex); depthTex = 0; }
     width = height = 0;
     hasDepth = false;
@@ -88,9 +83,8 @@ void Framebuffer::Resize(int w, int h) {
     Create(w, h, wantDepth);
 }
 
-void Framebuffer::Bind(bool setViewport) const {
+void Framebuffer::Bind(bool clear) const {
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    if (setViewport && width > 0 && height > 0) {
-        glViewport(0, 0, width, height);
-    }
+    if (width > 0 && height > 0) glViewport(0, 0, width, height);
+    if (clear) glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }

@@ -5,7 +5,7 @@ out vec4 FragColor;
 uniform sampler2D prevTex;
 uniform sampler2D objectTex;
 
-uniform float doXor;
+uniform bool doXor;
 uniform vec2 scrollOffset;
 uniform float rand;
 
@@ -28,7 +28,7 @@ void main() {
     vec3 objColor = texture(objectTex, gl_FragCoord.xy / vec2(texSize)).rgb;
     if (objColor != vec3(1, 0, 0)) { // xor (flickers wireframe)
         vec3 noiseColor = texelFetch(prevTex, fragPx, 0).rgb;
-        FragColor = vec4(doXor == 1.0 ? abs(objColor - noiseColor) : noiseColor, 1);
+        FragColor = vec4(doXor ? abs(objColor - noiseColor) : noiseColor, 1);
     }
     else { // scroll faces
         ivec2 off = ivec2(scrollOffset);

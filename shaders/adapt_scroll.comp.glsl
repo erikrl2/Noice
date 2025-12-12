@@ -9,21 +9,22 @@ uniform sampler2D prevDepthTex;
 uniform sampler2D currDepthTex;
 uniform sampler2D objectTex;
 uniform sampler2D prevNormalTex;
-uniform sampler2D currNormalTex;
 
 uniform mat4 prevModel;
 uniform mat4 currModel;
 uniform mat4 invPrevModel;
 uniform mat4 invCurrModel;
+uniform mat4 invPrevView;
+uniform mat4 invPrevProj;
 uniform mat4 prevViewProj;
 uniform mat4 currViewProj;
-uniform mat4 invPrevProj;
-uniform mat4 invPrevView;
+
 uniform vec2 fullResolution;
 uniform int downscaleFactor;
-
 uniform float normalScrollSpeed;
 uniform float deltaTime;
+
+// TODO: find out if all those safety checks are nessessary
 
 void main() {
     ivec2 prevNoisePx = ivec2(gl_GlobalInvocationID.xy);
@@ -40,17 +41,14 @@ void main() {
     
     float prevDepth = texture(prevDepthTex, prevFullUV).r;
     
-    // === HINTERGRUND: Behalte an gleicher Position ===
     if (prevDepth >= 1.0) {
         imageStore(currNoiseTex, prevNoisePx, vec4(prevNoise.rgb, 1.0));
         return;
     }
     
-    // === Lade Previous Normal ===
     vec3 prevNormalEncoded = texture(prevNormalTex, prevFullUV).rgb;
     vec3 prevNormal = normalize(prevNormalEncoded * 2.0 - 1.0);
     
-    // === Standard Forward Projection ===
     vec3 prevNDC;
     prevNDC.xy = prevFullUV * 2.0 - 1.0;
     prevNDC.z = prevDepth * 2.0 - 1.0;
@@ -72,40 +70,28 @@ void main() {
         return;
     }
     
-    vec2 prevScreenPos = prevFullPx;
     vec2 currScreenPos = (currNDC.xy * 0.5 + 0.5) * fullResolution;
     
-    // === FIX: Einfache normale-basierte Scroll-Offset-Berechnung ===
-    // OHNE komplexe Screen-Space-Normal-Projektion
-    
-    // Transformiere Normale zu Current World Space
     vec3 localNormal = normalize(mat3(invPrevModel) * prevNormal);
     vec3 currWorldNormal = normalize(mat3(currModel) * localNormal);
     
-    // Projiziere Normale in Screen Space (Richtungsvektor)
     vec4 normalClip = currViewProj * vec4(currWorldNormal, 0.0);
-    vec2 screenSpaceNormal = normalClip.xy;  // NICHT normalisieren!
+    vec2 screenSpaceNormal = normalClip.xy;
     
-    // Berechne Tangente (senkrecht zur Normale in 2D)
-    // Normalisiere NUR die Tangente für gleichmäßige Richtung
     vec2 tangent = vec2(-screenSpaceNormal.y, screenSpaceNormal.x);
     float tangentLength = length(tangent);
     
-    if (tangentLength > 0.001) {
-        tangent = tangent / tangentLength;  // Normalisiere
+    if (tangentLength > 0.0001) {
+        tangent = tangent / tangentLength;
     } else {
-        tangent = vec2(1.0, 0.0);  // Fallback
+        tangent = vec2(1.0, 0.0);
     }
     
-    // Scroll-Offset: Geschwindigkeit * Zeit * Richtung
-    float scrollDistance = normalScrollSpeed * deltaTime;
-    vec2 scrollOffset = tangent * scrollDistance;
+    vec2 scrollOffset = tangent * normalScrollSpeed * float(downscaleFactor) * deltaTime;
     
-    // Finale Position
     vec2 finalScreenPos = currScreenPos + scrollOffset;
     vec2 currFullUV = finalScreenPos / fullResolution;
     
-    // === Rest wie bisher ===
     float currDepth = texture(currDepthTex, currFullUV).r;
     if (currDepth >= 1.0) return;
     

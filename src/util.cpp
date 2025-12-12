@@ -1,6 +1,7 @@
 #include "util.hpp"
 
 #include <imgui.h>
+#include <glad/glad.h>
 
 #include <string>
 
@@ -48,5 +49,54 @@ bool ImGuiDirection2D(const char* label, glm::vec2& dir, float radius) {
 
     ImGui::EndGroup();
     return changed;
+}
+
+
+void SetWireframeMode(bool enable)
+{
+    if (enable) glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    else glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+}
+
+//void SetWireframeZOffset(bool enable)
+//{
+//    if (enable) glEnable(GL_POLYGON_OFFSET_LINE);
+//    else glDisable(GL_POLYGON_OFFSET_LINE);
+//}
+
+void SetFaceCulling(bool enable)
+{
+    if (enable) glEnable(GL_CULL_FACE);
+    else glDisable(GL_CULL_FACE);
+}
+
+void SetDepthTest(bool enable)
+{
+    if (enable) glEnable(GL_DEPTH_TEST);
+    else glDisable(GL_DEPTH_TEST);
+}
+
+void BlitFramebufferColor(const Framebuffer& src, const Framebuffer& dst)
+{
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, src.fbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, dst.fbo);
+    glBlitFramebuffer(
+        0, 0, src.width, src.height,
+        0, 0, dst.width, dst.height,
+        GL_COLOR_BUFFER_BIT, GL_NEAREST
+    );
+    Framebuffer::Unbind();
+}
+
+void BlitFramebufferDepth(const Framebuffer& src, const Framebuffer& dst)
+{
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, src.fbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, dst.fbo);
+    glBlitFramebuffer(
+        0, 0, src.width, src.height,
+        0, 0, dst.width, dst.height,
+        GL_DEPTH_BUFFER_BIT, GL_NEAREST
+    );
+    Framebuffer::Unbind();
 }
 

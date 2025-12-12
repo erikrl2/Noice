@@ -9,7 +9,6 @@ struct Shader {
     Shader() = default;
     Shader(const char* v, const char* f);
 
-    // TODO: clean
     static Shader CreateCompute(const char* computePath);
 
     void Use() const;

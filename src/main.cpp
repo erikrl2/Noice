@@ -17,34 +17,26 @@
 enum class MeshType { Triangle = 0, Icosahedron, Car, Count };
 enum class EffectType { Flicker = 0, Scroll, AdaptScroll, Count };
 
-// TODO: sort 
-static float flickerSpeed = 30.0f;
+static EffectType effectSelect = EffectType::AdaptScroll;
+static MeshType meshSelect = MeshType::Car;
 static int downscaleFactor = 1;
-static float lineWidth = 5.0f;
-static bool wireframeOn = false;
-static bool pauseFlicker = false;
 static bool disableEffect = false;
+static bool pauseEffect = false;
+static float flickerSpeed = 30.0f;
+static float scrollSpeed = 200.0f;
+static glm::vec2 scrollDir{ 0, -1 };
+static bool wireframeOn = false;
+static float lineWidth = 5.0f;
 static glm::vec3 color{ 1, 1, 1 };
 static bool rotateOn = false;
-static float scrollSpeed = 100.0f;
-static MeshType meshSelect = MeshType::Car;
-static EffectType effectSelect = EffectType::AdaptScroll;
-static glm::vec2 scrollDir{ 0, -1 };
-static glm::vec2 scrollAccumulator{ 0.0f, 0.0f };
 
-static float tangentialDamping = 0.5f;  // NEU: Dämpfungsfaktor für tangentiale Bewegung
-static bool useMotionBasedScroll = true;  // NEU: Toggle zwischen Motion-Based und Normal-Based
-static float normalScrollSpeed = 50.0f;  // NEU: Geschwindigkeit für rein normal-basiertes Scrolling
-
-static glm::mat4 prevViewProj = glm::mat4(1.0f);
-static glm::mat4 currViewProj = glm::mat4(1.0f);
-static glm::mat4 currProj = glm::mat4(1.0f);
-static glm::mat4 currView = glm::mat4(1.0f);
-static glm::mat4 prevProj = glm::mat4(1.0f);
-static glm::mat4 prevView = glm::mat4(1.0f);
-static glm::mat4 currModel = glm::mat4(1.0f);  // NEU: Current Model Matrix
-static glm::mat4 prevModel = glm::mat4(1.0f);  // NEU: Previous Model Matrix
 static bool havePrevViewProj = false;
+static glm::mat4 prevProj = glm::mat4(1.0f);
+static glm::mat4 currProj = glm::mat4(1.0f);
+static glm::mat4 prevView = glm::mat4(1.0f);
+static glm::mat4 currView = glm::mat4(1.0f);
+static glm::mat4 prevModel = glm::mat4(1.0f);
+static glm::mat4 currModel = glm::mat4(1.0f);
 
 static Camera camera;
 static bool mouseDown = false;
@@ -144,22 +136,19 @@ static GLFWwindow* InitWindow(WindowState& ws, const char* title) {
     return win;
 }
 
-static void CheckGLError(const char* label) {
-    GLenum err;
-    while ((err = glGetError()) != GL_NO_ERROR) {
-        std::cerr << "OpenGL Error at " << label << ": 0x" << std::hex << err << std::dec << "\n";
-    }
-}
-
 static void InitOpenGL() {
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
     glClearColor(0, 0, 0, 1);
+    glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
-    glDepthMask(GL_TRUE); // TODO: make false and fix
-    glDisable(GL_CULL_FACE);
+    glDepthMask(GL_TRUE);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glFrontFace(GL_CCW);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     glPolygonOffset(-1.0, -1.0);
+    glEnable(GL_POLYGON_OFFSET_LINE);
     glLineWidth(lineWidth);
 }
 
@@ -177,59 +166,40 @@ static void InitImGui(GLFWwindow* win) {
 struct Resources {
     Shader objectShader{};
     Shader noiseInitShader{};
-    Shader xorShader{};
+    Shader flickerShader{};
     Shader scrollShader{};
     Shader adaptScrollShader{};
-    Shader forwardScatterShader{};  // NEU: Compute Shader
-    Shader fillGapsShader{};        // NEU: Compute Shader
+    Shader fillGapsShader{};
     Shader postShader{};
     SimpleMesh quadMesh;
     SimpleMesh triMesh;
     SimpleMesh icosaMesh;
     SimpleMesh carMesh;
     Framebuffer objectFB;
-    Framebuffer noiseFB1;
-    Framebuffer noiseFB2;
-    Framebuffer prevDepthFB;  // NEU: Speichere vorherigen Depth Buffer
-    Framebuffer normalFB;       // NEU: Speichere World-Space Normalen
-    Framebuffer prevNormalFB;   // NEU: Previous Frame Normalen
+    Framebuffer prevObjDepthFB;
+    Framebuffer objNormalFB;
+    Framebuffer prevObjNormalFB;
+    Framebuffer noisePingFB;
+    Framebuffer noisePongFB;
 };
 
 static Resources SetupResources(WindowState& windowState) {
     Resources r;
     r.objectShader = Shader("shaders/basic.vert.glsl", "shaders/basic.frag.glsl");
     r.noiseInitShader = Shader("shaders/post.vert.glsl", "shaders/noise_init.frag.glsl");
-    r.xorShader = Shader("shaders/post.vert.glsl", "shaders/xor.frag.glsl");
-    r.scrollShader = Shader("shaders/post.vert.glsl", "shaders/mix.frag.glsl");
-    r.adaptScrollShader = Shader("shaders/post.vert.glsl", "shaders/fix.frag.glsl");
-
-    std::cout << "Loading forward scatter shader...\n";
-    r.forwardScatterShader = Shader::CreateCompute("shaders/forward_scatter.comp.glsl");
-    std::cout << "Forward scatter shader ID: " << r.forwardScatterShader.id << "\n";
-
-    std::cout << "Loading fill gaps shader...\n";
+    r.flickerShader = Shader("shaders/post.vert.glsl", "shaders/flicker.frag.glsl");
+    r.scrollShader = Shader("shaders/post.vert.glsl", "shaders/simple_scroll.frag.glsl");
+    r.adaptScrollShader = Shader::CreateCompute("shaders/adapt_scroll.comp.glsl");
     r.fillGapsShader = Shader::CreateCompute("shaders/fill_gaps.comp.glsl");
-    std::cout << "Fill gaps shader ID: " << r.fillGapsShader.id << "\n";
-
     r.postShader = Shader("shaders/post.vert.glsl", "shaders/post.frag.glsl");
 
     r.quadMesh = SimpleMesh::CreateFullscreenQuad();
-    r.triMesh = SimpleMesh::CreateTriangle();
+    r.triMesh = SimpleMesh::CreateTriangle(); // currently unused
     r.icosaMesh = SimpleMesh::LoadFromOBJ("models/icosahedron.obj");
     r.carMesh = SimpleMesh::LoadFromOBJ("models/car.obj");
 
-    r.objectFB.Create(windowState.width, windowState.height, true);
-    r.prevDepthFB.Create(windowState.width, windowState.height, true);
-
-    // FIX: Setze Draw Buffer = NONE für prevDepthFB (nur Depth, kein Color)
-    glBindFramebuffer(GL_FRAMEBUFFER, r.prevDepthFB.fbo);
-    glDrawBuffer(GL_NONE);
-    glReadBuffer(GL_NONE);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    r.normalFB.Create(windowState.width, windowState.height, true);  // Kein Depth
-    r.prevNormalFB.Create(windowState.width, windowState.height, true);
-
+    // triggers correct setup in resize handler
+    r.objectFB.hasDepth = r.prevObjDepthFB.hasDepth = r.objNormalFB.hasDepth = r.prevObjNormalFB.hasDepth = true;
     return r;
 }
 
@@ -238,27 +208,16 @@ static void ResetFramebuffers(WindowState& state, Resources& r) {
     int scaledHeight = state.height / downscaleFactor;
 
     r.objectFB.Resize(state.width, state.height);
-    r.prevDepthFB.Resize(state.width, state.height);
-    r.noiseFB1.Resize(scaledWidth, scaledHeight);
-    r.noiseFB2.Resize(scaledWidth, scaledHeight);
+    r.prevObjDepthFB.Resize(state.width, state.height);
+    r.objNormalFB.Resize(state.width, state.height);
+    r.prevObjNormalFB.Resize(state.width, state.height);
+    r.noisePingFB.Resize(scaledWidth, scaledHeight);
+    r.noisePongFB.Resize(scaledWidth, scaledHeight);
 
-    // Initialisiere BEIDE Noise-Buffer mit zufälligem Noise
-    r.noiseFB1.Bind();
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);  // Alpha = 1.0!
-    glClear(GL_COLOR_BUFFER_BIT);
     r.noiseInitShader.Use();
+    r.noisePingFB.Bind();
     r.quadMesh.Draw();
     Framebuffer::Unbind();
-
-    r.noiseFB2.Bind();
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);  // Alpha = 1.0!
-    glClear(GL_COLOR_BUFFER_BIT);
-    r.noiseInitShader.Use();
-    r.quadMesh.Draw();
-    Framebuffer::Unbind();
-
-    r.normalFB.Resize(state.width, state.height);
-    r.prevNormalFB.Resize(state.width, state.height);
 }
 
 static void RenderSettingsWindow(WindowState& state, Resources& r) {
@@ -275,20 +234,25 @@ static void RenderSettingsWindow(WindowState& state, Resources& r) {
     ImGui::RadioButton("Flicker", (int*)&effectSelect, 0); ImGui::SameLine();
     ImGui::RadioButton("Scroll", (int*)&effectSelect, 1); ImGui::SameLine();
     ImGui::RadioButton("Adapt Scroll", (int*)&effectSelect, 2);
-    ImGui::SliderFloat("Flicker Speed", &flickerSpeed, 1.0f, 60.0f, "%.2f");
-    ImGui::SliderFloat("Scroll Speed", &scrollSpeed, 0.0f, 200.0f, "%.0f");
+    static int refreshRate = glfwGetVideoMode(glfwGetPrimaryMonitor())->refreshRate;
+    if (effectSelect != EffectType::AdaptScroll)
+        ImGui::SliderFloat("Flicker Speed", &flickerSpeed, 1.0f, (float)refreshRate, "%.2f");
+    if (effectSelect != EffectType::Flicker)
+        ImGui::SliderFloat("Scroll Speed", &scrollSpeed, 0.0f, 400.0f, "%.0f");
     if (ImGui::SliderInt("Downscale", &downscaleFactor, 1, 8)) state.resized = true;
-    ImGui::Checkbox("Pause", &pauseFlicker); ImGui::SameLine();
+    ImGui::Checkbox("Pause", &pauseEffect); ImGui::SameLine();
     ImGui::Checkbox("Disable", &disableEffect);
 
     ImGui::Separator();
     ImGui::Text("Mesh:");
-    ImGui::RadioButton("Triangle", (int*)&meshSelect, 0); ImGui::SameLine();
+    //ImGui::RadioButton("Triangle", (int*)&meshSelect, 0); ImGui::SameLine();
     ImGui::RadioButton("Icosahedron", (int*)&meshSelect, 1); ImGui::SameLine();
     ImGui::RadioButton("Car", (int*)&meshSelect, 2);
-    ImGui::Checkbox("Wireframe", &wireframeOn);
-    if (ImGui::SliderFloat("Line Width", &lineWidth, 1.0f, 10.0f, "%.1f")) glLineWidth(lineWidth);
-    ImGui::ColorEdit3("Color", &color[0]);
+    if (effectSelect != EffectType::AdaptScroll) {
+        ImGui::Checkbox("Wireframe", &wireframeOn);
+        if (ImGui::SliderFloat("Line Width", &lineWidth, 1.0f, 10.0f, "%.1f")) glLineWidth(lineWidth);
+        ImGui::ColorEdit3("Color", &color[0]);
+    }
     ImGui::Checkbox("Rotate", &rotateOn);
 
     ImGui::Separator();
@@ -312,113 +276,92 @@ static SimpleMesh& GetMesh(MeshType meshSelect, Resources& r) {
     }
 }
 
-static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
+static void UpdateTransformMatrices(WindowState& ws, Resources& r, float delta) {
     float aspect = (ws.height > 0) ? ((float)ws.width / (float)ws.height) : 1.0f;
     glm::mat4 proj = camera.GetProjection(aspect);
     glm::mat4 view = camera.GetView();
-    glm::mat4 vp = proj * view;
 
-    currProj = proj;
-    currView = view;
-    currViewProj = vp;
-
+    static float x = 0.0f;
     static float angle = 90.0f;
     angle += 20.0f * delta;
 
-    static float x = 0.0f; // for testing
-    // move left and right
-    static bool movingRight = true;
-    //if (movingRight) {
-    //    x += 1.0f * delta;
-    //    if (x >= 2.0f) movingRight = false;
-    //}
-    //else {
-    //    x -= 1.0f * delta;
-    //    if (x <= -2.0f) movingRight = true;
-    //}
-
     glm::mat4 m = glm::mat4(1.0f);
     m = glm::translate(m, glm::vec3(x, 0.0f, 0.0f));
-    if (meshSelect == MeshType::Car) m = glm::translate(m, glm::vec3(0.0f, -1.0f, 0.0f));
+    if (meshSelect == MeshType::Car) {
+        m = glm::translate(m, glm::vec3(0.0f, -1.0f, 0.0f));
+        m = glm::rotate(m, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    }
     if (rotateOn) m = glm::rotate(m, glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
 
-    // NEU: Speichere Model-Matrix
+    if (havePrevViewProj) {
+        prevProj = currProj;
+        prevView = currView;
+        prevModel = currModel;
+    }
+    else {
+        prevProj = proj;
+        prevView = view;
+        prevModel = m;
+        havePrevViewProj = true;
+    }
+    currProj = proj;
+    currView = view;
     currModel = m;
+}
 
-    // NEU: Normal Matrix (inverse transpose of model matrix)
-    glm::mat4 normalMatrix = glm::transpose(glm::inverse(m));
+static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
+    UpdateTransformMatrices(ws, r, delta);
 
-    // --------------
-
-    // === PASS 1: Render Normalen ===
-    r.normalFB.Bind();
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);  // FIX: Clear auch Depth!
-    glDepthMask(GL_TRUE);  // FIX: Enable Depth Writing
-    glEnable(GL_DEPTH_TEST);  // FIX: Enable Depth Test!
-    glEnable(GL_CULL_FACE);  // FIX: Enable Backface Culling!
-    glCullFace(GL_BACK);  // Nur Vorderseiten rendern
-
-    r.objectShader.Use();
-    r.objectShader.SetMat4("mvp", vp * m);
-    r.objectShader.SetMat4("normalMatrix", normalMatrix);
-    r.objectShader.SetInt("outputNormal", true);
+    BlitFramebufferDepth(r.objectFB, r.prevObjDepthFB);
+    BlitFramebufferColor(r.objNormalFB, r.prevObjNormalFB);
 
     SimpleMesh& mesh = GetMesh(meshSelect, r);
 
-    // Nur filled geometry für Normalen
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    r.objectShader.Use();
+    r.objectShader.SetMat4("mvp", currProj * currView * currModel);
+    r.objectShader.SetInt("outputNormal", true);
+    r.objectShader.SetMat4("normalMatrix", glm::transpose(glm::inverse(currModel)));
+
+    SetDepthTest(true);
+    r.objNormalFB.Bind(true);
     mesh.Draw();
 
-    glDisable(GL_CULL_FACE);  // Zurücksetzen für späteren Code
-    Framebuffer::Unbind();
-
-    // === PASS 2: Render Color (wie bisher) ===
-    r.objectFB.Bind();
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glDepthMask(GL_TRUE);
-    glEnable(GL_DEPTH_TEST);
-
-    r.objectShader.Use();
-    r.objectShader.SetMat4("mvp", vp * m);
     r.objectShader.SetInt("outputNormal", false);
+    r.objectShader.SetVec3("color", color);
+
+    r.objectFB.Bind(true);
 
     switch (effectSelect) {
     case EffectType::Flicker: {
-        r.objectShader.SetVec3("color", color);
-        if (wireframeOn) {
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-            mesh.Draw();
-        }
-        else {
-            mesh.Draw();
-        }
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        SetWireframeMode(wireframeOn);
+        SetFaceCulling(!wireframeOn);
+        mesh.Draw();
+        SetFaceCulling(true);
+        SetWireframeMode(false);
         break;
     }
-    case EffectType::Scroll:
-    case EffectType::AdaptScroll: {
+    case EffectType::Scroll: {
         if (wireframeOn) {
-            r.objectShader.SetVec3("color", color);
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-            glEnable(GL_POLYGON_OFFSET_LINE);
+            SetWireframeMode(true);
             mesh.Draw();
+            SetWireframeMode(false);
         }
+        [[fallthrough]];
+    }
+    case EffectType::AdaptScroll: {
         r.objectShader.SetVec3("color", glm::vec3(1, 0, 0));
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        glDisable(GL_POLYGON_OFFSET_LINE);
         mesh.Draw();
         break;
     }
     default: assert(false);
     }
 
-    glDisable(GL_DEPTH_TEST);
-    //glDepthMask(GL_FALSE); //TODO: Fix
     Framebuffer::Unbind();
+    SetDepthTest(false);
 }
 
-static bool ShouldApplyEffect(float delta) {
-    if (pauseFlicker) return false;
+static bool ShouldApplyFlickerEffect(float delta) {
+    if (pauseEffect) return false;
     static float updateAccumulator = 0.0;
     updateAccumulator += delta;
     if (updateAccumulator >= 1.0f / flickerSpeed) {
@@ -428,146 +371,87 @@ static bool ShouldApplyEffect(float delta) {
     return false;
 }
 
-static Shader& GetEffectShader(EffectType effectSelect, Resources& r) {
-    switch (effectSelect) {
-    case EffectType::Flicker: return r.xorShader;
-    case EffectType::Scroll: return r.scrollShader;
-    case EffectType::AdaptScroll: return r.adaptScrollShader;
-    default: assert(false); return r.xorShader;
-    }
-}
-
 static void RenderNoiseEffect(Resources& r, Framebuffer& prev, Framebuffer& next, float delta) {
-    next.Bind();
-
-    Shader& shader = GetEffectShader(effectSelect, r);
-    shader.Use();
-    shader.SetTexture2D("prevTex", prev.Texture(), 0);
-    shader.SetTexture2D("objectTex", r.objectFB.Texture(), 1);
-    shader.SetFloat("doXor", ShouldApplyEffect(delta) ? 1.0f : 0.0f);
-
-    switch (effectSelect) {
-    case EffectType::Scroll: {
-        glm::vec2 dir(0.0f);
-        if (glm::length(scrollDir) > 0.0001f) dir = glm::normalize(scrollDir);
-
-        glm::vec2 deltaPixels = !pauseFlicker ? dir * scrollSpeed * delta : glm::vec2(0.0f);
-
-        scrollAccumulator += deltaPixels;
-        glm::ivec2 intStep = glm::ivec2(glm::floor(scrollAccumulator));
-        scrollAccumulator -= glm::vec2(intStep);
-
-        shader.SetVec2("scrollOffset", glm::vec2(intStep.x, intStep.y));
-        shader.SetFloat("rand", (float)rand());
-        break;
-    }
-    case EffectType::AdaptScroll: {
-        shader.SetTexture2D("objectDepthTex", r.objectFB.DepthTexture(), 2);
-        shader.SetTexture2D("prevDepthTex", r.prevDepthFB.DepthTexture(), 3); // NEU!
-
-        if (havePrevViewProj) {
-            shader.SetMat4("prevViewProj", prevViewProj);
-        }
-        else {
-            shader.SetMat4("prevViewProj", currViewProj);
-        }
-
-        shader.SetMat4("invCurrProj", glm::inverse(currProj));
-        shader.SetMat4("invCurrView", glm::inverse(currView));
-        shader.SetVec2("fullResolution", glm::vec2(r.objectFB.width, r.objectFB.height));
-        shader.SetInt("downscaleFactor", downscaleFactor);
-        shader.SetFloat("rand", (float)rand());
-        break;
-    }
-    }
-
-    r.quadMesh.Draw();
-    Framebuffer::Unbind();
-}
-
-static void RenderNoiseEffectForward(Resources& r, Framebuffer& prev, Framebuffer& next, float delta) {
     if (effectSelect != EffectType::AdaptScroll) {
-        RenderNoiseEffect(r, prev, next, delta);
-        return;
-    }
+        Shader& shader = effectSelect == EffectType::Flicker ? r.flickerShader : r.scrollShader;
+        shader.Use();
+        shader.SetTexture2D("prevTex", prev.Texture(), 0);
+        shader.SetTexture2D("objectTex", r.objectFB.Texture(), 1);
+        shader.SetInt("doXor", ShouldApplyFlickerEffect(delta));
 
-    if (!havePrevViewProj) {
+        if (effectSelect == EffectType::Scroll) {
+            static glm::vec2 scrollAccumulator{ 0.0f, 0.0f };
+            if (!pauseEffect) scrollAccumulator += scrollDir * scrollSpeed * delta;
+            glm::ivec2 intStep = glm::ivec2(glm::floor(scrollAccumulator));
+            scrollAccumulator -= glm::vec2(intStep);
+
+            shader.SetVec2("scrollOffset", glm::vec2(intStep.x, intStep.y));
+            shader.SetFloat("rand", (float)rand());
+        }
+
         next.Bind();
-        r.postShader.Use();
-        r.postShader.SetTexture2D("screenTex", prev.Texture());
-        r.postShader.SetVec2("resolution", glm::vec2(prev.width, prev.height));
         r.quadMesh.Draw();
         Framebuffer::Unbind();
         return;
     }
 
-    next.Bind();
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClearColor(0, 0, 0, 0);
+    next.Bind(true);
     Framebuffer::Unbind();
+    glClearColor(0, 0, 0, 1);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    r.adaptScrollShader.Use();
 
-    r.forwardScatterShader.Use();
+    r.adaptScrollShader.SetImage2D("prevNoiseTex", prev.Texture(), 0, GL_READ_ONLY);
+    r.adaptScrollShader.SetImage2D("currNoiseTex", next.Texture(), 1, GL_READ_WRITE);
 
-    r.forwardScatterShader.SetImage2D("prevNoiseTex", prev.Texture(), 0, GL_READ_ONLY);
-    r.forwardScatterShader.SetImage2D("currNoiseTex", next.Texture(), 1, GL_READ_WRITE);
+    r.adaptScrollShader.SetTexture2D("prevDepthTex", r.prevObjDepthFB.DepthTexture(), 2);
+    r.adaptScrollShader.SetTexture2D("currDepthTex", r.objectFB.DepthTexture(), 3);
+    r.adaptScrollShader.SetTexture2D("objectTex", r.objectFB.Texture(), 4);
+    r.adaptScrollShader.SetTexture2D("prevNormalTex", r.prevObjNormalFB.Texture(), 5);
 
-    r.forwardScatterShader.SetTexture2D("prevDepthTex", r.prevDepthFB.DepthTexture(), 2);
-    r.forwardScatterShader.SetTexture2D("currDepthTex", r.objectFB.DepthTexture(), 3);
-    r.forwardScatterShader.SetTexture2D("objectTex", r.objectFB.Texture(), 4);
+    r.adaptScrollShader.SetMat4("prevModel", prevModel);
+    r.adaptScrollShader.SetMat4("currModel", currModel);
+    r.adaptScrollShader.SetMat4("invPrevModel", glm::inverse(prevModel));
+    r.adaptScrollShader.SetMat4("invCurrModel", glm::inverse(currModel));
+    r.adaptScrollShader.SetMat4("invPrevView", glm::inverse(prevView));
+    r.adaptScrollShader.SetMat4("invPrevProj", glm::inverse(prevProj));
+    r.adaptScrollShader.SetMat4("prevViewProj", prevProj * prevView);
+    r.adaptScrollShader.SetMat4("currViewProj", currProj * currView);
 
-    r.forwardScatterShader.SetTexture2D("prevNormalTex", r.prevNormalFB.Texture(), 5);
-    r.forwardScatterShader.SetTexture2D("currNormalTex", r.normalFB.Texture(), 6);
-
-    r.forwardScatterShader.SetMat4("prevModel", prevModel);
-    r.forwardScatterShader.SetMat4("currModel", currModel);
-    r.forwardScatterShader.SetMat4("invPrevModel", glm::inverse(prevModel));
-    r.forwardScatterShader.SetMat4("invCurrModel", glm::inverse(currModel));
-    r.forwardScatterShader.SetMat4("invCurrProj", glm::inverse(currProj));
-    r.forwardScatterShader.SetMat4("invCurrView", glm::inverse(currView));
-
-    r.forwardScatterShader.SetMat4("prevViewProj", prevViewProj);
-    r.forwardScatterShader.SetMat4("invPrevProj", glm::inverse(prevProj));
-    r.forwardScatterShader.SetMat4("invPrevView", glm::inverse(prevView));
-    r.forwardScatterShader.SetMat4("currViewProj", currViewProj);
-    r.forwardScatterShader.SetVec2("fullResolution", glm::vec2(r.objectFB.width, r.objectFB.height));
-    r.forwardScatterShader.SetInt("downscaleFactor", downscaleFactor);
-
-    r.forwardScatterShader.SetFloat("normalScrollSpeed", scrollSpeed + 100.0f);
-    r.forwardScatterShader.SetFloat("deltaTime", pauseFlicker ? 0.0f : delta);
+    r.adaptScrollShader.SetVec2("fullResolution", glm::vec2(r.objectFB.width, r.objectFB.height));
+    r.adaptScrollShader.SetInt("downscaleFactor", downscaleFactor);
+    r.adaptScrollShader.SetFloat("normalScrollSpeed", scrollSpeed + 100.0f);
+    r.adaptScrollShader.SetFloat("deltaTime", pauseEffect ? 0.0f : delta);
 
     int noiseWidth = prev.width;
     int noiseHeight = prev.height;
     unsigned int numGroupsX = (noiseWidth + 15) / 16;
     unsigned int numGroupsY = (noiseHeight + 15) / 16;
 
-    r.forwardScatterShader.Dispatch(numGroupsX, numGroupsY, 1);
-    CheckGLError("After forward scatter");
+    r.adaptScrollShader.Dispatch(numGroupsX, numGroupsY, 1);
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 
-    // --- PASS 2: Fill Gaps ---
     r.fillGapsShader.Use();
     r.fillGapsShader.SetImage2D("noiseTex", next.Texture(), 0, GL_READ_WRITE);
-    r.fillGapsShader.SetTexture2D("objectTex", r.objectFB.Texture(), 1);
     r.fillGapsShader.SetFloat("rand", (float)rand());
 
     r.fillGapsShader.Dispatch(numGroupsX, numGroupsY, 1);
-    CheckGLError("After fill gaps");
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 }
+
 static void PresentScene(WindowState& state, Resources& r, Framebuffer& src) {
-    Framebuffer::BindDefault(state.width, state.height);
     r.postShader.Use();
     r.postShader.SetTexture2D("screenTex", src.Texture());
     r.postShader.SetVec2("resolution", glm::vec2(state.width, state.height));
+    Framebuffer::BindDefault(state.width, state.height);
     r.quadMesh.Draw();
 }
 
 int main() {
-    WindowState windowState{ 800, 600 };
+    WindowState windowState{ 1280, 720 };
 
     GLFWwindow* win = InitWindow(windowState, "Noice");
     if (!win) return -1;
@@ -587,81 +471,16 @@ int main() {
 
         if (windowState.resized) {
             ResetFramebuffers(windowState, res);
-            prevFB = &res.noiseFB1;
-            nextFB = &res.noiseFB2;
+            prevFB = &res.noisePingFB;
+            nextFB = &res.noisePongFB;
             windowState.resized = false;
             havePrevViewProj = false;
-
-            // WICHTIG: Initialisiere prev* mit aktuellen Werten
-            float aspect = (windowState.height > 0) ? ((float)windowState.width / (float)windowState.height) : 1.0f;
-            prevProj = currProj = camera.GetProjection(aspect);
-            prevView = currView = camera.GetView();
-            prevViewProj = currViewProj = prevProj * prevView;
-            prevModel = currModel = glm::mat4(1.0f);
         }
 
         RenderSettingsWindow(windowState, res);
-
-        // ======== FIX: Update Previous Matrizen VOR dem Rendering! ========
-        // So gehören prev* Matrizen und prevDepthFB zum GLEICHEN Frame
-
-        // 1. Speichere Current -> Previous (BEVOR wir neue Werte berechnen)
-        if (havePrevViewProj) {
-            prevViewProj = currViewProj;
-            prevView = currView;
-            prevProj = currProj;
-            prevModel = currModel;
-        }
-
-        // 2. Update View/Proj/Model für AKTUELLEN Frame
         UpdateAndRenderObjects(windowState, res, delta);
-
-        // 3. Kopiere Depth NACH dem Rendering, BEVOR wir das Noise rendern
-        // Jetzt ist prevDepthFB synchron mit prevModel/prevViewProj!
-        if (havePrevViewProj) {
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, res.objectFB.fbo);
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, res.prevDepthFB.fbo);
-            glBlitFramebuffer(
-                0, 0, res.objectFB.width, res.objectFB.height,
-                0, 0, res.prevDepthFB.width, res.prevDepthFB.height,
-                GL_DEPTH_BUFFER_BIT, GL_NEAREST
-            );
-            Framebuffer::Unbind();
-        }
-        else {
-            // Beim ersten Frame: Initialisiere prevDepthFB
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, res.objectFB.fbo);
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, res.prevDepthFB.fbo);
-            glBlitFramebuffer(
-                0, 0, res.objectFB.width, res.objectFB.height,
-                0, 0, res.prevDepthFB.width, res.prevDepthFB.height,
-                GL_DEPTH_BUFFER_BIT, GL_NEAREST
-            );
-            Framebuffer::Unbind();
-            havePrevViewProj = true;
-        }
-
-        // NEU: Kopiere auch Normalen
-        if (havePrevViewProj) {
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, res.normalFB.fbo);
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, res.prevNormalFB.fbo);
-            glBlitFramebuffer(
-                0, 0, res.normalFB.width, res.normalFB.height,
-                0, 0, res.prevNormalFB.width, res.prevNormalFB.height,
-                GL_COLOR_BUFFER_BIT, GL_NEAREST
-            );
-            Framebuffer::Unbind();
-        }
-
-        // 4. Render Noise Effect (verwendet prev* vom LETZTEN Frame)
-        if (effectSelect == EffectType::AdaptScroll) {
-            RenderNoiseEffectForward(res, *prevFB, *nextFB, delta);
-        }
-        else {
-            RenderNoiseEffect(res, *prevFB, *nextFB, delta);
-        }
+        RenderNoiseEffect(res, *prevFB, *nextFB, delta);
         std::swap(prevFB, nextFB);
-
         PresentScene(windowState, res, !disableEffect ? *prevFB : res.objectFB);
 
         ImGui::Render();
@@ -678,3 +497,4 @@ int main() {
     glfwTerminate();
     return 0;
 }
+

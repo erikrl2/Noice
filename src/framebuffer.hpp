@@ -4,7 +4,6 @@
 struct Framebuffer {
     GLuint fbo = 0;
     GLuint tex = 0;
-    GLuint rbo = 0;
     GLuint depthTex = 0;
     int width = 0;
     int height = 0;
@@ -22,7 +21,7 @@ struct Framebuffer {
     bool Create(int w, int h, bool attachDepth = false);
     void Destroy();
     void Resize(int w, int h);
-    void Bind(bool setViewport = true) const;
+    void Bind(bool clear = false) const;
 
     static void Unbind() { glBindFramebuffer(GL_FRAMEBUFFER, 0); }
     static void BindDefault(int w, int h) {
