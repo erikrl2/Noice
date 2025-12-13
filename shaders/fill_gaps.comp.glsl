@@ -26,7 +26,7 @@ void main() {
     ivec2 px = ivec2(gl_GlobalInvocationID.xy);
     ivec2 noiseSize = imageSize(noiseTex);
     
-    if (px.x >= noiseSize.x || px.y >= noiseSize.y) { // TODO: find out if this can happen
+    if (px.x >= noiseSize.x || px.y >= noiseSize.y) {
         return;
     }
     

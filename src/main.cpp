@@ -177,8 +177,7 @@ struct Resources {
     SimpleMesh carMesh;
     Framebuffer objectFB;
     Framebuffer prevObjDepthFB;
-    Framebuffer objNormalFB;
-    Framebuffer prevObjNormalFB;
+    Framebuffer objNormalFB; // TODO: rename to tangentFB
     Framebuffer noisePingFB;
     Framebuffer noisePongFB;
 };
@@ -199,7 +198,7 @@ static Resources SetupResources(WindowState& windowState) {
     r.carMesh = SimpleMesh::LoadFromOBJ("models/car.obj");
 
     // triggers correct setup in resize handler
-    r.objectFB.hasDepth = r.prevObjDepthFB.hasDepth = r.objNormalFB.hasDepth = r.prevObjNormalFB.hasDepth = true;
+    r.objectFB.hasDepth = r.prevObjDepthFB.hasDepth = r.objNormalFB.hasDepth = true;
     return r;
 }
 
@@ -210,7 +209,6 @@ static void ResetFramebuffers(WindowState& state, Resources& r) {
     r.objectFB.Resize(state.width, state.height);
     r.prevObjDepthFB.Resize(state.width, state.height);
     r.objNormalFB.Resize(state.width, state.height);
-    r.prevObjNormalFB.Resize(state.width, state.height);
     r.noisePingFB.Resize(scaledWidth, scaledHeight);
     r.noisePongFB.Resize(scaledWidth, scaledHeight);
 
@@ -289,7 +287,7 @@ static void UpdateTransformMatrices(WindowState& ws, Resources& r, float delta) 
     m = glm::translate(m, glm::vec3(x, 0.0f, 0.0f));
     if (meshSelect == MeshType::Car) {
         m = glm::translate(m, glm::vec3(0.0f, -1.0f, 0.0f));
-        m = glm::rotate(m, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        m = glm::rotate(m, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f)); 
     }
     if (rotateOn) m = glm::rotate(m, glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -313,12 +311,12 @@ static void UpdateAndRenderObjects(WindowState& ws, Resources& r, float delta) {
     UpdateTransformMatrices(ws, r, delta);
 
     BlitFramebufferDepth(r.objectFB, r.prevObjDepthFB);
-    BlitFramebufferColor(r.objNormalFB, r.prevObjNormalFB);
 
     SimpleMesh& mesh = GetMesh(meshSelect, r);
 
     r.objectShader.Use();
-    r.objectShader.SetMat4("mvp", currProj * currView * currModel);
+    r.objectShader.SetMat4("viewproj", currProj * currView);
+    r.objectShader.SetMat4("model", currModel);
     r.objectShader.SetInt("outputNormal", true);
     r.objectShader.SetMat4("normalMatrix", glm::transpose(glm::inverse(currModel)));
 
@@ -408,7 +406,7 @@ static void RenderNoiseEffect(Resources& r, Framebuffer& prev, Framebuffer& next
     r.adaptScrollShader.SetTexture2D("prevDepthTex", r.prevObjDepthFB.DepthTexture(), 2);
     r.adaptScrollShader.SetTexture2D("currDepthTex", r.objectFB.DepthTexture(), 3);
     r.adaptScrollShader.SetTexture2D("objectTex", r.objectFB.Texture(), 4);
-    r.adaptScrollShader.SetTexture2D("prevNormalTex", r.prevObjNormalFB.Texture(), 5);
+    r.adaptScrollShader.SetTexture2D("tangentTex", r.objNormalFB.Texture(), 5);
 
     r.adaptScrollShader.SetMat4("prevModel", prevModel);
     r.adaptScrollShader.SetMat4("currModel", currModel);
@@ -481,7 +479,8 @@ int main() {
         UpdateAndRenderObjects(windowState, res, delta);
         RenderNoiseEffect(res, *prevFB, *nextFB, delta);
         std::swap(prevFB, nextFB);
-        PresentScene(windowState, res, !disableEffect ? *prevFB : res.objectFB);
+        //PresentScene(windowState, res, !disableEffect ? *prevFB : res.objectFB);
+        PresentScene(windowState, res, !disableEffect ? *prevFB : res.objNormalFB);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

@@ -8,7 +8,7 @@ layout(rgba8, binding = 1) uniform image2D currNoiseTex;
 uniform sampler2D prevDepthTex;
 uniform sampler2D currDepthTex;
 uniform sampler2D objectTex;
-uniform sampler2D prevNormalTex;
+uniform sampler2D tangentTex;
 
 uniform mat4 prevModel;
 uniform mat4 currModel;
@@ -23,8 +23,6 @@ uniform vec2 fullResolution;
 uniform int downscaleFactor;
 uniform float normalScrollSpeed;
 uniform float deltaTime;
-
-// TODO: find out if all those safety checks are nessessary
 
 void main() {
     ivec2 prevNoisePx = ivec2(gl_GlobalInvocationID.xy);
@@ -45,9 +43,6 @@ void main() {
         imageStore(currNoiseTex, prevNoisePx, vec4(prevNoise.rgb, 1.0));
         return;
     }
-    
-    vec3 prevNormalEncoded = texture(prevNormalTex, prevFullUV).rgb;
-    vec3 prevNormal = normalize(prevNormalEncoded * 2.0 - 1.0);
     
     vec3 prevNDC;
     prevNDC.xy = prevFullUV * 2.0 - 1.0;
@@ -72,20 +67,8 @@ void main() {
     
     vec2 currScreenPos = (currNDC.xy * 0.5 + 0.5) * fullResolution;
     
-    vec3 localNormal = normalize(mat3(invPrevModel) * prevNormal);
-    vec3 currWorldNormal = normalize(mat3(currModel) * localNormal);
-    
-    vec4 normalClip = currViewProj * vec4(currWorldNormal, 0.0);
-    vec2 screenSpaceNormal = normalClip.xy;
-    
-    vec2 tangent = vec2(-screenSpaceNormal.y, screenSpaceNormal.x);
-    float tangentLength = length(tangent);
-    
-    if (tangentLength > 0.0001) {
-        tangent = tangent / tangentLength;
-    } else {
-        tangent = vec2(1.0, 0.0);
-    }
+    vec3 tangentEncoded = texture(tangentTex, currScreenPos / fullResolution).rgb;
+    vec2 tangent = normalize(tangentEncoded * 2.0 - 1.0).xy;
     
     vec2 scrollOffset = tangent * normalScrollSpeed * float(downscaleFactor) * deltaTime;
     
