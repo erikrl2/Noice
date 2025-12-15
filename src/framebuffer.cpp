@@ -111,5 +111,12 @@ void Framebuffer::Resize(int w, int h) {
 void Framebuffer::Bind(bool clear) const {
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     if (width > 0 && height > 0) glViewport(0, 0, width, height);
-    if (clear) glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    if (clear) {
+        if (internalFormat == GL_R32UI) {
+            unsigned int clearVal = 0;
+            glClearBufferuiv(GL_COLOR, 0, &clearVal);
+        } else {
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        }
+    }
 }
