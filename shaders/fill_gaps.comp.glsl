@@ -19,14 +19,15 @@ void main() {
     // Prüfen ob Pixel leer ist
     vec4 val = imageLoad(currNoiseTex, px);
     if (val.a < 0.1) {
-        // Ist es auf dem Dreieck? (Wir könnten flowTex lesen, aber hier füllen wir einfach alles)
-        // Für den Test okay.
-        
         float r = rng(vec2(px) + rand);
         float noiseVal = step(0.5, r);
         
         imageStore(currNoiseTex, px, vec4(vec3(noiseVal), 1.0));
-        // Acc auf 0 setzen (oder Nachbarn, aber erst mal 0 für Test)
-        imageStore(currAccTex, px, vec4(0.0));
+
+        vec4 v = imageLoad(currAccTex, ivec2(px.x, px.y - 1));
+        if (v.xy == vec2(0.0)) {
+            v = imageLoad(currAccTex, ivec2(px.x, px.y - 2));
+        }
+        imageStore(currAccTex, px, v);
     }
 }

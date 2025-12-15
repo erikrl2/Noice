@@ -74,7 +74,7 @@ int main() {
         res.triangle.Draw();
         Framebuffer::Unbind();
 
-        // 2. Compute: Adapt Scroll
+        // 2. Compute: Adapt Scroll 
         nextNoise->Bind(true);
         nextAcc->Bind(true);
         Framebuffer::Unbind();
@@ -87,12 +87,12 @@ int main() {
 
         res.adaptScroll.SetTexture2D("flowTex", res.flowFB.Texture(), 4);
 
-        res.adaptScroll.SetFloat("scrollSpeed", 0.1f);
+        res.adaptScroll.SetFloat("scrollSpeed", 1.1f);
 
         res.adaptScroll.Dispatch((width + 15) / 16, (height + 15) / 16, 1);
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
-        // 3. Compute: Fill Gaps
+        // 3. Compute: Fill Gaps 
         res.fillGaps.Use();
         res.fillGaps.SetImage2D("currNoiseTex", nextNoise->Texture(), 0, GL_READ_WRITE, GL_RGBA8);
         res.fillGaps.SetImage2D("currAccTex", nextAcc->Texture(), 1, GL_READ_WRITE, GL_RG16F);
@@ -101,9 +101,9 @@ int main() {
         res.fillGaps.Dispatch((width + 15) / 16, (height + 15) / 16, 1);
         glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
-        // 4. Present
+        // 4. Present 
         res.post.Use();
-#if 0
+#if 1
         res.post.SetTexture2D("screenTex", nextNoise->Texture());
 #else
         res.post.SetTexture2D("screenTex", nextAcc->Texture());
