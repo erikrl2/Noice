@@ -2,10 +2,28 @@
 #include <glad/glad.h>
 #include <iostream>
 
+namespace {
+    struct FormatInfo {
+        GLenum format;
+        GLenum type;
+    };
+
+    FormatInfo GetFormatInfo(GLenum internalFormat) {
+        if (internalFormat == GL_RG16F) {
+            return { GL_RG, GL_HALF_FLOAT };
+        }
+        else if (internalFormat == GL_R32UI) {
+            return { GL_RED_INTEGER, GL_UNSIGNED_INT };
+        }
+        return { GL_RGBA, GL_UNSIGNED_BYTE };
+    }
+}
+
 Framebuffer::Framebuffer(Framebuffer&& o) noexcept
-    : fbo(o.fbo), tex(o.tex), depthTex(o.depthTex), width(o.width), height(o.height), hasDepth(o.hasDepth) {
+    : fbo(o.fbo), tex(o.tex), depthTex(o.depthTex), width(o.width), height(o.height), hasDepth(o.hasDepth), internalFormat(o.internalFormat) {
     o.fbo = o.tex = o.depthTex = o.width = o.height = 0;
     o.hasDepth = false;
+    o.internalFormat = GL_RGBA8;
 }
 
 Framebuffer& Framebuffer::operator=(Framebuffer&& o) noexcept {
@@ -17,19 +35,24 @@ Framebuffer& Framebuffer::operator=(Framebuffer&& o) noexcept {
         width = o.width;
         height = o.height;
         hasDepth = o.hasDepth;
+        internalFormat = o.internalFormat;
         o.fbo = o.tex = o.depthTex = o.width = o.height = 0;
         o.hasDepth = false;
+        o.internalFormat = GL_RGBA8;
     }
     return *this;
 }
 
-bool Framebuffer::Create(int w, int h, bool attachDepth) {
+bool Framebuffer::Create(int w, int h, bool attachDepth, GLenum format) {
     width = w; height = h;
     hasDepth = attachDepth;
+    internalFormat = format;
+
+    FormatInfo formatInfo = GetFormatInfo(internalFormat);
 
     glGenTextures(1, &tex);
     glBindTexture(GL_TEXTURE_2D, tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, formatInfo.format, formatInfo.type, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
@@ -53,7 +76,8 @@ bool Framebuffer::Create(int w, int h, bool attachDepth) {
         glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, depthBorder);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTex, 0);
-    } else {
+    }
+    else {
         depthTex = 0;
     }
 
@@ -79,8 +103,9 @@ void Framebuffer::Destroy() {
 void Framebuffer::Resize(int w, int h) {
     if (w == width && h == height) return;
     bool wantDepth = hasDepth;
+    GLenum savedFormat = internalFormat;
     Destroy();
-    Create(w, h, wantDepth);
+    Create(w, h, wantDepth, savedFormat);
 }
 
 void Framebuffer::Bind(bool clear) const {

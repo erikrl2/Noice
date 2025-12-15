@@ -8,6 +8,7 @@ struct Framebuffer {
     int width = 0;
     int height = 0;
     bool hasDepth = false;
+    GLenum internalFormat = GL_RGBA8;
 
     Framebuffer() = default;
     ~Framebuffer() { Destroy(); }
@@ -18,7 +19,7 @@ struct Framebuffer {
     Framebuffer(const Framebuffer&) = delete;
     Framebuffer& operator=(const Framebuffer&) = delete;
 
-    bool Create(int w, int h, bool attachDepth = false);
+    bool Create(int w, int h, bool attachDepth = false, GLenum format = GL_RGBA8);
     void Destroy();
     void Resize(int w, int h);
     void Bind(bool clear = false) const;
@@ -33,6 +34,6 @@ struct Framebuffer {
     GLuint DepthTexture() const { return depthTex; }
 
     void BindTextureAsImage(GLuint unit, GLenum access = GL_WRITE_ONLY) const {
-        glBindImageTexture(unit, tex, 0, GL_FALSE, 0, access, GL_RGBA8);
+        glBindImageTexture(unit, tex, 0, GL_FALSE, 0, access, internalFormat);
     }
 };

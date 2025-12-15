@@ -113,12 +113,12 @@ void Shader::SetTexture2D(const std::string& name, GLuint texture, unsigned unit
     SetInt(name, (int)unit);
 }
 
-void Shader::Dispatch(unsigned int numGroupsX, unsigned int numGroupsY, unsigned int numGroupsZ) const {
-    glDispatchCompute(numGroupsX, numGroupsY, numGroupsZ);
+void Shader::SetImage2D(const std::string& name, GLuint texture, unsigned unit, GLenum access, GLenum internalFormat) const {
+    glBindImageTexture(unit, texture, 0, GL_FALSE, 0, access, internalFormat);
+    SetInt(name, unit);
 }
 
-void Shader::SetImage2D(const std::string& name, GLuint texture, unsigned unit, GLenum access) const {
-    glBindImageTexture(unit, texture, 0, GL_FALSE, 0, access, GL_RGBA8);
-    SetInt(name, unit);
+void Shader::Dispatch(unsigned int numGroupsX, unsigned int numGroupsY, unsigned int numGroupsZ) const {
+    glDispatchCompute(numGroupsX, numGroupsY, numGroupsZ);
 }
 

@@ -139,7 +139,7 @@ static GLFWwindow* InitWindow(WindowState& ws, const char* title) {
 static void InitOpenGL() {
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
-    glClearColor(0, 0, 0, 1);
+    glClearColor(0, 0, 0, 0);
     glDisable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
@@ -180,6 +180,9 @@ struct Resources {
     Framebuffer objNormalFB; // TODO: rename to tangentFB
     Framebuffer noisePingFB;
     Framebuffer noisePongFB;
+    Framebuffer scrollDirAccPingFB;
+    Framebuffer scrollDirAccPongFB;
+    Framebuffer lockFB; // NEU
 };
 
 static Resources SetupResources(WindowState& windowState) {
@@ -199,6 +202,9 @@ static Resources SetupResources(WindowState& windowState) {
 
     // triggers correct setup in resize handler
     r.objectFB.hasDepth = r.prevObjDepthFB.hasDepth = r.objNormalFB.hasDepth = true;
+    r.scrollDirAccPingFB.internalFormat = GL_RG16F;
+    r.scrollDirAccPongFB.internalFormat = GL_RG16F;
+    r.lockFB.internalFormat = GL_R32UI; // NEU
     return r;
 }
 
@@ -211,10 +217,18 @@ static void ResetFramebuffers(WindowState& state, Resources& r) {
     r.objNormalFB.Resize(state.width, state.height);
     r.noisePingFB.Resize(scaledWidth, scaledHeight);
     r.noisePongFB.Resize(scaledWidth, scaledHeight);
+    r.scrollDirAccPingFB.Resize(scaledWidth, scaledHeight);
+    r.scrollDirAccPongFB.Resize(scaledWidth, scaledHeight);
+    r.lockFB.Resize(scaledWidth, scaledHeight); // NEU
 
     r.noiseInitShader.Use();
     r.noisePingFB.Bind();
     r.quadMesh.Draw();
+    Framebuffer::Unbind();
+
+    // Clear Accumulators
+    r.scrollDirAccPingFB.Bind(true);
+    r.scrollDirAccPongFB.Bind(true);
     Framebuffer::Unbind();
 }
 
@@ -287,7 +301,7 @@ static void UpdateTransformMatrices(WindowState& ws, Resources& r, float delta) 
     m = glm::translate(m, glm::vec3(x, 0.0f, 0.0f));
     if (meshSelect == MeshType::Car) {
         m = glm::translate(m, glm::vec3(0.0f, -1.0f, 0.0f));
-        m = glm::rotate(m, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f)); 
+        m = glm::rotate(m, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     }
     if (rotateOn) m = glm::rotate(m, glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -369,11 +383,11 @@ static bool ShouldApplyFlickerEffect(float delta) {
     return false;
 }
 
-static void RenderNoiseEffect(Resources& r, Framebuffer& prev, Framebuffer& next, float delta) {
+static void RenderNoiseEffect(Resources& r, Framebuffer& prevNoise, Framebuffer& nextNoise, Framebuffer& prevScroll, Framebuffer& nextScroll, float delta) {
     if (effectSelect != EffectType::AdaptScroll) {
         Shader& shader = effectSelect == EffectType::Flicker ? r.flickerShader : r.scrollShader;
         shader.Use();
-        shader.SetTexture2D("prevTex", prev.Texture(), 0);
+        shader.SetTexture2D("prevTex", prevNoise.Texture(), 0);
         shader.SetTexture2D("objectTex", r.objectFB.Texture(), 1);
         shader.SetInt("doXor", ShouldApplyFlickerEffect(delta));
 
@@ -387,26 +401,34 @@ static void RenderNoiseEffect(Resources& r, Framebuffer& prev, Framebuffer& next
             shader.SetFloat("rand", (float)rand());
         }
 
-        next.Bind();
+        nextNoise.Bind();
         r.quadMesh.Draw();
         Framebuffer::Unbind();
         return;
     }
 
-    glClearColor(0, 0, 0, 0);
-    next.Bind(true);
+    nextNoise.Bind(true); // @Copilot: "true" argument means to clear the framebuffer 
+    nextScroll.Bind(true);
     Framebuffer::Unbind();
-    glClearColor(0, 0, 0, 1);
+
+    // Clear Lock Texture
+    r.lockFB.Bind();
+    unsigned int val = 0xFFFFFFFF;
+    glClearBufferuiv(GL_COLOR, 0, &val);
+    Framebuffer::Unbind();
 
     r.adaptScrollShader.Use();
 
-    r.adaptScrollShader.SetImage2D("prevNoiseTex", prev.Texture(), 0, GL_READ_ONLY);
-    r.adaptScrollShader.SetImage2D("currNoiseTex", next.Texture(), 1, GL_READ_WRITE);
+    r.adaptScrollShader.SetImage2D("prevNoiseTex", prevNoise.Texture(), 0, GL_READ_ONLY, prevNoise.internalFormat);
+    r.adaptScrollShader.SetImage2D("currNoiseTex", nextNoise.Texture(), 1, GL_READ_WRITE, nextNoise.internalFormat);
+    r.adaptScrollShader.SetImage2D("prevScrollAccTex", prevScroll.Texture(), 2, GL_READ_ONLY, prevScroll.internalFormat);
+    r.adaptScrollShader.SetImage2D("currScrollAccTex", nextScroll.Texture(), 3, GL_READ_WRITE, nextScroll.internalFormat);
+    r.adaptScrollShader.SetImage2D("lockTex", r.lockFB.Texture(), 4, GL_READ_WRITE, r.lockFB.internalFormat);
 
-    r.adaptScrollShader.SetTexture2D("prevDepthTex", r.prevObjDepthFB.DepthTexture(), 2);
-    r.adaptScrollShader.SetTexture2D("currDepthTex", r.objectFB.DepthTexture(), 3);
-    r.adaptScrollShader.SetTexture2D("objectTex", r.objectFB.Texture(), 4);
-    r.adaptScrollShader.SetTexture2D("tangentTex", r.objNormalFB.Texture(), 5);
+    r.adaptScrollShader.SetTexture2D("prevDepthTex", r.prevObjDepthFB.DepthTexture(), 8);
+    r.adaptScrollShader.SetTexture2D("currDepthTex", r.objectFB.DepthTexture(), 5);
+    r.adaptScrollShader.SetTexture2D("objectTex", r.objectFB.Texture(), 6);
+    r.adaptScrollShader.SetTexture2D("tangentTex", r.objNormalFB.Texture(), 7);
 
     r.adaptScrollShader.SetMat4("prevModel", prevModel);
     r.adaptScrollShader.SetMat4("currModel", currModel);
@@ -419,11 +441,11 @@ static void RenderNoiseEffect(Resources& r, Framebuffer& prev, Framebuffer& next
 
     r.adaptScrollShader.SetVec2("fullResolution", glm::vec2(r.objectFB.width, r.objectFB.height));
     r.adaptScrollShader.SetInt("downscaleFactor", downscaleFactor);
-    r.adaptScrollShader.SetFloat("normalScrollSpeed", scrollSpeed + 100.0f);
+    r.adaptScrollShader.SetFloat("normalScrollSpeed", scrollSpeed);
     r.adaptScrollShader.SetFloat("deltaTime", pauseEffect ? 0.0f : delta);
 
-    int noiseWidth = prev.width;
-    int noiseHeight = prev.height;
+    int noiseWidth = prevNoise.width;
+    int noiseHeight = prevNoise.height;
     unsigned int numGroupsX = (noiseWidth + 15) / 16;
     unsigned int numGroupsY = (noiseHeight + 15) / 16;
 
@@ -432,7 +454,8 @@ static void RenderNoiseEffect(Resources& r, Framebuffer& prev, Framebuffer& next
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 
     r.fillGapsShader.Use();
-    r.fillGapsShader.SetImage2D("noiseTex", next.Texture(), 0, GL_READ_WRITE);
+    r.fillGapsShader.SetImage2D("noiseTex", nextNoise.Texture(), 0, GL_READ_WRITE, nextNoise.internalFormat);
+    r.fillGapsShader.SetImage2D("currScrollAccTex", nextScroll.Texture(), 1, GL_READ_WRITE, nextScroll.internalFormat);
     r.fillGapsShader.SetFloat("rand", (float)rand());
 
     r.fillGapsShader.Dispatch(numGroupsX, numGroupsY, 1);
@@ -460,6 +483,7 @@ int main() {
     Resources res = SetupResources(windowState);
 
     Framebuffer* prevFB, * nextFB;
+    Framebuffer* prevScrollFB, * nextScrollFB;
     windowState.resized = true;
 
     while (!glfwWindowShouldClose(win)) {
@@ -471,16 +495,20 @@ int main() {
             ResetFramebuffers(windowState, res);
             prevFB = &res.noisePingFB;
             nextFB = &res.noisePongFB;
+            prevScrollFB = &res.scrollDirAccPingFB;
+            nextScrollFB = &res.scrollDirAccPongFB;
             windowState.resized = false;
             havePrevViewProj = false;
         }
 
         RenderSettingsWindow(windowState, res);
         UpdateAndRenderObjects(windowState, res, delta);
-        RenderNoiseEffect(res, *prevFB, *nextFB, delta);
+        RenderNoiseEffect(res, *prevFB, *nextFB, *prevScrollFB, *nextScrollFB, delta);
         std::swap(prevFB, nextFB);
+        std::swap(prevScrollFB, nextScrollFB);
+
         //PresentScene(windowState, res, !disableEffect ? *prevFB : res.objectFB);
-        PresentScene(windowState, res, !disableEffect ? *prevFB : res.objNormalFB);
+        PresentScene(windowState, res, !disableEffect ? *prevFB : *prevScrollFB);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -496,4 +524,3 @@ int main() {
     glfwTerminate();
     return 0;
 }
-
