@@ -195,7 +195,7 @@ static Resources SetupResources(WindowState& windowState) {
     r.quadMesh = SimpleMesh::CreateFullscreenQuad();
     r.triMesh = SimpleMesh::CreateTriangle(); // currently unused
     r.icosaMesh = SimpleMesh::LoadFromOBJ("models/icosahedron.obj");
-    r.carMesh = SimpleMesh::LoadFromOBJ("models/car.obj");
+    r.carMesh = SimpleMesh::LoadFromOBJ("models/jeep_pcd.obj");
 
     // triggers correct setup in resize handler
     r.objectFB.hasDepth = r.prevObjDepthFB.hasDepth = r.objNormalFB.hasDepth = true;
@@ -479,7 +479,7 @@ int main() {
         UpdateAndRenderObjects(windowState, res, delta);
         RenderNoiseEffect(res, *prevFB, *nextFB, delta);
         std::swap(prevFB, nextFB);
-        //PresentScene(windowState, res, !disableEffect ? *prevFB : res.objectFB);
+        //PresentScene(windowState, res, !disableEffect ? *prevFB : res.objectFB); 
         PresentScene(windowState, res, !disableEffect ? *prevFB : res.objNormalFB);
 
         ImGui::Render();

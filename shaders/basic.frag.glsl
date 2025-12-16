@@ -14,7 +14,7 @@ void main() {
         vec3 t = normalize(viewproj * vec4(cross(up, n), 0.0)).xyz;
 #else
         vec3 t = normalize(viewproj * vec4(n, 0.0)).xyz;
-        t.xy = t.yx * vec2(-1.0, 1.0);
+        //t.xy = t.yx * vec2(-1.0, 1.0);
 #endif
         fragColor = vec4(t.xy * 0.5 + 0.5, 0.5, 1.0);
     } else {
