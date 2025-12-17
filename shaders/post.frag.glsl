@@ -4,13 +4,9 @@ out vec4 FragColor;
 
 uniform sampler2D screenTex;
 uniform vec2 resolution;
+uniform bool showFlow;
 
 void main() {
-#if 1
-    float c = texture(screenTex, gl_FragCoord.xy / resolution).r;
-    FragColor = vec4(c, c, c, 1);
-#else
     vec2 v = texture(screenTex, gl_FragCoord.xy / resolution).rg;
-    FragColor = vec4(v * 0.5 + 0.5, 0, 1);
-#endif
+    FragColor = !showFlow ? vec4(vec3(v.r), 1) : vec4(v * 0.5 + 0.5, 0, 1);
 }

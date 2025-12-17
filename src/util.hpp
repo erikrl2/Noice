@@ -13,3 +13,8 @@ void SetFaceCulling(bool enable);
 void SetDepthTest(bool enable);
 void BlitFramebufferColor(const Framebuffer& src, const Framebuffer& dst);
 void BlitFramebufferDepth(const Framebuffer& src, const Framebuffer& dst);
+
+enum RenderFlags {
+    DepthTest = 1 << 0,
+    FaceCulling = 1 << 1,
+};

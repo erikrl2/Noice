@@ -1,4 +1,6 @@
 #pragma once
+#include "util.hpp"
+
 #include <glad/glad.h>
 
 #include <string>
@@ -19,7 +21,7 @@ struct SimpleMesh {
 
     void UploadIndexed(const void* vertexData, size_t vertexBytes, const unsigned int* indices, size_t indexCount_);
     void UploadArrays(const void* vertexData, size_t vertexBytes, size_t vertexCount_);
-    void Draw() const;
+    void Draw(int renderFlags = 0) const;
     void Destroy();
 
     static SimpleMesh CreateFullscreenQuad();

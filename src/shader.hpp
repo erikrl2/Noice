@@ -4,7 +4,7 @@
 #include <glad/glad.h>
 
 struct Shader {
-    unsigned int id;
+    unsigned int id = -1;
 
     Shader() = default;
     Shader(const char* v, const char* f);
@@ -19,5 +19,5 @@ struct Shader {
     void SetVec3(const std::string& name, const glm::vec3& v) const;
     void SetMat4(const std::string& name, const glm::mat4& m) const;
     void SetTexture2D(const std::string& name, GLuint texture, unsigned unit = 0) const;
-    void SetImage2D(const std::string& name, GLuint texture, unsigned unit, GLenum access = GL_WRITE_ONLY, GLenum internalFormat = GL_RGBA8) const;
+    void SetImage2D(const std::string& name, GLuint texture, unsigned unit, GLenum internalFormat, GLenum access = GL_READ_WRITE) const;
 };

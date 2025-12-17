@@ -12,8 +12,8 @@ namespace {
         if (internalFormat == GL_RG16F) {
             return { GL_RG, GL_HALF_FLOAT };
         }
-        else if (internalFormat == GL_R32UI) {
-            return { GL_RED_INTEGER, GL_UNSIGNED_INT };
+        else if (internalFormat == GL_RG8) {
+            return { GL_RG, GL_UNSIGNED_BYTE };
         }
         return { GL_RGBA, GL_UNSIGNED_BYTE };
     }
@@ -108,15 +108,8 @@ void Framebuffer::Resize(int w, int h) {
     Create(w, h, wantDepth, savedFormat);
 }
 
-void Framebuffer::Bind(bool clear) const {
+void Framebuffer::Clear() const {
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     if (width > 0 && height > 0) glViewport(0, 0, width, height);
-    if (clear) {
-        if (internalFormat == GL_R32UI) {
-            unsigned int clearVal = 0;
-            glClearBufferuiv(GL_COLOR, 0, &clearVal);
-        } else {
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        }
-    }
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }

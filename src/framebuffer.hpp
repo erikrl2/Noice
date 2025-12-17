@@ -22,7 +22,7 @@ struct Framebuffer {
     bool Create(int w, int h, bool attachDepth = false, GLenum format = GL_RGBA8);
     void Destroy();
     void Resize(int w, int h);
-    void Bind(bool clear = false) const;
+    void Clear() const;
 
     static void Unbind() { glBindFramebuffer(GL_FRAMEBUFFER, 0); }
     static void BindDefault(int w, int h) {

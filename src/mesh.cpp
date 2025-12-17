@@ -52,9 +52,12 @@ void SimpleMesh::UploadArrays(const void* vertexData, size_t vertexBytes, size_t
     glBindVertexArray(0);
 }
 
-void SimpleMesh::Draw() const {
+void SimpleMesh::Draw(int renderFlags) const {
     if (!vao) return;
     glBindVertexArray(vao);
+
+    if (renderFlags & RenderFlags::DepthTest) glEnable(GL_DEPTH_TEST);
+    if (renderFlags & RenderFlags::FaceCulling) glEnable(GL_CULL_FACE);
 
     if (indexCount > 0) {
         glDrawElements(GL_TRIANGLES, (GLsizei)indexCount, GL_UNSIGNED_INT, 0);
@@ -62,6 +65,9 @@ void SimpleMesh::Draw() const {
     else {
         glDrawArrays(GL_TRIANGLES, 0, (GLsizei)vertexCount);
     }
+
+    if (renderFlags & RenderFlags::DepthTest) glDisable(GL_DEPTH_TEST);
+    if (renderFlags & RenderFlags::FaceCulling) glDisable(GL_CULL_FACE);
 }
 
 void SimpleMesh::Destroy() {
