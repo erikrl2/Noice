@@ -1,10 +1,14 @@
 #version 430 core
+
 out vec4 FragColor;
+
 uniform sampler2D screenTex;
 uniform vec2 resolution;
+
 void main() {
 #if 1
-    FragColor = texture(screenTex, gl_FragCoord.xy / resolution);
+    float c = texture(screenTex, gl_FragCoord.xy / resolution).r;
+    FragColor = vec4(c, c, c, 1);
 #else
     vec2 v = texture(screenTex, gl_FragCoord.xy / resolution).rg;
     FragColor = vec4(v * 0.5 + 0.5, 0, 1);
