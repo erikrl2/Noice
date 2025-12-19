@@ -100,6 +100,7 @@ static void ProcessCameraMovement(GLFWwindow* win, float dt) {
     if (glfwGetKey(win, GLFW_KEY_D) == GLFW_PRESS) moveDir += right;
     if (glfwGetKey(win, GLFW_KEY_SPACE) == GLFW_PRESS) moveDir += worldUp;
     if (glfwGetKey(win, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) moveDir -= worldUp;
+    if (glfwGetKey(win, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) camSpeed *= 2.0f;
 
     if (glm::length(moveDir) > 0.001f) {
         moveDir = glm::normalize(moveDir);
@@ -110,15 +111,20 @@ static void ProcessCameraMovement(GLFWwindow* win, float dt) {
 struct WindowState {
     int width = 0;
     int height = 0;
-    bool resized = false;
+    bool minimized = false;
+    bool sizeChanged = false;
 };
 
 static void OnFramebufferResized(GLFWwindow* window, int w, int h) {
     WindowState* s = (WindowState*)glfwGetWindowUserPointer(window);
-    if (!s) return;
+    if (w == 0 || h == 0) {
+        s->minimized = true;
+        return;
+    }
+    s->minimized = false;
     s->width = w;
     s->height = h;
-    s->resized = true;
+    s->sizeChanged = true;
 }
 
 static GLFWwindow* InitWindow(WindowState& ws, const char* title) {
@@ -126,7 +132,6 @@ static GLFWwindow* InitWindow(WindowState& ws, const char* title) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE); // TODO: make debug config only
 
     GLFWwindow* win = glfwCreateWindow(ws.width, ws.height, title, nullptr, nullptr);
     if (!win) { std::cerr << "Failed to create GLFW window\n"; return nullptr; }
@@ -143,7 +148,9 @@ static GLFWwindow* InitWindow(WindowState& ws, const char* title) {
 static void InitOpenGL() {
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
-    EnableOpenGLDebugOutput(); // TODO: make debug config only
+#ifndef NDEBUG
+    EnableOpenGLDebugOutput();
+#endif
 
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glDisable(GL_DEPTH_TEST);
@@ -168,6 +175,8 @@ struct Resources {
     Shader postShader;
     SimpleMesh quadMesh;
     SimpleMesh carMesh;
+    SimpleMesh spiderMesh;
+    SimpleMesh dragonMesh;
     Framebuffer objectFB;
     Texture prevDepthTex;
     Texture currNoiseTex;
@@ -183,8 +192,9 @@ static void SetupResources(Resources& r, const WindowState& ws) {
     r.postShader.Create("shaders/post.vert.glsl", "shaders/post.frag.glsl");
 
     r.quadMesh = SimpleMesh::CreateFullscreenQuad();
-    r.carMesh = SimpleMesh::LoadFromOBJ("models/jeep_t.obj");
-    //r.carMesh = SimpleMesh::CreateTriangle();
+    r.carMesh = SimpleMesh::LoadFromOBJ("models/jeep.obj");
+    r.spiderMesh = SimpleMesh::LoadFromOBJ("models/spider.obj");
+    r.dragonMesh = SimpleMesh::LoadFromOBJ("models/dragon.obj");
 
     r.objectFB.Create(ws.width, ws.height, GL_RG16F, GL_LINEAR, true);
     r.prevDepthTex.Create(ws.width, ws.height, GL_DEPTH_COMPONENT24, GL_LINEAR);
@@ -214,7 +224,7 @@ static void ResetFramebuffers(WindowState& state, Resources& r) {
     r.currAccTex.Clear(); r.prevAccTex.Clear();
 }
 
-static void RenderSettingsWindow(WindowState& state) {
+static void UpdateSettings(WindowState& state) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -226,12 +236,16 @@ static void RenderSettingsWindow(WindowState& state) {
 
     ImGui::SliderFloat("Speed (px/s)", &scrollSpeed, 0.0f, 500.0f, "%.0f");
     ImGui::SliderInt("Reset Interval", &accResetInterval, 1, 100);
-    if (ImGui::SliderInt("Downscale", &downscaleFactor, 1, 8)) state.resized = true;
+    if (ImGui::SliderInt("Downscale", &downscaleFactor, 1, 8)) state.sizeChanged = true;
     ImGui::Checkbox("Disable", &disableEffect);
 
     ImGui::Separator();
     ImGui::Text("Mesh:");
-    ImGui::RadioButton("Car", (int*)&meshSelect, (int)MeshType::Car);
+    bool changed = false;
+    changed = ImGui::RadioButton("Car", (int*)&meshSelect, (int)MeshType::Car); ImGui::SameLine();
+    changed = ImGui::RadioButton("Spider", (int*)&meshSelect, (int)MeshType::Spider); ImGui::SameLine();
+    changed = ImGui::RadioButton("Dragon", (int*)&meshSelect, (int)MeshType::Dragon);
+    if (changed) havePrevViewProj = false;
 
     ImGui::Separator();
     ImGui::Text("Window: %dx%d", state.width, state.height);
@@ -243,6 +257,8 @@ static void RenderSettingsWindow(WindowState& state) {
 static SimpleMesh& GetMesh(MeshType meshSelect, Resources& r) {
     switch (meshSelect) {
     case MeshType::Car: return r.carMesh;
+    case MeshType::Spider: return r.spiderMesh;
+    case MeshType::Dragon: return r.dragonMesh;
     default: return r.carMesh;
     }
 }
@@ -253,8 +269,30 @@ static void UpdateTransformMatrices(WindowState& ws, float dt) {
     glm::mat4 view = camera.GetView();
     glm::mat4 m = glm::mat4(1.0f);
 
-    m = glm::translate(m, glm::vec3(0.0f, -1.0f, 0.0f));
-    m = glm::rotate(m, glm::radians(45.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::vec3 translation = glm::vec3(0.0f);
+    glm::vec3 rotation = glm::vec3(0.0f);
+    float scale = 1.0f;
+
+    switch (meshSelect) {
+    case MeshType::Car:
+        rotation.y = 45.0f;
+        break;
+    case MeshType::Spider:
+        rotation.y = 180.0f;
+        scale = 0.025f;
+        break;
+    case MeshType::Dragon:
+        rotation.x = -90.0f;
+        rotation.y = 20.0f;
+        scale = 0.07f;
+        break;
+    }
+
+    m = glm::translate(m, translation);
+    //m = glm::rotate(m, glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+    m = glm::rotate(m, glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+    m = glm::rotate(m, glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+    m = glm::scale(m, glm::vec3(scale));
 
     if (havePrevViewProj) {
         prevProj = currProj;
@@ -317,7 +355,7 @@ static void PresentScene(WindowState& state, Resources& r) {
     r.postShader.Use();
     r.postShader.SetTexture2D("screenTex", !disableEffect ? r.currNoiseTex : r.objectFB.tex);
     r.postShader.SetVec2("resolution", glm::vec2(state.width, state.height));
-    r.postShader.SetInt("showFlow", disableEffect); // rename uniform
+    r.postShader.SetInt("showFlow", disableEffect);
     Framebuffer::BindDefault(state.width, state.height);
     r.quadMesh.Draw();
 }
@@ -335,18 +373,23 @@ int main() {
     SetupResources(res, ws);
 
     while (!glfwWindowShouldClose(win)) {
-        float dt = ImGui::GetIO().DeltaTime;
-
-        if (ws.resized) {
+        if (ws.minimized) {
+            glfwWaitEvents();
+            continue;
+        }
+        if (ws.sizeChanged) {
             ResetFramebuffers(ws, res);
-            ws.resized = false;
+            ws.sizeChanged = false;
             havePrevViewProj = false;
         }
+
+        float dt = ImGui::GetIO().DeltaTime;
+
+        UpdateSettings(ws);
 
         ProcessCameraMovement(win, dt);
         UpdateTransformMatrices(ws, dt);
 
-        RenderSettingsWindow(ws);
         RenderObject(res, dt);
         RenderEffect(res, dt);
 

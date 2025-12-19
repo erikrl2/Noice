@@ -3,7 +3,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 struct Camera {
-    glm::vec3 position = {0.0f, 0.0f, 5.0f};
+    glm::vec3 position = {0.0f, 1.0f, 5.0f};
     float yaw = -90.0f;
     float pitch = 0.0f;
     float fov = 60.0f;
