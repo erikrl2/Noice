@@ -293,9 +293,15 @@ static void RenderEffect(Resources& r, float dt) {
     r.scrollShader.SetImage2D("prevNoiseTex", r.prevNoiseTex, 1, GL_READ_ONLY);
     r.scrollShader.SetImage2D("currAccTex", r.currAccTex, 2, GL_WRITE_ONLY);
     r.scrollShader.SetImage2D("prevAccTex", r.prevAccTex, 3, GL_READ_WRITE);
-    r.scrollShader.SetTexture2D("flowTex", r.objectFB.tex, 4);
-    r.scrollShader.SetTexture2D("depthTex", r.objectFB.depthTex, 5);
-    r.scrollShader.SetFloat("scrollSpeed", scrollSpeed * dt);
+    r.scrollShader.SetTexture2D("flowTex", r.objectFB.tex, 0);
+    r.scrollShader.SetTexture2D("currDepthTex", r.objectFB.depthTex, 1);
+    r.scrollShader.SetTexture2D("prevDepthTex", r.prevDepthTex, 2);
+    r.scrollShader.SetMat4("invPrevProj", glm::inverse(prevProj));
+    r.scrollShader.SetMat4("invPrevView", glm::inverse(prevView));
+    r.scrollShader.SetMat4("invPrevModel", glm::inverse(prevModel));
+    r.scrollShader.SetMat4("currModel", currModel);
+    r.scrollShader.SetMat4("currViewProj", currProj * currView);
+    r.scrollShader.SetFloat("scrollSpeed", scrollSpeed * dt / downscaleFactor);
     r.scrollShader.DispatchCompute(r.currNoiseTex.width, r.currNoiseTex.height, 16);
 
     r.fillShader.Use();
@@ -305,45 +311,6 @@ static void RenderEffect(Resources& r, float dt) {
     r.fillShader.SetImage2D("prevAccTex", r.prevAccTex, 3, GL_READ_WRITE);
     r.fillShader.SetFloat("seed", (float)glfwGetTime());
     r.fillShader.DispatchCompute(r.currNoiseTex.width, r.currNoiseTex.height, 16);
-
-
-    // ---------
-
-
-    //r.scrollShader.Use();
-
-    //r.scrollShader.SetImage2D("prevNoiseTex", prev.Texture(), 0, GL_READ_ONLY);
-    //r.scrollShader.SetImage2D("currNoiseTex", next.Texture(), 1, GL_READ_WRITE);
-
-    //r.scrollShader.SetTexture2D("prevDepthTex", r.prevDepthFB.DepthTexture(), 2);
-    //r.scrollShader.SetTexture2D("currDepthTex", r.objectFB.DepthTexture(), 3);
-    //r.scrollShader.SetTexture2D("objectTex", r.objectFB.Texture(), 4);
-    //r.scrollShader.SetTexture2D("tangentTex", r.objNormalFB.Texture(), 5);
-
-    //r.scrollShader.SetMat4("prevModel", prevModel);
-    //r.scrollShader.SetMat4("currModel", currModel);
-    //r.scrollShader.SetMat4("invPrevModel", glm::inverse(prevModel));
-    //r.scrollShader.SetMat4("invCurrModel", glm::inverse(currModel));
-    //r.scrollShader.SetMat4("invPrevView", glm::inverse(prevView));
-    //r.scrollShader.SetMat4("invPrevProj", glm::inverse(prevProj));
-    //r.scrollShader.SetMat4("prevViewProj", prevProj * prevView);
-    //r.scrollShader.SetMat4("currViewProj", currProj * currView);
-
-    //r.scrollShader.SetVec2("fullResolution", glm::vec2(r.objectFB.width, r.objectFB.height));
-    //r.scrollShader.SetInt("downscaleFactor", downscaleFactor);
-    //r.scrollShader.SetFloat("normalScrollSpeed", scrollSpeed + 100.0f);
-    //r.scrollShader.SetFloat("deltaTime", pauseEffect ? 0.0f : dt);
-
-    //int noiseWidth = prev.width;
-    //int noiseHeight = prev.height;
-
-    //r.scrollShader.DispatchCompute(noiseWidth, noiseHeight, 16);
-
-    //r.fillShader.Use();
-    //r.fillShader.SetImage2D("noiseTex", next.Texture(), 0, GL_READ_WRITE);
-    //r.fillShader.SetFloat("rand", (float)rand());
-
-    //r.fillShader.DispatchCompute(noiseWidth, noiseHeight, 16);
 }
 
 static void PresentScene(WindowState& state, Resources& r) {
