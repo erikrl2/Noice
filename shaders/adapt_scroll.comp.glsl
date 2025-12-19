@@ -3,21 +3,21 @@
 layout(local_size_x = 16, local_size_y = 16) in;
 
 layout(rg8, binding = 0) uniform writeonly image2D currNoiseTex;
-layout(rg16f, binding = 1) uniform writeonly image2D currAccTex;
-layout(rg16f, binding = 2) uniform image2D prevAccTex;
+layout(rg8, binding = 1) uniform readonly image2D prevNoiseTex;
+layout(rg16f, binding = 2) uniform writeonly image2D currAccTex;
+layout(rg16f, binding = 3) uniform image2D prevAccTex;
 
-uniform sampler2D prevNoiseTex;
 uniform sampler2D flowTex;
 uniform sampler2D depthTex;
 
 uniform float scrollSpeed;
 
 void main() {
-    ivec2 size = textureSize(prevNoiseTex, 0);
+    ivec2 size = imageSize(prevNoiseTex);
     ivec2 prevPx = ivec2(gl_GlobalInvocationID.xy);
     if (prevPx.x >= size.x || prevPx.y >= size.y) return;
 
-    vec2 noise = texelFetch(prevNoiseTex, prevPx, 0).rg;
+    vec2 noise = imageLoad(prevNoiseTex, prevPx).rg;
     if (noise.g < 0.1) return;
 
     vec2 uv = (vec2(prevPx) + 0.5) / vec2(size);

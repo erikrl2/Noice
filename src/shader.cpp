@@ -38,7 +38,7 @@ static void printProgramLog(GLuint prog, const char* name) {
     }
 }
 
-Shader::Shader(const char* v, const char* f) {
+void Shader::Create(const char* v, const char* f) {
     std::string vs = load(v);
     std::string fs = load(f);
     const char* vc = vs.c_str();
@@ -64,24 +64,24 @@ Shader::Shader(const char* v, const char* f) {
     glDeleteShader(frag);
 }
 
-Shader Shader::CreateCompute(const char* computePath) {
-    std::string source = load(computePath);
-    const char* code = source.c_str();
+void Shader::CreateCompute(const char* c) {
+    std::string cs = load(c);
+    const char* cc = cs.c_str();
 
-    unsigned int compute = glCreateShader(GL_COMPUTE_SHADER);
-    glShaderSource(compute, 1, &code, nullptr);
-    glCompileShader(compute);
-    printShaderLog(compute, computePath);
+    unsigned int comp = glCreateShader(GL_COMPUTE_SHADER);
+    glShaderSource(comp, 1, &cc, nullptr);
+    glCompileShader(comp);
+    printShaderLog(comp, c);
 
-    Shader shader;
-    shader.id = glCreateProgram();
-    glAttachShader(shader.id, compute);
-    glLinkProgram(shader.id);
-    printProgramLog(shader.id, computePath);
+    id = glCreateProgram();
+    glAttachShader(id, comp);
+    glLinkProgram(id);
+    printProgramLog(id, c);
 
-    glDeleteShader(compute);
-    return shader;
+    glDeleteShader(comp);
 }
+
+void Shader::Destroy() { glDeleteProgram(id); id = 0; }
 
 void Shader::Use() const { glUseProgram(id); }
 
@@ -97,30 +97,29 @@ void Shader::SetVec2(const std::string& name, const glm::vec2& v) const {
     glUniform2f(glGetUniformLocation(id, name.c_str()), v.x, v.y);
 }
 
-void Shader::SetVec3(const std::string& name, const glm::vec3& v) const
-{
+void Shader::SetVec3(const std::string& name, const glm::vec3& v) const {
     glUniform3f(glGetUniformLocation(id, name.c_str()), v.x, v.y, v.z);
 }
 
-void Shader::SetMat4(const std::string& name, const glm::mat4& m) const
-{
+void Shader::SetMat4(const std::string& name, const glm::mat4& m) const {
     glUniformMatrix4fv(glGetUniformLocation(id, name.c_str()), 1, GL_FALSE, &m[0][0]);
 }
 
-void Shader::SetTexture2D(const std::string& name, GLuint texture, unsigned unit) const {
+void Shader::SetTexture2D(const std::string& name, const Texture& texture, unsigned unit) const {
     glActiveTexture(GL_TEXTURE0 + (GLenum)unit);
-    glBindTexture(GL_TEXTURE_2D, texture);
+    glBindTexture(GL_TEXTURE_2D, texture.id);
     SetInt(name, (int)unit);
 }
 
-void Shader::SetImage2D(const std::string& name, GLuint texture, unsigned unit, GLenum internalFormat, GLenum access) const {
-    glBindImageTexture(unit, texture, 0, GL_FALSE, 0, access, internalFormat);
+void Shader::SetImage2D(const std::string& name, const Texture& texture, unsigned unit, GLenum access) const {
+    glBindImageTexture(unit, texture.id, 0, GL_FALSE, 0, access, texture.internalFormat);
     SetInt(name, unit);
 }
 
-void Shader::Dispatch(unsigned int numGroupsX, unsigned int numGroupsY, unsigned int numGroupsZ) const {
-    glDispatchCompute(numGroupsX, numGroupsY, numGroupsZ);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+void Shader::DispatchCompute(int width, int height, int groupSize, bool barrier) const {
+    int numGroupsX = (width + groupSize - 1) / groupSize;
+    int numGroupsY = (height + groupSize - 1) / groupSize;
+    glDispatchCompute(numGroupsX, numGroupsY, 1);
+    if (barrier) glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 
 }
-

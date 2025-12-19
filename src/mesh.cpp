@@ -7,28 +7,8 @@
 #include <unordered_map>
 #include <iostream>
 
-SimpleMesh::SimpleMesh(SimpleMesh&& o) noexcept
-    : vao(o.vao), vbo(o.vbo), ebo(o.ebo), indexCount(o.indexCount), vertexCount(o.vertexCount) {
-    o.vao = o.vbo = o.ebo = 0;
-    o.indexCount = o.vertexCount = 0;
-}
-
-SimpleMesh& SimpleMesh::operator=(SimpleMesh&& o) noexcept {
-    if (this != &o) {
-        Destroy();
-        vao = o.vao;
-        vbo = o.vbo;
-        ebo = o.ebo;
-        indexCount = o.indexCount;
-        vertexCount = o.vertexCount;
-        o.vao = o.vbo = o.ebo = 0;
-        o.indexCount = o.vertexCount = 0;
-    }
-    return *this;
-}
-
-void SimpleMesh::UploadIndexed(const void* vertexData, size_t vertexBytes, const unsigned int* indices, size_t indexCount_) {
-    indexCount = indexCount_;
+void SimpleMesh::UploadIndexed(const void* vertexData, size_t vertexBytes, const unsigned int* indices, size_t indexCount) {
+    this->indexCount = indexCount;
     vertexCount = 0;
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
@@ -41,9 +21,9 @@ void SimpleMesh::UploadIndexed(const void* vertexData, size_t vertexBytes, const
     glBindVertexArray(0);
 }
 
-void SimpleMesh::UploadArrays(const void* vertexData, size_t vertexBytes, size_t vertexCount_) {
+void SimpleMesh::UploadArrays(const void* vertexData, size_t vertexBytes, size_t vertexCount) {
+    this->vertexCount = vertexCount;
     indexCount = 0;
-    vertexCount = vertexCount_;
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
     glBindVertexArray(vao);
@@ -56,8 +36,7 @@ void SimpleMesh::Draw(int renderFlags) const {
     if (!vao) return;
     glBindVertexArray(vao);
 
-    if (renderFlags & RenderFlags::DepthTest) glEnable(GL_DEPTH_TEST);
-    if (renderFlags & RenderFlags::FaceCulling) glEnable(GL_CULL_FACE);
+    if (renderFlags & RenderFlag::DepthTest) glEnable(GL_DEPTH_TEST);
 
     if (indexCount > 0) {
         glDrawElements(GL_TRIANGLES, (GLsizei)indexCount, GL_UNSIGNED_INT, 0);
@@ -66,8 +45,7 @@ void SimpleMesh::Draw(int renderFlags) const {
         glDrawArrays(GL_TRIANGLES, 0, (GLsizei)vertexCount);
     }
 
-    if (renderFlags & RenderFlags::DepthTest) glDisable(GL_DEPTH_TEST);
-    if (renderFlags & RenderFlags::FaceCulling) glDisable(GL_CULL_FACE);
+    if (renderFlags & RenderFlag::DepthTest) glDisable(GL_DEPTH_TEST);
 }
 
 void SimpleMesh::Destroy() {
@@ -76,7 +54,21 @@ void SimpleMesh::Destroy() {
     if (vao) { glDeleteVertexArrays(1, &vao); vao = 0; }
 }
 
-// Convenience factory: fullscreen quad (pos.xy, uv.xy)
+SimpleMesh::SimpleMesh(SimpleMesh&& other) noexcept
+    : vao(other.vao), vbo(other.vbo), ebo(other.ebo), indexCount(other.indexCount), vertexCount(other.vertexCount) {
+    other.vao = 0; other.vbo = 0; other.ebo = 0;
+}
+
+SimpleMesh& SimpleMesh::operator=(SimpleMesh&& other) noexcept {
+    if (this != &other) {
+        Destroy();
+        vao = other.vao; vbo = other.vbo; ebo = other.ebo;
+        indexCount = other.indexCount; vertexCount = other.vertexCount;
+        other.vao = 0; other.vbo = 0; other.ebo = 0;
+    }
+    return *this;
+}
+
 SimpleMesh SimpleMesh::CreateFullscreenQuad() {
     static const float quadVerts[] = {
         -1.0f, -1.0f,
@@ -99,7 +91,6 @@ SimpleMesh SimpleMesh::CreateFullscreenQuad() {
     return m;
 }
 
-// Convenience factory: simple triangle (pos.xyz)
 SimpleMesh SimpleMesh::CreateTriangle() {
     static const float triVerts[] = {
         -0.5f, -0.5f, 0.0f,
@@ -126,7 +117,7 @@ SimpleMesh SimpleMesh::LoadFromOBJ(const std::string& path) {
     std::string warn, err;
 
     bool ok = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, path.c_str(), nullptr, true);
-    //if (!warn.empty()) std::cerr << "tinyobj warning: " << warn << "\n";
+    if (!warn.empty()) std::cerr << "tinyobj warning: " << warn << "\n";
     if (!err.empty()) std::cerr << "tinyobj error: " << err << "\n";
     if (!ok) {
         std::cerr << "Failed to load OBJ: " << path << "\n";

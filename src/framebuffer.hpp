@@ -1,39 +1,45 @@
 #pragma once
 #include <glad/glad.h>
 
-struct Framebuffer {
-    GLuint fbo = 0;
-    GLuint tex = 0;
-    GLuint depthTex = 0;
+struct Texture {
+    GLuint id = 0;
     int width = 0;
     int height = 0;
-    bool hasDepth = false;
     GLenum internalFormat = GL_RGBA8;
+    GLenum filter = GL_NEAREST;
 
-    Framebuffer() = default;
-    ~Framebuffer() { Destroy(); }
-
-    Framebuffer(Framebuffer&& other) noexcept;
-    Framebuffer& operator=(Framebuffer&& other) noexcept;
-
-    Framebuffer(const Framebuffer&) = delete;
-    Framebuffer& operator=(const Framebuffer&) = delete;
-
-    bool Create(int w, int h, bool attachDepth = false, GLenum format = GL_RGBA8);
+    Texture() = default;
+    ~Texture() { Destroy(); }
+    Texture(const Texture&) = delete;
+    Texture& operator=(const Texture&) = delete;
+    
+    void Create(int w, int h, GLenum internalFormat = GL_RGBA8, GLenum filter = GL_NEAREST);
     void Destroy();
     void Resize(int w, int h);
     void Clear() const;
 
-    static void Unbind() { glBindFramebuffer(GL_FRAMEBUFFER, 0); }
-    static void BindDefault(int w, int h) {
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glViewport(0, 0, w, h);
-    }
+    void Swap(Texture& other);
+};
 
-    GLuint Texture() const { return tex; }
-    GLuint DepthTexture() const { return depthTex; }
+struct Framebuffer {
+    GLuint fbo = 0;
+    Texture tex;
+    Texture depthTex;
+    bool hasDepth = false;
 
-    void BindTextureAsImage(GLuint unit, GLenum access = GL_WRITE_ONLY) const {
-        glBindImageTexture(unit, tex, 0, GL_FALSE, 0, access, internalFormat);
-    }
+    Framebuffer() = default;
+    ~Framebuffer() { Destroy(); }
+    Framebuffer(const Framebuffer&) = delete;
+    Framebuffer& operator=(const Framebuffer&) = delete;
+
+    bool Create(int w, int h, GLenum format = GL_RGBA8, GLenum filter = GL_NEAREST, bool attachDepth = false);
+    void Destroy();
+    void Resize(int w, int h);
+    void Clear() const;
+
+    void SwapColorTex(Texture& other);
+    void SwapDepthTex(Texture& other);
+
+    static void Unbind();
+    static void BindDefault(int w, int h);
 };

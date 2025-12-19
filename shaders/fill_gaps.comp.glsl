@@ -3,9 +3,9 @@
 layout(local_size_x = 16, local_size_y = 16) in;
 
 layout(rg8, binding = 0) uniform image2D currNoiseTex;
-layout(rg16f, binding = 1) uniform writeonly image2D currAccTex;
-
-uniform sampler2D prevAccTex;
+layout(rg8, binding = 1) uniform writeonly image2D prevNoiseTex;
+layout(rg16f, binding = 2) uniform writeonly image2D currAccTex;
+layout(rg16f, binding = 3) uniform image2D prevAccTex;
 
 uniform float seed;
 
@@ -23,7 +23,10 @@ void main() {
         float noiseVal = step(0.5, rng(vec2(px) + seed));
         imageStore(currNoiseTex, px, vec4(noiseVal, 1, 0, 0));
 
-        vec2 inheritedAcc = texelFetch(prevAccTex, px, 0).xy;
+        vec2 inheritedAcc = imageLoad(prevAccTex, px).xy;
         imageStore(currAccTex, px, vec4(inheritedAcc, 0, 0));
     }
+
+    imageStore(prevNoiseTex, px, vec4(0));
+    imageStore(prevAccTex, px, vec4(0));
 }

@@ -1,90 +1,24 @@
 #include "framebuffer.hpp"
 #include <glad/glad.h>
 #include <iostream>
+#include <cassert>
 
-namespace {
-    struct FormatInfo {
-        GLenum format;
-        GLenum type;
-    };
-
-    FormatInfo GetFormatInfo(GLenum internalFormat) {
-        if (internalFormat == GL_RG16F) {
-            return { GL_RG, GL_HALF_FLOAT };
-        }
-        else if (internalFormat == GL_RG8) {
-            return { GL_RG, GL_UNSIGNED_BYTE };
-        }
-        return { GL_RGBA, GL_UNSIGNED_BYTE };
-    }
-}
-
-Framebuffer::Framebuffer(Framebuffer&& o) noexcept
-    : fbo(o.fbo), tex(o.tex), depthTex(o.depthTex), width(o.width), height(o.height), hasDepth(o.hasDepth), internalFormat(o.internalFormat) {
-    o.fbo = o.tex = o.depthTex = o.width = o.height = 0;
-    o.hasDepth = false;
-    o.internalFormat = GL_RGBA8;
-}
-
-Framebuffer& Framebuffer::operator=(Framebuffer&& o) noexcept {
-    if (this != &o) {
-        Destroy();
-        fbo = o.fbo;
-        tex = o.tex;
-        depthTex = o.depthTex;
-        width = o.width;
-        height = o.height;
-        hasDepth = o.hasDepth;
-        internalFormat = o.internalFormat;
-        o.fbo = o.tex = o.depthTex = o.width = o.height = 0;
-        o.hasDepth = false;
-        o.internalFormat = GL_RGBA8;
-    }
-    return *this;
-}
-
-bool Framebuffer::Create(int w, int h, bool attachDepth, GLenum format) {
-    width = w; height = h;
+bool Framebuffer::Create(int w, int h, GLenum format, GLenum filter, bool attachDepth) {
     hasDepth = attachDepth;
-    internalFormat = format;
-
-    FormatInfo formatInfo = GetFormatInfo(internalFormat);
-
-    glGenTextures(1, &tex);
-    glBindTexture(GL_TEXTURE_2D, tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, formatInfo.format, formatInfo.type, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    GLfloat borderColor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
     glGenFramebuffers(1, &fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
+
+    tex.Create(w, h, format, filter);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex.id, 0);
 
     if (attachDepth) {
-        glGenTextures(1, &depthTex);
-        glBindTexture(GL_TEXTURE_2D, depthTex);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-        GLfloat depthBorder[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, depthBorder);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTex, 0);
-    }
-    else {
-        depthTex = 0;
+        depthTex.Create(w, h, GL_DEPTH_COMPONENT24, filter);
+        glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depthTex.id, 0);
     }
 
     bool ok = (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
-    if (!ok) {
-        std::cerr << "Framebuffer incomplete\n";
-    }
+    if (!ok) { std::cerr << "Framebuffer incomplete\n"; }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -94,22 +28,102 @@ bool Framebuffer::Create(int w, int h, bool attachDepth, GLenum format) {
 
 void Framebuffer::Destroy() {
     if (fbo) { glDeleteFramebuffers(1, &fbo); fbo = 0; }
-    if (tex) { glDeleteTextures(1, &tex); tex = 0; }
-    if (depthTex) { glDeleteTextures(1, &depthTex); depthTex = 0; }
-    width = height = 0;
-    hasDepth = false;
+    if (tex.id) tex.Destroy();
+    if (depthTex.id) depthTex.Destroy();
 }
 
 void Framebuffer::Resize(int w, int h) {
-    if (w == width && h == height) return;
-    bool wantDepth = hasDepth;
-    GLenum savedFormat = internalFormat;
+    if (w == tex.width && h == tex.height) return;
     Destroy();
-    Create(w, h, wantDepth, savedFormat);
+    Create(w, h, tex.internalFormat, tex.filter, hasDepth);
 }
 
 void Framebuffer::Clear() const {
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    if (width > 0 && height > 0) glViewport(0, 0, width, height);
+    glViewport(0, 0, tex.width, tex.height);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
+
+void Framebuffer::SwapColorTex(Texture& other) {
+    assert(tex.width == other.width && tex.height == other.height);
+    assert(tex.internalFormat == other.internalFormat);
+    std::swap(tex.id, other.id);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex.id, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Framebuffer::SwapDepthTex(Texture& other) {
+    assert(depthTex.width == other.width && depthTex.height == other.height);
+    assert(depthTex.internalFormat == other.internalFormat);
+    std::swap(depthTex.id, other.id);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depthTex.id, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Framebuffer::Unbind() {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Framebuffer::BindDefault(int w, int h) {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, w, h);
+}
+
+namespace {
+    struct FormatInfo { GLenum format; GLenum type; };
+
+    FormatInfo GetFormatInfo(GLenum internalFormat) {
+        if (internalFormat == GL_RG16F) return { GL_RG, GL_HALF_FLOAT };
+        else if (internalFormat == GL_RG8) return { GL_RG, GL_UNSIGNED_BYTE };
+        else if (internalFormat == GL_DEPTH_COMPONENT24) return { GL_DEPTH_COMPONENT, GL_UNSIGNED_INT };
+        return { GL_RGBA, GL_UNSIGNED_BYTE };
+    }
+}
+
+void Texture::Create(int w, int h, GLenum internalFormat, GLenum filter) {
+    width = w;
+    height = h;
+    this->internalFormat = internalFormat;
+    this->filter = filter;
+
+    glGenTextures(1, &id);
+    glBindTexture(GL_TEXTURE_2D, id);
+    FormatInfo formatInfo = GetFormatInfo(internalFormat);
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, formatInfo.format, formatInfo.type, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    float bc = (formatInfo.format == GL_DEPTH_COMPONENT) ? 1.0f : 0.0f;
+    GLfloat borderColorV[] = { bc, bc, bc, bc };
+    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColorV);
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void Texture::Destroy() {
+    if (id) { glDeleteTextures(1, &id); id = 0; }
+    width = 0;
+    height = 0;
+}
+
+void Texture::Resize(int w, int h) {
+    if (w == width && h == height) return;
+    Destroy();
+    Create(w, h, internalFormat, filter);
+}
+
+void Texture::Clear() const {
+    GLenum format = GetFormatInfo(internalFormat).format;
+    float clearValue[4] = { 0, 0, 0, 0 };
+    if (format == GL_DEPTH_COMPONENT) clearValue[0] = 1.0f;
+    glClearTexImage(id, 0, format, GL_FLOAT, clearValue);
+}
+
+void Texture::Swap(Texture& other) {
+    assert(width == other.width && height == other.height);
+    assert(internalFormat == other.internalFormat);
+    std::swap(id, other.id);
+}
+
