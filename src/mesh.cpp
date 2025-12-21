@@ -140,6 +140,9 @@ SimpleMesh SimpleMesh::LoadFromOBJ(const std::string& path) {
     std::vector<unsigned int> indices;
     std::unordered_map<Idx, unsigned int, IdxHash, IdxEq> cache;
 
+    verts.reserve(attrib.vertices.size() / 3 * 8); // 8 floats per vertex
+    indices.reserve(shapes.size() * 3 * 100); // rough estimate
+
     for (const auto& shape : shapes) {
         const auto& mesh = shape.mesh;
         for (size_t i = 0; i < mesh.indices.size(); ++i) {
