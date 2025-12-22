@@ -126,7 +126,7 @@ void App::Update(float dt) {
 
     RenderObject();
 
-    effect3D.Apply(objectFB, mvpState, dt);
+    effect3D.ApplyDynamic(objectFB, mvpState, dt);
 
     RenderTexToScreen(effect3D.GetNoiseTex());
 }

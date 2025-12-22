@@ -17,12 +17,18 @@ public:
     void Init(int width, int height);
     void Destroy();
 
-    void Apply(Framebuffer& in, const MvpState& mats, float dt);
+    void ApplyDynamic(Framebuffer& in, MvpState& mats, float dt);
+    void ApplyStatic(Framebuffer& in, float dt);
 
     Texture& GetNoiseTex() { return prevNoiseTex; }
     Texture& GetAccTex() { return prevAccTex; }
 
     void OnResize(int width, int height);
+
+private:
+    void ScatterPass(Framebuffer& in, float dt, MvpState* mats = nullptr);
+    void FillPass();
+    void SwapBuffers(Framebuffer* in = nullptr);
 
 public:
     float scrollSpeed = 150.0f;
