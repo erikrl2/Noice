@@ -81,12 +81,18 @@ void Shader::CreateCompute(const char* c) {
     glDeleteShader(comp);
 }
 
-void Shader::Destroy() { glDeleteProgram(id); id = 0; }
+void Shader::Destroy() {
+    if (id) { glDeleteProgram(id); id = 0; }
+}
 
 void Shader::Use() const { glUseProgram(id); }
 
 void Shader::SetInt(const std::string& name, int value) const {
     glUniform1i(glGetUniformLocation(id, name.c_str()), value);
+}
+
+void Shader::SetUint(const std::string& name, unsigned int value) const {
+    glUniform1ui(glGetUniformLocation(id, name.c_str()), value);
 }
 
 void Shader::SetFloat(const std::string& name, float value) const {

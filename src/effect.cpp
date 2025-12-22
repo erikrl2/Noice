@@ -21,6 +21,18 @@ void Effect::Init(int width, int height) {
     currAccTex.Clear(); prevAccTex.Clear();
 }
 
+void Effect::Destroy() {
+    scrollShader.Destroy();
+    fillShader.Destroy();
+
+    currNoiseTex.Destroy();
+    prevNoiseTex.Destroy();
+    currAccTex.Destroy();
+    prevAccTex.Destroy();
+
+    prevDepthTex.Destroy();
+}
+
 void Effect::Apply(Framebuffer& in, const MvpState& mats, float dt) {
     static unsigned frameCount = 0;
     if (++frameCount % accResetInterval == 0) prevAccTex.Clear();
@@ -46,7 +58,7 @@ void Effect::Apply(Framebuffer& in, const MvpState& mats, float dt) {
     fillShader.SetImage2D("prevNoiseTex", prevNoiseTex, 1, GL_WRITE_ONLY);
     fillShader.SetImage2D("currAccTex", currAccTex, 2, GL_WRITE_ONLY);
     fillShader.SetImage2D("prevAccTex", prevAccTex, 3, GL_READ_WRITE);
-    fillShader.SetFloat("seed", (float)glfwGetTime());
+    fillShader.SetUint("seed", (uint32_t)rand());
     fillShader.DispatchCompute(currNoiseTex.width, currNoiseTex.height, 16);
 
     in.SwapDepthTex(prevDepthTex);

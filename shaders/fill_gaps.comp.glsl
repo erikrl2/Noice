@@ -7,10 +7,16 @@ layout(rg8, binding = 1) uniform writeonly image2D prevNoiseTex;
 layout(rg16f, binding = 2) uniform writeonly image2D currAccTex;
 layout(rg16f, binding = 3) uniform image2D prevAccTex;
 
-uniform float seed;
+uniform uint seed;
 
-float rng(vec2 p) {
-    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+uint hash(uvec2 p) {
+    uint h = p.x * 374761393u + p.y * 668265263u + seed;
+    h = (h ^ (h >> 13)) * 1274126177u;
+    return h;
+}
+
+float rng(uvec2 p) {
+    return float(hash(p)) * (1.0 / 4294967296.0);
 }
 
 void main() {
@@ -20,7 +26,7 @@ void main() {
 
     vec2 noise = imageLoad(currNoiseTex, px).rg;
     if (noise.g < 0.5) {
-        float noiseVal = step(0.5, rng(vec2(px) + seed));
+        float noiseVal = step(0.5, rng(uvec2(px)));
         imageStore(currNoiseTex, px, vec4(noiseVal, 1, 0, 0));
 
         vec2 inheritedAcc = imageLoad(prevAccTex, px).xy;

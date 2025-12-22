@@ -19,6 +19,7 @@ private:
     void InitOpenGL();
     void InitImGui();
     void SetupResources();
+    void DestroyResources();
 
     void Update(float dt);
 
@@ -35,9 +36,9 @@ private:
     SimpleMesh& SelectedMesh();
     Effect& SelectedEffect();
 
-private:
-    static inline App* app = nullptr;
+    void CheckWindowSize();
 
+private:
     GLFWwindow* win = nullptr;
     int width = 1280;
     int height = 720;

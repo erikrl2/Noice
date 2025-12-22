@@ -15,6 +15,7 @@ struct MvpState {
 class Effect {
 public:
     void Init(int width, int height);
+    void Destroy();
 
     void Apply(Framebuffer& in, const MvpState& mats, float dt);
 

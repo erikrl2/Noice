@@ -55,7 +55,9 @@ static void GLAPIENTRY OnOpenGLDebugMessage(GLenum source, GLenum type, GLuint i
         << " | " << (message ? message : "")
         << "\n";
 
+#ifdef _MSC_VER
     if (type == GL_DEBUG_TYPE_ERROR) { __debugbreak(); }
+#endif
 }
 
 void EnableOpenGLDebugOutput() {

@@ -8,9 +8,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 App::App() {
-    assert(app == nullptr);
-    app = this;
-
     InitWindow();
 
     InitOpenGL();
@@ -18,7 +15,7 @@ App::App() {
 
     SetupResources();
 
-    effect3D.Init(width, height);
+    CheckWindowSize();
 }
 
 void App::Run() {
@@ -45,6 +42,8 @@ void App::Run() {
 }
 
 App::~App() {
+    DestroyResources();
+
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
@@ -102,6 +101,22 @@ void App::SetupResources() {
     postShader.Create("shaders/post.vert.glsl", "shaders/post.frag.glsl");
 
     objectFB.Create(width, height, GL_RG16F, GL_LINEAR, true);
+
+    effect3D.Init(width, height);
+}
+
+void App::DestroyResources() {
+    quadMesh.Destroy();
+    carMesh.Destroy();
+    spiderMesh.Destroy();
+    dragonMesh.Destroy();
+
+    objectShader.Destroy();
+    postShader.Destroy();
+
+    objectFB.Destroy();
+
+    effect3D.Destroy();
 }
 
 void App::Update(float dt) {
@@ -250,6 +265,13 @@ void App::OnMouseMoved(GLFWwindow* window, double xpos, double ypos) {
 
     App& app = *(App*)glfwGetWindowUserPointer(window);
     app.camera.OnMouseMoved(xpos, ypos);
+}
+
+void App::CheckWindowSize() {
+    int w, h;
+    glfwGetFramebufferSize(win, &w, &h);
+    if (w != width || h != height)
+        App::OnFramebufferResized(win, w, h);
 }
 
 SimpleMesh& App::SelectedMesh() {
