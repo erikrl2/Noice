@@ -71,10 +71,5 @@ target_link_libraries(Noice PRIVATE glfw glad imgui glm tinyobjloader)
 
 add_custom_command(TARGET Noice POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_SOURCE_DIR}/shaders ${CMAKE_BINARY_DIR}/shaders
+        ${CMAKE_SOURCE_DIR}/assets ${CMAKE_BINARY_DIR}/assets
 )
-add_custom_command(TARGET Noice POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_SOURCE_DIR}/models ${CMAKE_BINARY_DIR}/models
-)
-

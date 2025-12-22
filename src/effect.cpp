@@ -5,8 +5,8 @@
 #include <glm/glm.hpp>
 
 void Effect::Init(int width, int height) {
-    scrollShader.CreateCompute("shaders/adapt_scroll.comp.glsl");
-    fillShader.CreateCompute("shaders/fill_gaps.comp.glsl");
+    scrollShader.CreateCompute("assets/shaders/adapt_scroll.comp.glsl");
+    fillShader.CreateCompute("assets/shaders/fill_gaps.comp.glsl");
 
     int scaledWidth = width / downscaleFactor;
     int scaledHeight = height / downscaleFactor;

@@ -93,12 +93,12 @@ void App::InitImGui() {
 
 void App::SetupResources() {
     quadMesh = SimpleMesh::CreateFullscreenQuad();
-    carMesh = SimpleMesh::LoadFromOBJ("models/jeep.obj");
-    spiderMesh = SimpleMesh::LoadFromOBJ("models/spider.obj");
-    //dragonMesh = SimpleMesh::LoadFromOBJ("models/dragon.obj");
+    carMesh = SimpleMesh::LoadFromOBJ("assets/models/jeep.obj");
+    spiderMesh = SimpleMesh::LoadFromOBJ("assets/models/spider.obj");
+    //dragonMesh = SimpleMesh::LoadFromOBJ("assets/models/dragon.obj");
 
-    objectShader.Create("shaders/basic.vert.glsl", "shaders/basic.frag.glsl");
-    postShader.Create("shaders/post.vert.glsl", "shaders/post.frag.glsl");
+    objectShader.Create("assets/shaders/basic.vert.glsl", "assets/shaders/basic.frag.glsl");
+    postShader.Create("assets/shaders/post.vert.glsl", "assets/shaders/post.frag.glsl");
 
     objectFB.Create(width, height, GL_RG16F, GL_LINEAR, true);
 
