@@ -19,9 +19,10 @@ struct Texture {
     void Destroy();
     void Resize(int w, int h);
     void Clear() const;
+    void Bind() const;
 
     void Swap(Texture& other);
-    void SetUnpackStorageMode(int value);
+    void UploadFromCPU(unsigned char* data);
 };
 
 struct Framebuffer {
