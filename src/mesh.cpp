@@ -32,6 +32,14 @@ void SimpleMesh::UploadArrays(const void* vertexData, size_t vertexBytes, size_t
     glBindVertexArray(0);
 }
 
+void SimpleMesh::SetAttrib(GLuint location, GLint componentCount, GLenum type, GLboolean normalized, GLsizei stride, size_t offset) {
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glVertexAttribPointer(location, componentCount, type, normalized, stride, (void*)offset);
+    glEnableVertexAttribArray(location);
+    glBindVertexArray(0);
+}
+
 void SimpleMesh::Draw(int renderFlags) const {
     if (!vao) return;
     glBindVertexArray(vao);

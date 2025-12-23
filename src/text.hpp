@@ -16,6 +16,8 @@ public:
 
     void UpdateImGui();
     void Update(float dt);
+    
+    void OnResize(int width, int height);
 
     Framebuffer& GetObjFB() { return textFB; } // TODO: rename
 
@@ -31,9 +33,9 @@ private:
     Framebuffer textFB;
 
     // --- stb baked font atlas ---
-    GLuint fontAtlasTex = 0;
-    int atlasW = 1024;
-    int atlasH = 1024;
+    Texture fontAtlasTex;
+    int atlasW = 2048;
+    int atlasH = 2048;
 
     static constexpr int kFirstChar = 32;
     static constexpr int kCharCount = 95; // 32..126 inclusive
@@ -52,11 +54,10 @@ private:
     bool center = true;
 
     glm::vec2 direction = glm::vec2(1.0f, 0.0f); // written into RG16F
+    glm::vec2 bgScrollDir = glm::vec2(0.0f, 0.0f); // background scroll direction for Clear()
     float threshold = 0.02f;
     float softness = 0.05f;
     bool premultiply = true;
-
-    bool additiveBlend = false;
 
     // state
     bool dirtyMesh = true;
