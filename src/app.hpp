@@ -3,6 +3,7 @@
 #include "framebuffer.hpp"
 #include "effect.hpp"
 #include "object.hpp"
+#include "text.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -45,10 +46,10 @@ private:
     SimpleMesh quadMesh;
 
     enum class Mode { Object, Text, Paint };
-    Mode modeSelect = Mode::Object;
+    Mode modeSelect = Mode::Text;
 
+    // TODO: make abstract Mode interface and use func SelectedMode() in cpp
     ObjectMode objectMode;
-
-    // TODO: Text
+    TextMode textMode;
     // TODO: Paint
 };

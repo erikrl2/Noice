@@ -65,7 +65,7 @@ file(GLOB SRC
 )
 add_executable(Noice ${SRC})
 
-target_include_directories(Noice PRIVATE src)
+target_include_directories(Noice PRIVATE src external/stb)
 
 target_link_libraries(Noice PRIVATE glfw glad imgui glm tinyobjloader)
 
