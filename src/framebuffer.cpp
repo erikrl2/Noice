@@ -3,7 +3,7 @@
 #include <iostream>
 #include <cassert>
 
-bool Framebuffer::Create(int w, int h, GLenum format, GLenum filter, bool attachDepth) {
+bool Framebuffer::Create(int w, int h, GLint format, GLint filter, GLint wrap, bool attachDepth) {
     hasDepth = attachDepth;
 
     glGenFramebuffers(1, &fbo);
@@ -35,12 +35,13 @@ void Framebuffer::Destroy() {
 void Framebuffer::Resize(int w, int h) {
     if (w == tex.width && h == tex.height) return;
     Destroy();
-    Create(w, h, tex.internalFormat, tex.filter, hasDepth);
+    Create(w, h, tex.internalFormat, tex.filter, tex.wrap, hasDepth);
 }
 
-void Framebuffer::Clear() const {
+void Framebuffer::Clear(const glm::vec4& color) const {
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     glViewport(0, 0, tex.width, tex.height);
+    glClearColor(color.r, color.g, color.b, color.a);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
@@ -75,18 +76,22 @@ namespace {
     struct FormatInfo { GLenum format; GLenum type; };
 
     FormatInfo GetFormatInfo(GLenum internalFormat) {
-        if (internalFormat == GL_RG16F) return { GL_RG, GL_HALF_FLOAT };
-        else if (internalFormat == GL_RG8) return { GL_RG, GL_UNSIGNED_BYTE };
-        else if (internalFormat == GL_DEPTH_COMPONENT24) return { GL_DEPTH_COMPONENT, GL_UNSIGNED_INT };
-        return { GL_RGBA, GL_UNSIGNED_BYTE };
+        switch (internalFormat) {
+        case GL_RG16F: return { GL_RG, GL_HALF_FLOAT }; 
+        case GL_RG8: return { GL_RG, GL_UNSIGNED_BYTE };
+        case GL_R8: return { GL_RED, GL_UNSIGNED_BYTE };
+        case GL_DEPTH_COMPONENT24: return { GL_DEPTH_COMPONENT, GL_UNSIGNED_INT };
+        default: return { GL_RGBA, GL_UNSIGNED_BYTE };
+        }
     }
 }
 
-void Texture::Create(int w, int h, GLenum internalFormat, GLenum filter) {
+void Texture::Create(int w, int h, GLint internalFormat, GLint filter, GLint wrap) {
     width = w;
     height = h;
     this->internalFormat = internalFormat;
     this->filter = filter;
+    this->wrap = wrap;
 
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
@@ -94,11 +99,13 @@ void Texture::Create(int w, int h, GLenum internalFormat, GLenum filter) {
     glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, formatInfo.format, formatInfo.type, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    float bc = (formatInfo.format == GL_DEPTH_COMPONENT) ? 1.0f : 0.0f;
-    GLfloat borderColorV[] = { bc, bc, bc, bc };
-    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColorV);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap);
+    if (wrap == GL_CLAMP_TO_BORDER) {
+        float bc = (formatInfo.format == GL_DEPTH_COMPONENT) ? 1.0f : 0.0f;
+        GLfloat borderColorV[] = { bc, bc, bc, bc };
+        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColorV);
+    }
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
@@ -111,7 +118,7 @@ void Texture::Destroy() {
 void Texture::Resize(int w, int h) {
     if (w == width && h == height) return;
     Destroy();
-    Create(w, h, internalFormat, filter);
+    Create(w, h, internalFormat, filter, wrap);
 }
 
 void Texture::Clear() const {
@@ -125,5 +132,11 @@ void Texture::Swap(Texture& other) {
     assert(width == other.width && height == other.height);
     assert(internalFormat == other.internalFormat);
     std::swap(id, other.id);
+}
+
+void Texture::SetUnpackStorageMode(int value) {
+    glBindTexture(GL_TEXTURE_2D, id);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, value);
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 

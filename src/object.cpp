@@ -11,7 +11,7 @@ void ObjectMode::Init(int width, int height) {
 
     objectShader.Create("assets/shaders/basic.vert.glsl", "assets/shaders/basic.frag.glsl");
 
-    objectFB.Create(width, height, GL_RG16F, GL_LINEAR, true);
+    objectFB.Create(width, height, GL_RG16F, GL_LINEAR, GL_CLAMP_TO_BORDER, true);
 }
 
 void ObjectMode::Destroy() {
