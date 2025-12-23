@@ -140,6 +140,8 @@ void Texture::Swap(Texture& other) {
 
 void Texture::UploadFromCPU(unsigned char* data) {
     FormatInfo fi = GetFormatInfo(internalFormat);
+    glBindTexture(GL_TEXTURE_2D, id);
     glPixelStorei(GL_UNPACK_ALIGNMENT, (fi.format == GL_RGBA) ? 4 : 1);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, fi.format, fi.type, data);
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
