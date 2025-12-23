@@ -164,8 +164,15 @@ void TextMode::LoadFontAtlas(const char* ttfPath)
     if (res <= 0)
         return;
 
+    // Create texture if needed, or ensure it has correct dimensions
     if (fontAtlasTex.id == 0)
+    {
         fontAtlasTex.Create(atlasW, atlasH, GL_R8, GL_LINEAR, GL_CLAMP_TO_EDGE);
+    }
+    else if (fontAtlasTex.width != atlasW || fontAtlasTex.height != atlasH)
+    {
+        fontAtlasTex.Resize(atlasW, atlasH);
+    }
 
     // Upload pixels using glTexSubImage2D
     glBindTexture(GL_TEXTURE_2D, fontAtlasTex.id);
