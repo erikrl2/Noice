@@ -17,34 +17,38 @@ public:
     void Init(int width, int height);
     void Destroy();
 
+    void UpdateImGui();
+
     void ApplyDynamic(Framebuffer& in, MvpState& mats, float dt);
     void ApplyStatic(Framebuffer& in, float dt);
 
     Texture& GetNoiseTex() { return prevNoiseTex; }
     Texture& GetAccTex() { return prevAccTex; }
+    bool Disabled() { return disabled; }
 
     void OnResize(int width, int height);
+    void OnMouseClicked(int button, int action);
 
 private:
     void ScatterPass(Framebuffer& in, float dt, MvpState* mats = nullptr);
     void FillPass();
     void SwapBuffers(Framebuffer* in = nullptr);
 
-public:
+private:
     float scrollSpeed = 150.0f;
     int accResetInterval = 10;
     int downscaleFactor = 1;
     bool disabled = false;
     bool paused = false;
 
-private:
     Texture prevDepthTex;
     Texture currNoiseTex;
     Texture prevNoiseTex;
     Texture currAccTex;
     Texture prevAccTex;
 
-    static inline SimpleMesh quadMesh;
-    static inline Shader scrollShader;
-    static inline Shader fillShader;
+    Shader scrollShader;
+    Shader fillShader;
+
+    SimpleMesh quadMesh;
 };

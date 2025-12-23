@@ -1,9 +1,8 @@
 #pragma once
 #include "shader.hpp"
 #include "framebuffer.hpp"
-#include "mesh.hpp"
-#include "camera.hpp"
 #include "effect.hpp"
+#include "object.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -21,19 +20,16 @@ private:
     void SetupResources();
     void DestroyResources();
 
+    void UpdateImGui();
     void Update(float dt);
 
-    void UpdateImGui();
-    void UpdateTransformMatrices(float dt);
-
-    void RenderObject();
     void RenderTexToScreen(Texture& resultTex);
 
     static void OnFramebufferResized(GLFWwindow* window, int w, int h);
-    static void OnMouseClicked(GLFWwindow* window, int button, int action, int mods);
     static void OnMouseMoved(GLFWwindow* window, double xpos, double ypos);
+    static void OnMouseClicked(GLFWwindow* window, int button, int action, int mods);
+    static void OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, int mods);
 
-    SimpleMesh& SelectedMesh();
     Effect& SelectedEffect();
 
     void CheckWindowSize();
@@ -44,22 +40,15 @@ private:
     int height = 720;
     bool minimized = false;
 
-    enum class MeshType { Car, Spider, Dragon, Alien };
-    MeshType meshSelect = MeshType::Car;
-
-    bool hasValidPrevMvp = false;
-    MvpState mvpState;
-
-    Camera camera;
-
-    Effect effect3D;
-    // TODO: list of 2D effects associated with imgui windows
-
-    SimpleMesh quadMesh;
-    SimpleMesh carMesh;
-    SimpleMesh spiderMesh;
-    SimpleMesh dragonMesh;
-    Shader objectShader;
+    Effect scrollEffect;
     Shader postShader;
-    Framebuffer objectFB;
+    SimpleMesh quadMesh;
+
+    enum class Mode { Object, Text, Paint };
+    Mode modeSelect = Mode::Object;
+
+    ObjectMode objectMode;
+
+    // TODO: Text
+    // TODO: Paint
 };

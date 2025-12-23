@@ -1,11 +1,10 @@
 #pragma once
-#include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 
 class Camera {
 public:
-    void UpdateCamera(GLFWwindow* win, float dt);
-    void OnMouseClicked(GLFWwindow* win, int button, int action);
+    void Update(float dt);
+    void OnMouseClicked(int button, int action);
     void OnMouseMoved(double xpos, double ypos);
 
     glm::mat4 GetView() const;

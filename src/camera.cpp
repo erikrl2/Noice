@@ -1,12 +1,14 @@
 #include "camera.hpp"
 
+#include "GLFW/glfw3.h"
 #include <imgui.h>
 #include <glm/gtc/matrix_transform.hpp>
 
 static bool mouseDown = false;
 
-void Camera::UpdateCamera(GLFWwindow* win, float dt) {
+void Camera::Update(float dt) {
     if (ImGui::GetIO().WantCaptureKeyboard) return;
+    GLFWwindow* win = glfwGetCurrentContext();
 
     float camSpeed = 5.0f * dt;
     glm::vec3 front = GetFront();
@@ -28,7 +30,8 @@ void Camera::UpdateCamera(GLFWwindow* win, float dt) {
     }
 }
 
-void Camera::OnMouseClicked(GLFWwindow* win, int button, int action) {
+void Camera::OnMouseClicked(int button, int action) {
+    GLFWwindow* win = glfwGetCurrentContext();
     switch (button) {
     case GLFW_MOUSE_BUTTON_LEFT: {
         if (action == GLFW_PRESS) {

@@ -3,6 +3,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include <imgui.h>
 
 void Effect::Init(int width, int height) {
     scrollShader.CreateCompute("assets/shaders/adapt_scroll.comp.glsl");
@@ -33,6 +34,15 @@ void Effect::Destroy() {
     prevDepthTex.Destroy();
 }
 
+void Effect::UpdateImGui() {
+    ImGui::Text("Effect:");
+    ImGui::SliderFloat("Speed (px/s)", &scrollSpeed, 0.0f, 500.0f, "%.0f");
+    ImGui::SliderInt("Reset Interval", &accResetInterval, 1, 100);
+    if (ImGui::SliderInt("Downscale", &downscaleFactor, 1, 8)) OnResize(prevDepthTex.width, prevDepthTex.height);
+    ImGui::Checkbox("Disable", &disabled); ImGui::SameLine();
+    ImGui::Checkbox("Pause", &paused);
+}
+
 void Effect::ApplyDynamic(Framebuffer& in, MvpState& mats, float dt) {
     ScatterPass(in, dt, &mats);
     FillPass();
@@ -46,6 +56,8 @@ void Effect::ApplyStatic(Framebuffer& in, float dt) {
 }
 
 void Effect::ScatterPass(Framebuffer& in, float dt, MvpState* mats) {
+    assert(in.tex.internalFormat == GL_RG16F);
+
     static unsigned frameCount = 0;
     if (++frameCount % accResetInterval == 0) prevAccTex.Clear();
 
@@ -104,4 +116,12 @@ void Effect::OnResize(int width, int height) {
 
     currNoiseTex.Clear(); prevNoiseTex.Clear();
     currAccTex.Clear(); prevAccTex.Clear();
+}
+
+void Effect::OnMouseClicked(int button, int action) {
+    if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+        if (action == GLFW_PRESS) {
+            disabled = !disabled;
+        }
+    }
 }
