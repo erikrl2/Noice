@@ -17,6 +17,8 @@ public:
     void UpdateImGui();
     void Update(float dt);
 
+    void OnResize(int width, int height);
+
     Framebuffer& GetObjFB() { return textFB; } // TODO: rename
 
 private:
@@ -31,9 +33,9 @@ private:
     Framebuffer textFB;
 
     // --- stb baked font atlas ---
-    GLuint fontAtlasTex = 0;
-    int atlasW = 1024;
-    int atlasH = 1024;
+    Texture fontAtlasTex;
+    int atlasW = 2048;
+    int atlasH = 2048;
 
     static constexpr int kFirstChar = 32;
     static constexpr int kCharCount = 95; // 32..126 inclusive
@@ -47,7 +49,7 @@ private:
 
     // --- parameters ---
     std::string text = "NOICE";
-    float bakeFontPx = 256.0f; // requires re-bake atlas when changed
+    float bakeFontPx = 100.0f; // requires re-bake atlas when changed
     float scale = 1.0f;        // additional scale after baking
     bool center = true;
 
@@ -56,7 +58,9 @@ private:
     float softness = 0.05f;
     bool premultiply = true;
 
-    bool additiveBlend = false;
+    glm::vec2 bgDir = glm::vec2(0.0f, 0.0f); // background clear direction
+
+    float wrapWidthFrac = 0.9f; // wrap width as fraction of window width (0..1)
 
     // state
     bool dirtyMesh = true;

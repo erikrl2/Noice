@@ -70,6 +70,12 @@ void TextMode::Destroy()
     textFB.Destroy();
 }
 
+void TextMode::OnResize(int width, int height)
+{
+    textFB.Resize(width, height);
+    dirtyMesh = true;
+}
+
 void TextMode::UpdateImGui()
 {
     ImGui::Text("TextMode");
@@ -88,7 +94,7 @@ void TextMode::UpdateImGui()
     }
 
     float prevBake = bakeFontPx;
-    if (ImGui::SliderFloat("Bake font px", &bakeFontPx, 16.0f, 512.0f, "%.0f"))
+    if (ImGui::SliderFloat("Bake font px", &bakeFontPx, 16.0f, 140.0f, "%.0f"))
     {
         // re-bake atlas on change
         if (bakeFontPx != prevBake)
@@ -101,16 +107,17 @@ void TextMode::UpdateImGui()
     if (ImGui::SliderFloat("Scale", &scale, 0.1f, 4.0f, "%.2f"))
         dirtyMesh = true;
 
+    if (ImGui::SliderFloat("Wrap width", &wrapWidthFrac, 0.1f, 1.0f, "%.2f"))
+        dirtyMesh = true;
+
     ImGui::Checkbox("Center", &center);
 
     ImGui::Separator();
     ImGui::SliderFloat2("Direction (RG)", glm::value_ptr(direction), -1.0f, 1.0f);
+    ImGui::SliderFloat2("BG Direction", glm::value_ptr(bgDir), -1.0f, 1.0f);
     ImGui::SliderFloat("Threshold", &threshold, 0.0f, 0.5f, "%.4f");
     ImGui::SliderFloat("Softness", &softness, 0.0f, 0.25f, "%.4f");
     ImGui::Checkbox("Premultiply", &premultiply);
-
-    ImGui::Separator();
-    ImGui::Checkbox("Additive blend", &additiveBlend);
 }
 
 void TextMode::Update(float /*dt*/)
@@ -119,21 +126,11 @@ void TextMode::Update(float /*dt*/)
         RebuildTextMesh();
 
     // Bind FBO + viewport via Clear()
-    textFB.Clear();
+    textFB.Clear(glm::vec4(bgDir.x, bgDir.y, 0.0f, 0.0f));
 
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
-
-    if (additiveBlend)
-    {
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_ONE, GL_ONE);
-    }
-    else
-    {
-        // "overwrite": write directly
-        glDisable(GL_BLEND);
-    }
+    glDisable(GL_BLEND);
 
     textShader.Use();
     textShader.SetVec2("uScreenSize", glm::vec2((float)textFB.tex.width, (float)textFB.tex.height));
@@ -142,14 +139,9 @@ void TextMode::Update(float /*dt*/)
     textShader.SetFloat("uSoftness", softness);
     textShader.SetInt("uPremultiply", premultiply ? 1 : 0);
 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, fontAtlasTex);
-    textShader.SetInt("uFontAtlas", 0);
+    textShader.SetTexture2D("uFontAtlas", fontAtlasTex, 0);
 
     textMesh.Draw(0);
-
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glDisable(GL_BLEND);
 }
 
 void TextMode::LoadFontAtlas(const char* ttfPath)
@@ -172,27 +164,19 @@ void TextMode::LoadFontAtlas(const char* ttfPath)
     if (res <= 0)
         return;
 
-    if (fontAtlasTex == 0)
-        glGenTextures(1, &fontAtlasTex);
+    if (fontAtlasTex.id == 0)
+        fontAtlasTex.Create(atlasW, atlasH, GL_R8, GL_LINEAR, GL_CLAMP_TO_EDGE);
 
-    // TODO: use Texture class
-    glBindTexture(GL_TEXTURE_2D, fontAtlasTex);
+    // Upload pixels using glTexSubImage2D
+    glBindTexture(GL_TEXTURE_2D, fontAtlasTex.id);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, atlasW, atlasH, 0, GL_RED, GL_UNSIGNED_BYTE, atlasPixels.data());
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, atlasW, atlasH, GL_RED, GL_UNSIGNED_BYTE, atlasPixels.data());
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void TextMode::DestroyFontAtlas()
 {
-    if (fontAtlasTex)
-    {
-        glDeleteTextures(1, &fontAtlasTex);
-        fontAtlasTex = 0;
-    }
+    fontAtlasTex.Destroy();
     atlasPixels.clear();
     ttfBuffer.clear();
 }
@@ -208,7 +192,7 @@ void TextMode::RebuildTextMesh()
 
     DestroyTextMesh();
 
-    if (text.empty() || fontAtlasTex == 0)
+    if (text.empty() || fontAtlasTex.id == 0)
         return;
 
     std::vector<TextVertex> verts;
@@ -216,15 +200,23 @@ void TextMode::RebuildTextMesh()
     verts.reserve(text.size() * 4);
     indices.reserve(text.size() * 6);
 
-    // Pass 1: compute bounds
+    float screenW = (float)textFB.tex.width;
+    float screenH = (float)textFB.tex.height;
+    float wrapWidth = screenW * wrapWidthFrac;
+
+    // Pass 1: layout text with wrapping and compute bounds
+    std::vector<stbtt_aligned_quad> quads;
+    quads.reserve(text.size());
+
     float x = 0.0f;
     float y = 0.0f;
-
     float minX =  1e9f, minY =  1e9f;
     float maxX = -1e9f, maxY = -1e9f;
 
-    for (char c : text)
+    for (size_t i = 0; i < text.size(); ++i)
     {
+        char c = text[i];
+        
         if (c == '\n')
         {
             x = 0.0f;
@@ -237,7 +229,18 @@ void TextMode::RebuildTextMesh()
             continue;
 
         stbtt_aligned_quad q;
+        float prevX = x;
         stbtt_GetBakedQuad(baked, atlasW, atlasH, code - kFirstChar, &x, &y, &q, 1);
+
+        // Check if we need to wrap
+        if (x > wrapWidth && prevX > 0.0f)
+        {
+            x = 0.0f;
+            y += bakeFontPx;
+            stbtt_GetBakedQuad(baked, atlasW, atlasH, code - kFirstChar, &x, &y, &q, 1);
+        }
+
+        quads.push_back(q);
 
         minX = (q.x0 < minX) ? q.x0 : minX;
         minY = (q.y0 < minY) ? q.y0 : minY;
@@ -245,14 +248,11 @@ void TextMode::RebuildTextMesh()
         maxY = (q.y1 > maxY) ? q.y1 : maxY;
     }
 
-    if (minX > maxX)
+    if (minX > maxX || quads.empty())
         return;
 
     float textW = (maxX - minX) * scale;
     float textH = (maxY - minY) * scale;
-
-    float screenW = (float)textFB.tex.width;
-    float screenH = (float)textFB.tex.height;
 
     float originX = 0.0f;
     float originY = 0.0f;
@@ -263,24 +263,8 @@ void TextMode::RebuildTextMesh()
     }
 
     // Pass 2: emit quads
-    x = 0.0f;
-    y = 0.0f;
-    for (char c : text)
+    for (const auto& q : quads)
     {
-        if (c == '\n')
-        {
-            x = 0.0f;
-            y += bakeFontPx;
-            continue;
-        }
-
-        int code = (unsigned char)c;
-        if (code < kFirstChar || code >= kFirstChar + kCharCount)
-            continue;
-
-        stbtt_aligned_quad q;
-        stbtt_GetBakedQuad(baked, atlasW, atlasH, code - kFirstChar, &x, &y, &q, 1);
-
         float x0 = originX + (q.x0 - minX) * scale;
         float y0 = originY + (q.y0 - minY) * scale;
         float x1 = originX + (q.x1 - minX) * scale;
@@ -292,15 +276,7 @@ void TextMode::RebuildTextMesh()
     // upload
     textMesh.UploadIndexed(verts.data(), verts.size() * sizeof(TextVertex), indices.data(), indices.size());
 
-    // setup attribute pointers: layout(location=0) vec2 pos, layout(location=1) vec2 uv 
-    glBindVertexArray(textMesh.vao);
-    glBindBuffer(GL_ARRAY_BUFFER, textMesh.vbo);
-
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(TextVertex), (void*)offsetof(TextVertex, pos));
-    glEnableVertexAttribArray(0);
-
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(TextVertex), (void*)offsetof(TextVertex, uv));
-    glEnableVertexAttribArray(1);
-
-    glBindVertexArray(0);
+    // setup attribute pointers using helper
+    textMesh.SetAttrib(0, 2, GL_FLOAT, GL_FALSE, sizeof(TextVertex), offsetof(TextVertex, pos));
+    textMesh.SetAttrib(1, 2, GL_FLOAT, GL_FALSE, sizeof(TextVertex), offsetof(TextVertex, uv));
 }

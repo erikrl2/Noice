@@ -168,6 +168,7 @@ void App::OnFramebufferResized(GLFWwindow* window, int w, int h) {
 
     app.scrollEffect.OnResize(w, h);
     app.objectMode.OnResize(w, h);
+    app.textMode.OnResize(w, h);
 }
 
 void App::OnMouseMoved(GLFWwindow* window, double xpos, double ypos) {
