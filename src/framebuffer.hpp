@@ -22,6 +22,7 @@ struct Texture {
 
     void Swap(Texture& other);
     void SetUnpackStorageMode(int value);
+    void UploadFromCPU(unsigned char* data);
 };
 
 struct Framebuffer {

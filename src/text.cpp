@@ -80,21 +80,21 @@ void TextMode::UpdateImGui()
 {
     ImGui::Text("TextMode");
 
-    // Basic InputText without imgui_stdlib (fixed buffer)
-    char buf[256];
+    // InputTextMultiline for better text editing
+    char buf[1024];
 #ifdef _MSC_VER
     strcpy_s(buf, text.c_str());
 #else
     std::snprintf(buf, sizeof(buf), "%s", text.c_str());
 #endif
-    if (ImGui::InputText("Text", buf, sizeof(buf)))
+    if (ImGui::InputTextMultiline("Text", buf, sizeof(buf), ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 4)))
     {
         text = buf;
         dirtyMesh = true;
     }
 
     float prevBake = bakeFontPx;
-    if (ImGui::SliderFloat("Bake font px", &bakeFontPx, 16.0f, 140.0f, "%.0f"))
+    if (ImGui::SliderFloat("Bake font px", &bakeFontPx, 16.0f, 290.0f, "%.0f"))
     {
         // re-bake atlas on change
         if (bakeFontPx != prevBake)
@@ -110,7 +110,8 @@ void TextMode::UpdateImGui()
     if (ImGui::SliderFloat("Wrap width", &wrapWidthFrac, 0.1f, 1.0f, "%.2f"))
         dirtyMesh = true;
 
-    ImGui::Checkbox("Center", &center);
+    if (ImGui::Checkbox("Center", &center))
+        dirtyMesh = true;
 
     ImGui::Separator();
     ImGui::SliderFloat2("Direction (RG)", glm::value_ptr(direction), -1.0f, 1.0f);
@@ -174,11 +175,8 @@ void TextMode::LoadFontAtlas(const char* ttfPath)
         fontAtlasTex.Resize(atlasW, atlasH);
     }
 
-    // Upload pixels using glTexSubImage2D
-    glBindTexture(GL_TEXTURE_2D, fontAtlasTex.id);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, atlasW, atlasH, GL_RED, GL_UNSIGNED_BYTE, atlasPixels.data());
-    glBindTexture(GL_TEXTURE_2D, 0);
+    // Upload pixels using Texture wrapper
+    fontAtlasTex.UploadFromCPU(atlasPixels.data());
 }
 
 void TextMode::DestroyFontAtlas()
@@ -209,9 +207,9 @@ void TextMode::RebuildTextMesh()
 
     float screenW = (float)textFB.tex.width;
     float screenH = (float)textFB.tex.height;
-    float wrapWidth = screenW * wrapWidthFrac;
+    float wrapWidth = (screenW * wrapWidthFrac) / scale; // Account for scale
 
-    // Pass 1: layout text with wrapping and compute bounds
+    // Pass 1: layout text with word-based wrapping and compute bounds
     std::vector<stbtt_aligned_quad> quads;
     quads.reserve(text.size());
 
@@ -220,7 +218,8 @@ void TextMode::RebuildTextMesh()
     float minX =  1e9f, minY =  1e9f;
     float maxX = -1e9f, maxY = -1e9f;
 
-    for (size_t i = 0; i < text.size(); ++i)
+    size_t i = 0;
+    while (i < text.size())
     {
         char c = text[i];
         
@@ -228,31 +227,87 @@ void TextMode::RebuildTextMesh()
         {
             x = 0.0f;
             y += bakeFontPx;
+            ++i;
             continue;
         }
 
-        int code = (unsigned char)c;
-        if (code < kFirstChar || code >= kFirstChar + kCharCount)
+        // Check if this is a space or start of a word
+        bool isSpace = (c == ' ' || c == '\t');
+        
+        if (isSpace)
+        {
+            // Process single space/tab character
+            int code = (unsigned char)c;
+            if (code >= kFirstChar && code < kFirstChar + kCharCount)
+            {
+                stbtt_aligned_quad q;
+                stbtt_GetBakedQuad(baked, atlasW, atlasH, code - kFirstChar, &x, &y, &q, 1);
+                quads.push_back(q);
+                
+                minX = (q.x0 < minX) ? q.x0 : minX;
+                minY = (q.y0 < minY) ? q.y0 : minY;
+                maxX = (q.x1 > maxX) ? q.x1 : maxX;
+                maxY = (q.y1 > maxY) ? q.y1 : maxY;
+            }
+            ++i;
             continue;
+        }
 
-        stbtt_aligned_quad q;
-        float prevX = x;
-        stbtt_GetBakedQuad(baked, atlasW, atlasH, code - kFirstChar, &x, &y, &q, 1);
+        // Process a word (sequence of non-whitespace chars)
+        size_t wordStart = i;
+        size_t wordEnd = i;
+        while (wordEnd < text.size() && text[wordEnd] != ' ' && text[wordEnd] != '\t' && text[wordEnd] != '\n')
+            ++wordEnd;
 
-        // Check if we need to wrap
-        if (x > wrapWidth && prevX > 0.0f)
+        // Measure the word width
+        float wordStartX = x;
+        float tempX = x;
+        float tempY = y;
+        
+        std::vector<stbtt_aligned_quad> wordQuads;
+        for (size_t j = wordStart; j < wordEnd; ++j)
+        {
+            int code = (unsigned char)text[j];
+            if (code < kFirstChar || code >= kFirstChar + kCharCount)
+                continue;
+            
+            stbtt_aligned_quad q;
+            stbtt_GetBakedQuad(baked, atlasW, atlasH, code - kFirstChar, &tempX, &tempY, &q, 1);
+            wordQuads.push_back(q);
+        }
+        
+        float wordWidth = tempX - wordStartX;
+        
+        // Check if word needs to wrap to next line
+        if (x + wordWidth > wrapWidth && x > 0.0f)
         {
             x = 0.0f;
             y += bakeFontPx;
-            stbtt_GetBakedQuad(baked, atlasW, atlasH, code - kFirstChar, &x, &y, &q, 1);
         }
 
-        quads.push_back(q);
-
-        minX = (q.x0 < minX) ? q.x0 : minX;
-        minY = (q.y0 < minY) ? q.y0 : minY;
-        maxX = (q.x1 > maxX) ? q.x1 : maxX;
-        maxY = (q.y1 > maxY) ? q.y1 : maxY;
+        // Add the word quads
+        for (auto& q : wordQuads)
+        {
+            // Adjust quad positions if we wrapped
+            if (x == 0.0f && wordStartX > 0.0f)
+            {
+                float dx = -wordStartX;
+                q.x0 += dx;
+                q.x1 += dx;
+                q.y0 += (y - tempY);
+                q.y1 += (y - tempY);
+            }
+            
+            quads.push_back(q);
+            
+            minX = (q.x0 < minX) ? q.x0 : minX;
+            minY = (q.y0 < minY) ? q.y0 : minY;
+            maxX = (q.x1 > maxX) ? q.x1 : maxX;
+            maxY = (q.y1 > maxY) ? q.y1 : maxY;
+        }
+        
+        x += wordWidth;
+        i = wordEnd;
     }
 
     if (minX > maxX || quads.empty())
