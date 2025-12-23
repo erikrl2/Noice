@@ -20,8 +20,8 @@ bool Framebuffer::Create(int w, int h, GLint format, GLint filter, GLint wrap, b
     bool ok = (glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
     if (!ok) { std::cerr << "Framebuffer incomplete\n"; }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glBindTexture(GL_TEXTURE_2D, 0);
+    // glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // glBindTexture(GL_TEXTURE_2D, 0);
 
     return ok;
 }
@@ -51,7 +51,7 @@ void Framebuffer::SwapColorTex(Texture& other) {
     std::swap(tex.id, other.id);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex.id, 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Framebuffer::SwapDepthTex(Texture& other) {
@@ -60,7 +60,7 @@ void Framebuffer::SwapDepthTex(Texture& other) {
     std::swap(depthTex.id, other.id);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depthTex.id, 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    // glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Framebuffer::Unbind() {
@@ -106,7 +106,7 @@ void Texture::Create(int w, int h, GLint internalFormat, GLint filter, GLint wra
         GLfloat borderColorV[] = { bc, bc, bc, bc };
         glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColorV);
     }
-    glBindTexture(GL_TEXTURE_2D, 0);
+    // glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void Texture::Destroy() {
@@ -128,23 +128,18 @@ void Texture::Clear() const {
     glClearTexImage(id, 0, format, GL_FLOAT, clearValue);
 }
 
+void Texture::Bind() const {
+    glBindTexture(GL_TEXTURE_2D, id);
+}
+
 void Texture::Swap(Texture& other) {
     assert(width == other.width && height == other.height);
     assert(internalFormat == other.internalFormat);
     std::swap(id, other.id);
 }
 
-void Texture::SetUnpackStorageMode(int value) {
-    glBindTexture(GL_TEXTURE_2D, id);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, value);
-    glBindTexture(GL_TEXTURE_2D, 0);
-}
-
 void Texture::UploadFromCPU(unsigned char* data) {
     FormatInfo fi = GetFormatInfo(internalFormat);
-    glBindTexture(GL_TEXTURE_2D, id);
     glPixelStorei(GL_UNPACK_ALIGNMENT, (fi.format == GL_RGBA) ? 4 : 1);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, fi.format, fi.type, data);
-    glBindTexture(GL_TEXTURE_2D, 0);
 }
-
