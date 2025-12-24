@@ -17,47 +17,41 @@ public:
     void UpdateImGui();
     void Update(float dt);
 
-    Framebuffer& GetObjFB() { return textFB; } // TODO: rename
+    void OnResize(int width, int height);
+
+    Framebuffer& GetTextFB() { return textFB; }
 
 private:
     void LoadFontAtlas(const char* ttfPath);
     void DestroyFontAtlas();
 
-    void RebuildTextMesh(); // rebuild VBO/IBO for current text
-    void DestroyTextMesh();
+    void RebuildTextMesh();
 
 private:
     Shader textShader;
     Framebuffer textFB;
 
-    // --- stb baked font atlas ---
-    GLuint fontAtlasTex = 0;
-    int atlasW = 1024;
-    int atlasH = 1024;
+    Texture fontAtlasTex;
+    const int atlasW = 2048;
+    const int atlasH = 2048;
 
-    static constexpr int kFirstChar = 32;
-    static constexpr int kCharCount = 95; // 32..126 inclusive
-    stbtt_bakedchar baked[kCharCount]{};
+    static const int firstChar = 32;
+    static const int charCount = 95;
+    stbtt_bakedchar baked[charCount]{};
 
     std::vector<unsigned char> ttfBuffer;
     std::vector<unsigned char> atlasPixels;
 
-    // --- text mesh (quads) ---
     SimpleMesh textMesh;
+    bool dirtyMesh = true;
 
-    // --- parameters ---
     std::string text = "NOICE";
-    float bakeFontPx = 256.0f; // requires re-bake atlas when changed
-    float scale = 1.0f;        // additional scale after baking
+    float bakeFontPx = 290.0f;
+    float scale = 1.0f;
     bool center = true;
 
-    glm::vec2 direction = glm::vec2(1.0f, 0.0f); // written into RG16F
-    float threshold = 0.02f;
-    float softness = 0.05f;
-    bool premultiply = true;
+    glm::vec2 direction = glm::vec2(1.0f, 0.0f);
+    glm::vec2 bgDir = glm::vec2(0.0f, 0.0f);
 
-    bool additiveBlend = false;
-
-    // state
-    bool dirtyMesh = true;
+    float wrapWidthFrac = 0.9f;
 };

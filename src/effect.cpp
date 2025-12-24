@@ -6,8 +6,8 @@
 #include <imgui.h>
 
 void Effect::Init(int width, int height) {
-    scrollShader.CreateCompute("assets/shaders/adapt_scroll.comp.glsl");
-    fillShader.CreateCompute("assets/shaders/fill_gaps.comp.glsl");
+    scrollShader.CreateCompute("assets/shaders/scroll_move.comp.glsl");
+    fillShader.CreateCompute("assets/shaders/scroll_fill.comp.glsl");
 
     int scaledWidth = width / downscaleFactor;
     int scaledHeight = height / downscaleFactor;
@@ -123,5 +123,16 @@ void Effect::OnMouseClicked(int button, int action) {
         if (action == GLFW_PRESS) {
             disabled = !disabled;
         }
+    }
+}
+
+void Effect::OnKeyPressed(int key, int action) {
+    switch (key) {
+    case GLFW_KEY_P:
+      if (action == GLFW_PRESS) paused = !paused;
+      break;
+    case GLFW_KEY_T:
+      if (action == GLFW_PRESS) disabled = !disabled;
+      break;
     }
 }

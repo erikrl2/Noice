@@ -32,6 +32,7 @@ private:
     static void OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, int mods);
 
     Effect& SelectedEffect();
+    Texture& SelectedModeTex();
 
     void CheckWindowSize();
 
@@ -52,4 +53,6 @@ private:
     ObjectMode objectMode;
     TextMode textMode;
     // TODO: Paint
+
+    bool showSettings = true;
 };

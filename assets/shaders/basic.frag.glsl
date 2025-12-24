@@ -2,10 +2,10 @@
 
 in vec3 t;
 
-out vec4 FragColor;
+layout(location=0) out vec2 outRG;
 
 uniform mat4 viewproj;
 
 void main() {
-    FragColor = vec4(normalize(viewproj * vec4(t, 0)).xy, 0, 0);
+    outRG = normalize(viewproj * vec4(t, 0)).xy;
 }

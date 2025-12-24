@@ -1,20 +1,16 @@
 #version 430 core
 
-layout(location=0) in vec2 aPos; // pixel coords
-layout(location=1) in vec2 aUV;
+layout(location=0) in vec2 pos;
+layout(location=1) in vec2 uvIn;
 
-out vec2 vUV;
+out vec2 uv;
 
-uniform vec2 uScreenSize;
+uniform vec2 screenSize;
 
-void main()
-{
-    vUV = aUV;
+void main() {
+    uv = uvIn;
 
-    // pixel -> NDC
-    vec2 ndc = (aPos / uScreenSize) * 2.0 - 1.0;
-
-    // flip y (we build y down in pixels)
+    vec2 ndc = (pos / screenSize) * 2.0 - 1.0;
     ndc.y = -ndc.y;
 
     gl_Position = vec4(ndc, 0.0, 1.0);

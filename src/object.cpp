@@ -1,4 +1,5 @@
 #include "object.hpp"
+#include "mesh.hpp"
 
 #include <imgui.h>
 #include <glm/glm.hpp>
@@ -7,7 +8,7 @@
 void ObjectMode::Init(int width, int height) {
     carMesh = SimpleMesh::LoadFromOBJ("assets/models/jeep.obj");
     spiderMesh = SimpleMesh::LoadFromOBJ("assets/models/spider.obj");
-    //dragonMesh = SimpleMesh::LoadFromOBJ("assets/models/dragon.obj");
+    dragonMesh = SimpleMesh::LoadFromOBJ("assets/models/dragon.obj");
 
     objectShader.Create("assets/shaders/basic.vert.glsl", "assets/shaders/basic.frag.glsl");
 
@@ -23,11 +24,11 @@ void ObjectMode::Destroy() {
 }
 
 void ObjectMode::UpdateImGui() {
-    ImGui::Text("Mesh:");
+    ImGui::Text("Object Mode");
     bool changed = false;
-    changed = ImGui::RadioButton("Car", (int*)&meshSelect, (int)MeshType::Car); ImGui::SameLine();
-    changed = ImGui::RadioButton("Spider", (int*)&meshSelect, (int)MeshType::Spider); ImGui::SameLine();
-    if (dragonMesh.vao) changed = ImGui::RadioButton("Dragon", (int*)&meshSelect, (int)MeshType::Dragon);
+    changed |= ImGui::RadioButton("Car", (int*)&meshSelect, (int)MeshType::Car); ImGui::SameLine();
+    changed |= ImGui::RadioButton("Spider", (int*)&meshSelect, (int)MeshType::Spider); ImGui::SameLine();
+    changed |= ImGui::RadioButton("Dragon", (int*)&meshSelect, (int)MeshType::Dragon);
     if (changed) hasValidPrevMvp = false;
 }
 
@@ -45,7 +46,7 @@ void ObjectMode::RenderObject() {
 
     objectFB.Clear();
 
-    SelectedMesh().Draw(RenderFlag::DepthTest);
+    SelectedMesh().Draw(RenderFlag::DepthTest | RenderFlag::CullFace);
 }
 
 void ObjectMode::UpdateTransformMatrices(float dt) {

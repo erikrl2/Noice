@@ -28,6 +28,7 @@ public:
 
     void OnResize(int width, int height);
     void OnMouseClicked(int button, int action);
+    void OnKeyPressed(int key, int action);
 
 private:
     void ScatterPass(Framebuffer& in, float dt, MvpState* mats = nullptr);

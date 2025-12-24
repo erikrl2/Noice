@@ -1,46 +1,16 @@
 #include "shader.hpp"
+#include "util.hpp"
 
 #include <glad/glad.h>
 
-#include <fstream>
-#include <sstream>
 #include <iostream>
-#include <vector>
 
-static std::string load(const char* p) {
-    std::ifstream f(p);
-    std::stringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
-}
-
-static void printShaderLog(GLuint shader, const char* name) {
-    GLint ok = 0;
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
-    if (ok == GL_FALSE) {
-        GLint len = 0;
-        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &len);
-        std::vector<char> buf(len ? len : 1);
-        glGetShaderInfoLog(shader, (GLsizei)buf.size(), nullptr, buf.data());
-        std::cerr << "Shader compile error (" << (name ? name : "") << "):\n" << buf.data() << "\n";
-    }
-}
-
-static void printProgramLog(GLuint prog, const char* name) {
-    GLint ok = 0;
-    glGetProgramiv(prog, GL_LINK_STATUS, &ok);
-    if (ok == GL_FALSE) {
-        GLint len = 0;
-        glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &len);
-        std::vector<char> buf(len ? len : 1);
-        glGetProgramInfoLog(prog, (GLsizei)buf.size(), nullptr, buf.data());
-        std::cerr << "Program link error (" << (name ? name : "") << "):\n" << buf.data() << "\n";
-    }
-}
+static void printShaderLog(GLuint shader, const char* name);
+static void printProgramLog(GLuint prog, const char* name);
 
 void Shader::Create(const char* v, const char* f) {
-    std::string vs = load(v);
-    std::string fs = load(f);
+    std::string vs = ReadFileString(v);
+    std::string fs = ReadFileString(f);
     const char* vc = vs.c_str();
     const char* fc = fs.c_str();
 
@@ -65,7 +35,7 @@ void Shader::Create(const char* v, const char* f) {
 }
 
 void Shader::CreateCompute(const char* c) {
-    std::string cs = load(c);
+    std::string cs = ReadFileString(c);
     const char* cc = cs.c_str();
 
     unsigned int comp = glCreateShader(GL_COMPUTE_SHADER);
@@ -128,4 +98,30 @@ void Shader::DispatchCompute(int width, int height, int groupSize, bool barrier)
     glDispatchCompute(numGroupsX, numGroupsY, 1);
     if (barrier) glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 
+}
+
+// ---
+
+static void printShaderLog(GLuint shader, const char* name) {
+    GLint ok = 0;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
+    if (ok == GL_FALSE) {
+        GLint len = 0;
+        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &len);
+        std::vector<char> buf(len ? len : 1);
+        glGetShaderInfoLog(shader, (GLsizei)buf.size(), nullptr, buf.data());
+        std::cerr << "Shader compile error (" << (name ? name : "") << "):\n" << buf.data() << "\n";
+    }
+}
+
+static void printProgramLog(GLuint prog, const char* name) {
+    GLint ok = 0;
+    glGetProgramiv(prog, GL_LINK_STATUS, &ok);
+    if (ok == GL_FALSE) {
+        GLint len = 0;
+        glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &len);
+        std::vector<char> buf(len ? len : 1);
+        glGetProgramInfoLog(prog, (GLsizei)buf.size(), nullptr, buf.data());
+        std::cerr << "Program link error (" << (name ? name : "") << "):\n" << buf.data() << "\n";
+    }
 }

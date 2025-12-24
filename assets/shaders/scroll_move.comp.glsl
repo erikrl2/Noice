@@ -82,7 +82,7 @@ void main() {
     if (targetPx.x < 0 || targetPx.x >= size.x || targetPx.y < 0 || targetPx.y >= size.y) return;
 
     if (isDynamic) {
-        float targetDepth = texture(currDepthTex, targetUV).r; // TODO: find out if imgui renders depth
+        float targetDepth = texture(currDepthTex, targetUV).r;
         if (targetDepth >= 1.0) return;
 
         float depthDiff = abs(currNDC.z - (targetDepth * 2.0 - 1.0));

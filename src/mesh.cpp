@@ -32,11 +32,20 @@ void SimpleMesh::UploadArrays(const void* vertexData, size_t vertexBytes, size_t
     glBindVertexArray(0);
 }
 
+void SimpleMesh::SetAttrib(GLuint location, GLint components, GLenum type, GLboolean normalized, GLsizei stride, size_t offset) {
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glVertexAttribPointer(location, components, type, normalized, stride, (void*)offset);
+    glEnableVertexAttribArray(location);
+    glBindVertexArray(0);
+}
+
 void SimpleMesh::Draw(int renderFlags) const {
     if (!vao) return;
     glBindVertexArray(vao);
 
     if (renderFlags & RenderFlag::DepthTest) glEnable(GL_DEPTH_TEST);
+    if (renderFlags & RenderFlag::CullFace) glEnable(GL_CULL_FACE);
 
     if (indexCount > 0) {
         glDrawElements(GL_TRIANGLES, (GLsizei)indexCount, GL_UNSIGNED_INT, 0);
@@ -45,6 +54,7 @@ void SimpleMesh::Draw(int renderFlags) const {
         glDrawArrays(GL_TRIANGLES, 0, (GLsizei)vertexCount);
     }
 
+    if (renderFlags & RenderFlag::CullFace) glDisable(GL_CULL_FACE);
     if (renderFlags & RenderFlag::DepthTest) glDisable(GL_DEPTH_TEST);
 }
 

@@ -16,6 +16,8 @@ struct SimpleMesh {
     void UploadIndexed(const void* vertexData, size_t vertexBytes, const unsigned int* indices, size_t indexCount);
     void UploadArrays(const void* vertexData, size_t vertexBytes, size_t vertexCount);
 
+    void SetAttrib(GLuint location, GLint components, GLenum type, GLboolean normalized, GLsizei stride, size_t offset);
+
     void Draw(int renderFlags = 0) const;
     void Destroy();
 
@@ -24,4 +26,4 @@ struct SimpleMesh {
     static SimpleMesh LoadFromOBJ(const std::string& path);
 };
 
-enum RenderFlag { DepthTest = 1 << 0, };
+enum RenderFlag { DepthTest = 1 << 0, CullFace = 1 << 1 };

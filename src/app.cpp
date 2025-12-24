@@ -1,5 +1,7 @@
 #include "app.hpp"
 #include "GLFW/glfw3.h"
+#include "framebuffer.hpp"
+#include "mesh.hpp"
 #include "util.hpp"
 
 #include <glad/glad.h>
@@ -78,7 +80,7 @@ void App::InitOpenGL() {
 #endif
 
     glDisable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
+    glDisable(GL_CULL_FACE);
 }
 
 void App::InitImGui() {
@@ -119,7 +121,7 @@ void App::Update(float dt) {
     }
     case Mode::Text: {
         textMode.Update(dt);
-        effect.ApplyStatic(textMode.GetObjFB(), dt);
+        effect.ApplyStatic(textMode.GetTextFB(), dt);
       break;
     }
     case Mode::Paint: {}
@@ -129,7 +131,8 @@ void App::Update(float dt) {
 }
 
 void App::UpdateImGui() {
-    bool open = ImGui::Begin("Settings", 0, ImGuiWindowFlags_AlwaysAutoResize);
+    if (!showSettings) return;
+    bool open = ImGui::Begin("Settings", &showSettings, ImGuiWindowFlags_AlwaysAutoResize);
     if (open) {
         SelectedEffect().UpdateImGui();
 
@@ -138,6 +141,8 @@ void App::UpdateImGui() {
         ImGui::Text("Mode:");
         ImGui::RadioButton("Objet##Mode", (int*)&modeSelect, (int)Mode::Object); ImGui::SameLine();
         ImGui::RadioButton("Text##Mode", (int*)&modeSelect, (int)Mode::Text);
+
+        ImGui::Separator();
 
         switch (modeSelect) {
         case Mode::Object: objectMode.UpdateImGui(); break;
@@ -149,10 +154,11 @@ void App::UpdateImGui() {
 }
 
 void App::RenderTexToScreen(Texture& resultTex) {
+    Effect& e = SelectedEffect();
     postShader.Use();
-    postShader.SetTexture2D("screenTex", !scrollEffect.Disabled() ? resultTex : (true ? textMode.GetObjFB().tex : scrollEffect.GetAccTex())); // TODO
+    postShader.SetTexture2D("screenTex", !e.Disabled() ? resultTex : SelectedModeTex());
     postShader.SetVec2("resolution", glm::vec2(width, height));
-    postShader.SetInt("showFlow", scrollEffect.Disabled());
+    postShader.SetInt("showFlow", e.Disabled());
     Framebuffer::BindDefault(width, height);
     quadMesh.Draw();
 }
@@ -168,6 +174,7 @@ void App::OnFramebufferResized(GLFWwindow* window, int w, int h) {
 
     app.scrollEffect.OnResize(w, h);
     app.objectMode.OnResize(w, h);
+    app.textMode.OnResize(w, h);
 }
 
 void App::OnMouseMoved(GLFWwindow* window, double xpos, double ypos) {
@@ -190,11 +197,17 @@ void App::OnMouseClicked(GLFWwindow* window, int button, int action, int mods) {
 
 void App::OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (ImGui::GetIO().WantCaptureKeyboard) return;
+    App& app = *(App*)glfwGetWindowUserPointer(window);
 
-    if (key == GLFW_KEY_ESCAPE) {
-      if (action == GLFW_PRESS) {
-          glfwSetWindowShouldClose(window, true);
-      }
+    app.scrollEffect.OnKeyPressed(key, action);
+
+    switch (key) {
+    case GLFW_KEY_ESCAPE:
+      if (action == GLFW_PRESS) glfwSetWindowShouldClose(window, true);
+      break;
+    case GLFW_KEY_H:
+      if (action == GLFW_PRESS) app.showSettings = !app.showSettings;
+      break;
     }
 }
 
@@ -207,4 +220,13 @@ void App::CheckWindowSize() {
 
 Effect& App::SelectedEffect() {
     return scrollEffect;
+}
+
+Texture& App::SelectedModeTex() {
+    switch (modeSelect) {
+    case Mode::Object: return objectMode.GetObjFB().tex;
+    case Mode::Text: return textMode.GetTextFB().tex;
+    case Mode::Paint: break;
+    }
+    return SelectedEffect().GetNoiseTex();
 }
