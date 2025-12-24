@@ -2,6 +2,7 @@
 #include "shader.hpp"
 #include "framebuffer.hpp"
 #include "mesh.hpp"
+#include "mode.hpp"
 
 #include <stb_truetype.h>
 #include <glm/glm.hpp>
@@ -9,7 +10,7 @@
 #include <string>
 #include <vector>
 
-class TextMode {
+class TextMode : public Mode {
 public:
     void Init(int width, int height);
     void Destroy();
@@ -19,7 +20,7 @@ public:
 
     void OnResize(int width, int height);
 
-    Framebuffer& GetTextFB() { return textFB; }
+    Framebuffer& GetResultFB() { return textFB; }
 
 private:
     void LoadFontAtlas(const char* ttfPath);

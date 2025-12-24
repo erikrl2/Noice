@@ -43,19 +43,14 @@ void Effect::UpdateImGui() {
     ImGui::Checkbox("Pause", &paused);
 }
 
-void Effect::ApplyDynamic(Framebuffer& in, MvpState& mats, float dt) {
-    ScatterPass(in, dt, &mats);
+void Effect::Apply(Framebuffer& in, float dt, const MvpState* mats) {
+    assert((mats == nullptr) | in.hasDepth); // mats => depth
+    ScatterPass(in, dt, mats);
     FillPass();
-    SwapBuffers(&in);
+    SwapBuffers(in);
 }
 
-void Effect::ApplyStatic(Framebuffer& in, float dt) {
-    ScatterPass(in, dt);
-    FillPass();
-    SwapBuffers();
-}
-
-void Effect::ScatterPass(Framebuffer& in, float dt, MvpState* mats) {
+void Effect::ScatterPass(Framebuffer& in, float dt, const MvpState* mats) {
     assert(in.tex.internalFormat == GL_RG16F);
 
     static unsigned frameCount = 0;
@@ -70,8 +65,7 @@ void Effect::ScatterPass(Framebuffer& in, float dt, MvpState* mats) {
     scrollShader.SetTexture2D("flowTex", in.tex, 0);
     scrollShader.SetFloat("scrollSpeed", scrollSpeed * dt / downscaleFactor * (int)!paused);
 
-    bool isDynamic = (mats != nullptr);
-    if (isDynamic) {
+    if (mats != nullptr) {
         scrollShader.SetTexture2D("currDepthTex", in.depthTex, 1);
         scrollShader.SetTexture2D("prevDepthTex", prevDepthTex, 2);
 
@@ -81,7 +75,7 @@ void Effect::ScatterPass(Framebuffer& in, float dt, MvpState* mats) {
         scrollShader.SetMat4("currModel", mats->currModel);
         scrollShader.SetMat4("currViewProj", mats->currProj * mats->currView);
     }
-    scrollShader.SetInt("isDynamic", isDynamic);
+    scrollShader.SetInt("reproject", (mats != nullptr));
 
     scrollShader.DispatchCompute(currNoiseTex.width, currNoiseTex.height, 16);
 }
@@ -98,10 +92,15 @@ void Effect::FillPass() {
     fillShader.DispatchCompute(currNoiseTex.width, currNoiseTex.height, 16);
 }
 
-void Effect::SwapBuffers(Framebuffer* in) {
+void Effect::SwapBuffers(Framebuffer& in) {
     currNoiseTex.Swap(prevNoiseTex);
     currAccTex.Swap(prevAccTex);
-    if (in) in->SwapDepthTex(prevDepthTex);
+    if (in.hasDepth) in.SwapDepthTex(prevDepthTex);
+}
+
+void Effect::ClearBuffers() {
+    currNoiseTex.Clear(); prevNoiseTex.Clear();
+    currAccTex.Clear(); prevAccTex.Clear();
 }
 
 void Effect::OnResize(int width, int height) {
@@ -114,8 +113,7 @@ void Effect::OnResize(int width, int height) {
 
     prevDepthTex.Resize(width, height);
 
-    currNoiseTex.Clear(); prevNoiseTex.Clear();
-    currAccTex.Clear(); prevAccTex.Clear();
+    ClearBuffers();
 }
 
 void Effect::OnMouseClicked(int button, int action) {

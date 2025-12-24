@@ -18,7 +18,7 @@ uniform mat4 currModel;
 uniform mat4 currViewProj;
 
 uniform float scrollSpeed;
-uniform bool isDynamic;
+uniform bool reproject;
 
 void main() {
     ivec2 prevPx = ivec2(gl_GlobalInvocationID.xy);
@@ -34,7 +34,7 @@ void main() {
     ivec2 currPx;
     vec3 currNDC;
 
-    if (isDynamic) {
+    if (reproject) {
         float prevDepth = texture(prevDepthTex, prevUV).r;
         if (prevDepth >= 1.0) {
             imageStore(currNoiseTex, prevPx, vec4(prevNoise.r, 1, 0, 0));
@@ -81,7 +81,7 @@ void main() {
 
     if (targetPx.x < 0 || targetPx.x >= size.x || targetPx.y < 0 || targetPx.y >= size.y) return;
 
-    if (isDynamic) {
+    if (reproject) {
         float targetDepth = texture(currDepthTex, targetUV).r;
         if (targetDepth >= 1.0) return;
 

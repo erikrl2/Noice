@@ -3,11 +3,11 @@
 #include "framebuffer.hpp"
 #include "mesh.hpp"
 #include "camera.hpp"
-#include "effect.hpp"
+#include "mode.hpp"
 
 #include <GLFW/glfw3.h>
 
-class ObjectMode {
+class ObjectMode : public Mode {
 public:
     void Init(int width, int height);
     void Destroy();
@@ -19,8 +19,8 @@ public:
     void OnMouseClicked(int button, int action);
     void OnMouseMoved(double xpos, double ypos);
 
-    Framebuffer& GetObjFB() { return objectFB; }
-    MvpState& GetMvpState() { return mvpState; }
+    Framebuffer& GetResultFB() { return objectFB; }
+    const MvpState* GetMvpState() { return &mvpState; }
 
 private:
     void UpdateTransformMatrices(float dt);

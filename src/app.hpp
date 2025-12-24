@@ -1,6 +1,5 @@
 #pragma once
 #include "shader.hpp"
-#include "framebuffer.hpp"
 #include "effect.hpp"
 #include "object.hpp"
 #include "text.hpp"
@@ -24,7 +23,7 @@ private:
     void UpdateImGui();
     void Update(float dt);
 
-    void RenderTexToScreen(Texture& resultTex);
+    void RenderToScreen();
 
     static void OnFramebufferResized(GLFWwindow* window, int w, int h);
     static void OnMouseMoved(GLFWwindow* window, double xpos, double ypos);
@@ -32,7 +31,7 @@ private:
     static void OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, int mods);
 
     Effect& SelectedEffect();
-    Texture& SelectedModeTex();
+    Mode& SelectedMode();
 
     void CheckWindowSize();
 
@@ -46,10 +45,9 @@ private:
     Shader postShader;
     SimpleMesh quadMesh;
 
-    enum class Mode { Object, Text, Paint };
-    Mode modeSelect = Mode::Text;
+    enum class ModeType { Object, Text, Paint };
+    ModeType modeSelect = ModeType::Text;
 
-    // TODO: make abstract Mode interface and use func SelectedMode() in cpp
     ObjectMode objectMode;
     TextMode textMode;
     // TODO: Paint

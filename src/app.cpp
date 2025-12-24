@@ -111,23 +111,14 @@ void App::DestroyResources() {
 }
 
 void App::Update(float dt) {
-    Effect& effect = SelectedEffect();
+    Effect& e = SelectedEffect();
+    Mode& m = SelectedMode();
 
-    switch (modeSelect) {
-    case Mode::Object: {
-        objectMode.Update(dt);
-        effect.ApplyDynamic(objectMode.GetObjFB(), objectMode.GetMvpState(), dt);
-        break;
-    }
-    case Mode::Text: {
-        textMode.Update(dt);
-        effect.ApplyStatic(textMode.GetTextFB(), dt);
-      break;
-    }
-    case Mode::Paint: {}
-    }
+    m.Update(dt);
+    if (m.HasMvp()) e.Apply(m.GetResultFB(), dt, m.GetMvpState());
+    else e.Apply(m.GetResultFB(), dt);
 
-    RenderTexToScreen(effect.GetNoiseTex());
+    RenderToScreen();
 }
 
 void App::UpdateImGui() {
@@ -139,27 +130,29 @@ void App::UpdateImGui() {
         ImGui::Separator();
 
         ImGui::Text("Mode:");
-        ImGui::RadioButton("Objet##Mode", (int*)&modeSelect, (int)Mode::Object); ImGui::SameLine();
-        ImGui::RadioButton("Text##Mode", (int*)&modeSelect, (int)Mode::Text);
+        bool changed = false;
+        changed |= ImGui::RadioButton("Object##Mode", (int*)&modeSelect, (int)ModeType::Object); ImGui::SameLine();
+        changed |= ImGui::RadioButton("Text##Mode", (int*)&modeSelect, (int)ModeType::Text);
+        if (changed) { SelectedMode().OnResize(width, height); SelectedEffect().ClearBuffers(); }
 
         ImGui::Separator();
 
-        switch (modeSelect) {
-        case Mode::Object: objectMode.UpdateImGui(); break;
-        case Mode::Text: textMode.UpdateImGui(); break;
-        case Mode::Paint: break;
-        }
+        SelectedMode().UpdateImGui();
     }
     ImGui::End();
 }
 
-void App::RenderTexToScreen(Texture& resultTex) {
+void App::RenderToScreen() {
     Effect& e = SelectedEffect();
+    Mode& m = SelectedMode();
+
     postShader.Use();
-    postShader.SetTexture2D("screenTex", !e.Disabled() ? resultTex : SelectedModeTex());
+    postShader.SetTexture2D("screenTex", !e.IsDisabled() ? e.GetResultTex() : m.GetResultFB().tex);
     postShader.SetVec2("resolution", glm::vec2(width, height));
-    postShader.SetInt("showFlow", e.Disabled());
+    postShader.SetInt("showVectors", e.IsDisabled());
+
     Framebuffer::BindDefault(width, height);
+
     quadMesh.Draw();
 }
 
@@ -172,34 +165,30 @@ void App::OnFramebufferResized(GLFWwindow* window, int w, int h) {
     app.width = w;
     app.height = h;
 
-    app.scrollEffect.OnResize(w, h);
-    app.objectMode.OnResize(w, h);
-    app.textMode.OnResize(w, h);
+    app.SelectedEffect().OnResize(w, h);
+    app.SelectedMode().OnResize(w, h);
 }
 
 void App::OnMouseMoved(GLFWwindow* window, double xpos, double ypos) {
     if (ImGui::GetIO().WantCaptureMouse) return;
     App& app = *(App*)glfwGetWindowUserPointer(window);
 
-    if (app.modeSelect == Mode::Object)
-        app.objectMode.OnMouseMoved(xpos, ypos);
+    app.SelectedMode().OnMouseMoved(xpos, ypos);
 }
 
 void App::OnMouseClicked(GLFWwindow* window, int button, int action, int mods) {
     if (ImGui::GetIO().WantCaptureMouse) return;
     App& app = *(App*)glfwGetWindowUserPointer(window);
 
-    app.scrollEffect.OnMouseClicked(button, action);
-
-    if (app.modeSelect == Mode::Object)
-        app.objectMode.OnMouseClicked(button, action);
+    app.SelectedEffect().OnMouseClicked(button, action);
+    app.SelectedMode().OnMouseClicked(button, action);
 }
 
 void App::OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (ImGui::GetIO().WantCaptureKeyboard) return;
     App& app = *(App*)glfwGetWindowUserPointer(window);
 
-    app.scrollEffect.OnKeyPressed(key, action);
+    app.SelectedEffect().OnKeyPressed(key, action);
 
     switch (key) {
     case GLFW_KEY_ESCAPE:
@@ -222,11 +211,11 @@ Effect& App::SelectedEffect() {
     return scrollEffect;
 }
 
-Texture& App::SelectedModeTex() {
+Mode& App::SelectedMode() {
     switch (modeSelect) {
-    case Mode::Object: return objectMode.GetObjFB().tex;
-    case Mode::Text: return textMode.GetTextFB().tex;
-    case Mode::Paint: break;
+    case ModeType::Object: return objectMode;
+    case ModeType::Text: return textMode;
+    case ModeType::Paint: break;
     }
-    return SelectedEffect().GetNoiseTex();
+    return textMode;
 }

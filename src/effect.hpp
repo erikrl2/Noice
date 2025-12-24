@@ -19,21 +19,21 @@ public:
 
     void UpdateImGui();
 
-    void ApplyDynamic(Framebuffer& in, MvpState& mats, float dt);
-    void ApplyStatic(Framebuffer& in, float dt);
+    void Apply(Framebuffer& in, float dt, const MvpState* mats = nullptr);
 
-    Texture& GetNoiseTex() { return prevNoiseTex; }
-    Texture& GetAccTex() { return prevAccTex; }
-    bool Disabled() { return disabled; }
+    void ClearBuffers();
+
+    Texture& GetResultTex() { return prevNoiseTex; }
+    bool IsDisabled() { return disabled; }
 
     void OnResize(int width, int height);
     void OnMouseClicked(int button, int action);
     void OnKeyPressed(int key, int action);
 
 private:
-    void ScatterPass(Framebuffer& in, float dt, MvpState* mats = nullptr);
+    void ScatterPass(Framebuffer& in, float dt, const MvpState* mats);
     void FillPass();
-    void SwapBuffers(Framebuffer* in = nullptr);
+    void SwapBuffers(Framebuffer& in);
 
 private:
     float scrollSpeed = 150.0f;
