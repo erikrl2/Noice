@@ -3,7 +3,6 @@
 #include <glad/glad.h>
 #include <tiny_obj_loader.h>
 
-#include <vector>
 #include <unordered_map>
 #include <iostream>
 
@@ -21,6 +20,7 @@ void SimpleMesh::UploadIndexed(const void* vertexData, size_t vertexBytes, const
     glBindVertexArray(0);
 }
 
+// unused
 void SimpleMesh::UploadArrays(const void* vertexData, size_t vertexBytes, size_t vertexCount) {
     this->vertexCount = vertexCount;
     indexCount = 0;
@@ -34,7 +34,7 @@ void SimpleMesh::UploadArrays(const void* vertexData, size_t vertexBytes, size_t
 
 void SimpleMesh::SetAttrib(GLuint location, GLint components, GLenum type, GLboolean normalized, GLsizei stride, size_t offset) {
     glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    // glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glVertexAttribPointer(location, components, type, normalized, stride, (void*)offset);
     glEnableVertexAttribArray(location);
     glBindVertexArray(0);
@@ -90,13 +90,7 @@ SimpleMesh SimpleMesh::CreateFullscreenQuad() {
 
     SimpleMesh m;
     m.UploadIndexed(quadVerts, sizeof(quadVerts), quadIdx, 6);
-
-    // setup attribute pointers: layout(location=0) vec2 pos
-    glBindVertexArray(m.vao);
-    glBindBuffer(GL_ARRAY_BUFFER, m.vbo);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glBindVertexArray(0);
+    m.SetAttrib(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0);
 
     return m;
 }
@@ -107,20 +101,15 @@ SimpleMesh SimpleMesh::CreateTriangle() {
          0.5f, -0.5f, 0.0f,
          0.0f,  0.5f, 0.0f
     };
+
     SimpleMesh m;
     m.UploadArrays(triVerts, sizeof(triVerts), 3);
-
-    // setup attribute pointer: layout(location=0) vec3 pos
-    glBindVertexArray(m.vao);
-    glBindBuffer(GL_ARRAY_BUFFER, m.vbo);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glBindVertexArray(0);
+    m.SetAttrib(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
 
     return m;
 }
 
-SimpleMesh SimpleMesh::LoadFromOBJ(const std::string& path) {
+MeshData SimpleMesh::LoadFromOBJ(const std::string& path) {
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
@@ -131,7 +120,7 @@ SimpleMesh SimpleMesh::LoadFromOBJ(const std::string& path) {
     if (!err.empty()) std::cerr << "tinyobj error: " << err << "\n";
     if (!ok) {
         std::cerr << "Failed to load OBJ: " << path << "\n";
-        return SimpleMesh{};
+        return MeshData{}; // TODO: test
     }
 
     struct Idx { int v, t, n; };
@@ -146,12 +135,11 @@ SimpleMesh SimpleMesh::LoadFromOBJ(const std::string& path) {
         }
     };
 
-    std::vector<float> verts; // interleaved: pos(3), normal(3), uv(2)
-    std::vector<unsigned int> indices;
+    MeshData d;
     std::unordered_map<Idx, unsigned int, IdxHash, IdxEq> cache;
 
-    verts.reserve(attrib.vertices.size() / 3 * 8); // 8 floats per vertex
-    indices.reserve(shapes.size() * 3 * 100); // rough estimate
+    d.verts.reserve(attrib.vertices.size() / 3 * 8); // 8 floats per vertex
+    d.indices.reserve(shapes.size() * 3 * 100); // rough estimate
 
     for (const auto& shape : shapes) {
         const auto& mesh = shape.mesh;
@@ -160,62 +148,54 @@ SimpleMesh SimpleMesh::LoadFromOBJ(const std::string& path) {
             Idx key{ idx.vertex_index, idx.texcoord_index, idx.normal_index };
             auto it = cache.find(key);
             if (it != cache.end()) {
-                indices.push_back(it->second);
+                d.indices.push_back(it->second);
                 continue;
             }
 
-            unsigned int newIndex = (unsigned int)(verts.size() / 8); // 8 floats per vertex
+            unsigned int newIndex = (unsigned int)(d.verts.size() / 8); // 8 floats per vertex
             // position
             if (key.v >= 0) {
-                verts.push_back(attrib.vertices[3 * key.v + 0]);
-                verts.push_back(attrib.vertices[3 * key.v + 1]);
-                verts.push_back(attrib.vertices[3 * key.v + 2]);
+                d.verts.push_back(attrib.vertices[3 * key.v + 0]);
+                d.verts.push_back(attrib.vertices[3 * key.v + 1]);
+                d.verts.push_back(attrib.vertices[3 * key.v + 2]);
             }
             else {
-                verts.push_back(0.0f); verts.push_back(0.0f); verts.push_back(0.0f);
+                d.verts.push_back(0.0f); d.verts.push_back(0.0f); d.verts.push_back(0.0f);
             }
             // normal
             if (key.n >= 0 && (size_t)(3 * key.n + 2) < attrib.normals.size()) {
-                verts.push_back(attrib.normals[3 * key.n + 0]);
-                verts.push_back(attrib.normals[3 * key.n + 1]);
-                verts.push_back(attrib.normals[3 * key.n + 2]);
+                d.verts.push_back(attrib.normals[3 * key.n + 0]);
+                d.verts.push_back(attrib.normals[3 * key.n + 1]);
+                d.verts.push_back(attrib.normals[3 * key.n + 2]);
             }
             else {
-                verts.push_back(0.0f); verts.push_back(0.0f); verts.push_back(0.0f);
+                d.verts.push_back(0.0f); d.verts.push_back(0.0f); d.verts.push_back(0.0f);
             }
             // uv
             if (key.t >= 0 && (size_t)(2 * key.t + 1) < attrib.texcoords.size()) {
-                verts.push_back(attrib.texcoords[2 * key.t + 0]);
-                verts.push_back(attrib.texcoords[2 * key.t + 1]);
+                d.verts.push_back(attrib.texcoords[2 * key.t + 0]);
+                d.verts.push_back(attrib.texcoords[2 * key.t + 1]);
             }
             else {
-                verts.push_back(0.0f); verts.push_back(0.0f);
+                d.verts.push_back(0.0f); d.verts.push_back(0.0f);
             }
 
             cache.emplace(key, newIndex);
-            indices.push_back(newIndex);
+            d.indices.push_back(newIndex);
         }
     }
 
-    if (verts.empty() || indices.empty()) {
+    if (d.verts.empty() || d.indices.empty()) {
         std::cerr << "OBJ produced no geometry: " << path << "\n";
-        return SimpleMesh{};
+        return MeshData{};
     }
 
-    SimpleMesh m;
-    m.UploadIndexed(verts.data(), verts.size() * sizeof(float), indices.data(), indices.size());
+    return d;
+}
 
-    // setup attribute pointers: layout(location=0) pos(3), location=1 normal(3), location=2 uv(2)
-    glBindVertexArray(m.vao);
-    glBindBuffer(GL_ARRAY_BUFFER, m.vbo);
-    GLsizei stride = (GLsizei)(8 * sizeof(float));
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    glBindVertexArray(0);
-
-    return m;
+void SimpleMesh::UploadDataFromOBJ(const MeshData& d) {
+    UploadIndexed(d.verts.data(), d.verts.size() * sizeof(float), d.indices.data(), d.indices.size());
+    SetAttrib(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), 0);
+    SetAttrib(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), 3 * sizeof(float));
+    SetAttrib(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), 6 * sizeof(float));
 }

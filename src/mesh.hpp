@@ -2,6 +2,12 @@
 #include <glad/glad.h>
 
 #include <string>
+#include <vector>
+
+struct MeshData {
+    std::vector<float> verts;
+    std::vector<unsigned int> indices;
+};
 
 struct SimpleMesh {
     GLuint vao = 0, vbo = 0, ebo = 0;
@@ -23,7 +29,9 @@ struct SimpleMesh {
 
     static SimpleMesh CreateFullscreenQuad();
     static SimpleMesh CreateTriangle();
-    static SimpleMesh LoadFromOBJ(const std::string& path);
+
+    static MeshData LoadFromOBJ(const std::string& path);
+    void UploadDataFromOBJ(const MeshData& data); // TODO: rename
 };
 
 enum RenderFlag { DepthTest = 1 << 0, CullFace = 1 << 1 };

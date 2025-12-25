@@ -46,7 +46,7 @@ private:
     SimpleMesh quadMesh;
 
     enum class ModeType { Object, Text, Paint };
-    ModeType modeSelect = ModeType::Text;
+    ModeType modeSelect = ModeType::Object;
 
     ObjectMode objectMode;
     TextMode textMode;

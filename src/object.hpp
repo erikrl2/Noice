@@ -7,6 +7,8 @@
 
 #include <GLFW/glfw3.h>
 
+#include <array>
+
 class ObjectMode : public Mode {
 public:
     void Init(int width, int height);
@@ -29,12 +31,10 @@ private:
     SimpleMesh& SelectedMesh();
 
 private:
-    enum class MeshType { Car, Spider, Dragon, Alien };
-    MeshType meshSelect = MeshType::Car;
+    enum class MeshType { Car = 0, Spider, Dragon, Alien, Head, Count };
+    MeshType meshSelect = MeshType::Head;
 
-    SimpleMesh carMesh;
-    SimpleMesh spiderMesh;
-    SimpleMesh dragonMesh;
+    std::array<SimpleMesh, (size_t)MeshType::Count> meshes;
 
     Shader objectShader;
     Framebuffer objectFB;
