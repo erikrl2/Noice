@@ -19,11 +19,12 @@ public:
     void Update(float dt);
 
     void OnResize(int width, int height);
+    void OnKeyPressed(int key, int action);
 
     Framebuffer& GetResultFB() { return textFB; }
 
 private:
-    void LoadFontAtlas(const char* ttfPath);
+    void LoadFontAtlas();
     void DestroyFontAtlas();
 
     void RebuildTextMesh();

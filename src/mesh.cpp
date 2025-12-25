@@ -118,66 +118,55 @@ MeshData SimpleMesh::LoadFromOBJ(const std::string& path) {
     bool ok = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, path.c_str(), nullptr, true);
     if (!warn.empty()) std::cerr << "tinyobj warning: " << warn << "\n";
     if (!err.empty()) std::cerr << "tinyobj error: " << err << "\n";
-    if (!ok) {
-        std::cerr << "Failed to load OBJ: " << path << "\n";
-        return MeshData{}; // TODO: test
-    }
+    if (!ok) return MeshData{};
 
-    struct Idx { int v, t, n; };
+    // Only position + normal (no texcoords)
+    struct Idx { int v, n; };
     struct IdxHash {
         size_t operator()(Idx const& a) const noexcept {
-            return ((size_t)a.v * 73856093u) ^ ((size_t)a.t * 19349663u) ^ ((size_t)a.n * 83492791u);
+            return ((size_t)a.v * 73856093u) ^ ((size_t)a.n * 83492791u);
         }
     };
     struct IdxEq {
         bool operator()(Idx const& a, Idx const& b) const noexcept {
-            return a.v == b.v && a.t == b.t && a.n == b.n;
+            return a.v == b.v && a.n == b.n;
         }
     };
 
     MeshData d;
     std::unordered_map<Idx, unsigned int, IdxHash, IdxEq> cache;
 
-    d.verts.reserve(attrib.vertices.size() / 3 * 8); // 8 floats per vertex
+    d.verts.reserve(attrib.vertices.size() / 3 * 6);
     d.indices.reserve(shapes.size() * 3 * 100); // rough estimate
 
     for (const auto& shape : shapes) {
         const auto& mesh = shape.mesh;
         for (size_t i = 0; i < mesh.indices.size(); ++i) {
             tinyobj::index_t idx = mesh.indices[i];
-            Idx key{ idx.vertex_index, idx.texcoord_index, idx.normal_index };
+            Idx key{ idx.vertex_index, idx.normal_index };
+
             auto it = cache.find(key);
             if (it != cache.end()) {
                 d.indices.push_back(it->second);
                 continue;
             }
 
-            unsigned int newIndex = (unsigned int)(d.verts.size() / 8); // 8 floats per vertex
-            // position
-            if (key.v >= 0) {
+            unsigned int newIndex = (unsigned int)(d.verts.size() / 6);
+
+            if (key.v >= 0 && (size_t)(3 * key.v + 2) < attrib.vertices.size()) {
                 d.verts.push_back(attrib.vertices[3 * key.v + 0]);
                 d.verts.push_back(attrib.vertices[3 * key.v + 1]);
                 d.verts.push_back(attrib.vertices[3 * key.v + 2]);
-            }
-            else {
+            } else {
                 d.verts.push_back(0.0f); d.verts.push_back(0.0f); d.verts.push_back(0.0f);
             }
-            // normal
+
             if (key.n >= 0 && (size_t)(3 * key.n + 2) < attrib.normals.size()) {
                 d.verts.push_back(attrib.normals[3 * key.n + 0]);
                 d.verts.push_back(attrib.normals[3 * key.n + 1]);
                 d.verts.push_back(attrib.normals[3 * key.n + 2]);
-            }
-            else {
+            } else {
                 d.verts.push_back(0.0f); d.verts.push_back(0.0f); d.verts.push_back(0.0f);
-            }
-            // uv
-            if (key.t >= 0 && (size_t)(2 * key.t + 1) < attrib.texcoords.size()) {
-                d.verts.push_back(attrib.texcoords[2 * key.t + 0]);
-                d.verts.push_back(attrib.texcoords[2 * key.t + 1]);
-            }
-            else {
-                d.verts.push_back(0.0f); d.verts.push_back(0.0f);
             }
 
             cache.emplace(key, newIndex);
@@ -194,8 +183,8 @@ MeshData SimpleMesh::LoadFromOBJ(const std::string& path) {
 }
 
 void SimpleMesh::UploadDataFromOBJ(const MeshData& d) {
+    if (d.indices.empty()) return;
     UploadIndexed(d.verts.data(), d.verts.size() * sizeof(float), d.indices.data(), d.indices.size());
-    SetAttrib(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), 0);
-    SetAttrib(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), 3 * sizeof(float));
-    SetAttrib(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), 6 * sizeof(float));
+    SetAttrib(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), 0);
+    SetAttrib(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), 3 * sizeof(float));
 }

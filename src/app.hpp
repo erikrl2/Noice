@@ -30,10 +30,11 @@ private:
     static void OnMouseClicked(GLFWwindow* window, int button, int action, int mods);
     static void OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, int mods);
 
+    void OnModeChange();
+    void CheckWindowSize();
+
     Effect& SelectedEffect();
     Mode& SelectedMode();
-
-    void CheckWindowSize();
 
 private:
     GLFWwindow* win = nullptr;

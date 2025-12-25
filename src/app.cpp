@@ -133,7 +133,7 @@ void App::UpdateImGui() {
         bool changed = false;
         changed |= ImGui::RadioButton("Object##Mode", (int*)&modeSelect, (int)ModeType::Object); ImGui::SameLine();
         changed |= ImGui::RadioButton("Text##Mode", (int*)&modeSelect, (int)ModeType::Text);
-        if (changed) { SelectedMode().OnResize(width, height); SelectedEffect().ClearBuffers(); }
+        if (changed) OnModeChange();
 
         ImGui::Separator();
 
@@ -189,15 +189,27 @@ void App::OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, in
     App& app = *(App*)glfwGetWindowUserPointer(window);
 
     app.SelectedEffect().OnKeyPressed(key, action);
+    app.SelectedMode().OnKeyPressed(key, action);
 
     switch (key) {
     case GLFW_KEY_ESCAPE:
-      if (action == GLFW_PRESS) glfwSetWindowShouldClose(window, true);
-      break;
+        if (action == GLFW_PRESS) glfwSetWindowShouldClose(window, true);
+        break;
     case GLFW_KEY_H:
-      if (action == GLFW_PRESS) app.showSettings = !app.showSettings;
-      break;
+        if (action == GLFW_PRESS) app.showSettings = !app.showSettings;
+        break;
+    case GLFW_KEY_O:
+        if (action == GLFW_PRESS) { app.modeSelect = ModeType::Object; app.OnModeChange(); }
+        break;
+    case GLFW_KEY_T:
+        if (action == GLFW_PRESS) { app.modeSelect = ModeType::Text; app.OnModeChange(); }
+        break;
     }
+}
+
+void App::OnModeChange() {
+    SelectedMode().OnResize(width, height);
+    SelectedEffect().ClearBuffers();
 }
 
 void App::CheckWindowSize() {

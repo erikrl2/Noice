@@ -6,12 +6,15 @@
 #include <imgui.h>
 #include <misc/cpp/imgui_stdlib.h>
 #include <glm/glm.hpp>
+#include <GLFW/glfw3.h>
+
+static const char* fontPath = "assets/fonts/courier-mon.ttf";
 
 void TextMode::Init(int width, int height) {
     textFB.Create(width, height, GL_RG16F, GL_LINEAR);
     textShader.Create("assets/shaders/text.vert.glsl", "assets/shaders/text.frag.glsl");
 
-    LoadFontAtlas("assets/fonts/courier-mon.ttf");
+    LoadFontAtlas();
 }
 
 void TextMode::Destroy() {
@@ -26,20 +29,25 @@ void TextMode::OnResize(int width, int height) {
     dirtyMesh = true;
 }
 
+void TextMode::OnKeyPressed(int key, int action) {
+    switch (key) {
+    case GLFW_KEY_C:
+        if (action == GLFW_PRESS) { center = !center; dirtyMesh = true; }
+        break;
+    }
+}
+
 void TextMode::UpdateImGui() {
     ImGui::Text("Text Mode");
 
-    if (ImGui::InputTextMultiline("Text", &text, ImVec2(0, 32), ImGuiInputTextFlags_WordWrap)) {
+    if (ImGui::InputTextMultiline("Text", &text, ImVec2(0, 32), ImGuiInputTextFlags_WordWrap))
         dirtyMesh = true;
-    }
 
-    if (ImGui::SliderFloat("Font Size", &bakeFontPx, 16.0f, 290.0f, "%.0f")) {
-        LoadFontAtlas("assets/fonts/courier-mon.ttf");
-        dirtyMesh = true;
-    }
+    if (ImGui::SliderFloat("Font Size", &bakeFontPx, 20.0f, 290.0f, "%.0f"))
+        LoadFontAtlas();
 
     dirtyMesh |= ImGui::SliderFloat("Scale", &scale, 0.1f, 5.0f, "%.2f");
-    // dirtyMesh |= ImGui::SliderFloat("Wrap width", &wrapWidthFrac, 0.1f, 1.0f, "%.2f");
+    dirtyMesh |= ImGui::SliderFloat("Wrap width", &wrapWidthFrac, 0.1f, 1.0f, "%.2f");
     dirtyMesh |= ImGui::Checkbox("Center", &center);
 
     ImGui::Separator();
@@ -48,6 +56,12 @@ void TextMode::UpdateImGui() {
 }
 
 void TextMode::Update(float dt) {
+    if (!ImGui::GetIO().WantCaptureKeyboard) {
+        auto win = glfwGetCurrentContext();
+        if (glfwGetKey(win, GLFW_KEY_W) == GLFW_PRESS) { scale *= 1.0f + dt; dirtyMesh = true; }
+        if (glfwGetKey(win, GLFW_KEY_S) == GLFW_PRESS) { scale *= 1.0f - dt; dirtyMesh = true; }
+    }
+
     if (dirtyMesh) RebuildTextMesh();
 
     textFB.Clear(glm::vec4(bgDir.x, bgDir.y, 0.0f, 0.0f));
@@ -60,9 +74,9 @@ void TextMode::Update(float dt) {
     textMesh.Draw();
 }
 
-void TextMode::LoadFontAtlas(const char* ttfPath) {
+void TextMode::LoadFontAtlas() {
     std::vector<unsigned char> newTtf;
-    if (!ReadFileBytes(ttfPath, newTtf)) return;
+    if (!ReadFileBytes(fontPath, newTtf)) return;
 
     ttfBuffer.swap(newTtf);
 
@@ -82,6 +96,8 @@ void TextMode::LoadFontAtlas(const char* ttfPath) {
     }
 
     fontAtlasTex.Upload(atlasPixels.data());
+
+    dirtyMesh = true;
 }
 
 void TextMode::DestroyFontAtlas() {

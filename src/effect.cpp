@@ -126,11 +126,11 @@ void Effect::OnMouseClicked(int button, int action) {
 
 void Effect::OnKeyPressed(int key, int action) {
     switch (key) {
-    case GLFW_KEY_P:
-      if (action == GLFW_PRESS) paused = !paused;
-      break;
-    case GLFW_KEY_T:
-      if (action == GLFW_PRESS) disabled = !disabled;
-      break;
+    case GLFW_KEY_F:
+        if (action == GLFW_PRESS) paused = !paused;
+        break;
+    case GLFW_KEY_TAB:
+        if (action == GLFW_PRESS) disabled = !disabled;
+        break;
     }
 }

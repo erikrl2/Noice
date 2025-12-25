@@ -32,7 +32,7 @@ private:
 
 private:
     enum class MeshType { Car = 0, Spider, Dragon, Alien, Head, Count };
-    MeshType meshSelect = MeshType::Head;
+    MeshType meshSelect = MeshType::Car;
 
     std::array<SimpleMesh, (size_t)MeshType::Count> meshes;
 

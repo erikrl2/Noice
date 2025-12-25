@@ -31,7 +31,7 @@ struct SimpleMesh {
     static SimpleMesh CreateTriangle();
 
     static MeshData LoadFromOBJ(const std::string& path);
-    void UploadDataFromOBJ(const MeshData& data); // TODO: rename
+    void UploadDataFromOBJ(const MeshData& data);
 };
 
 enum RenderFlag { DepthTest = 1 << 0, CullFace = 1 << 1 };
