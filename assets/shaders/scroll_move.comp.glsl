@@ -66,11 +66,12 @@ void main() {
 
 
     vec2 flowDir = normalize(texture(flowTex, currUV).xy);
+    vec2 prevAcc = imageLoad(prevAccTex, prevPx).xy;
+
     vec2 flow = flowDir * scrollSpeed;
 
-    vec2 prevAcc = imageLoad(prevAccTex, prevPx).xy;
     vec2 totalMove = prevAcc + flow;
-    vec2 intStep = trunc(totalMove);
+    vec2 intStep = trunc(totalMove); // or floor(totalMove + 0.5 * sign(totalMove));
 
     vec2 nextAcc = totalMove - intStep;
     imageStore(prevAccTex, prevPx, vec4(nextAcc, 0, 0));

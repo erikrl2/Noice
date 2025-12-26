@@ -123,7 +123,7 @@ void App::Update(float dt) {
 
 void App::UpdateImGui() {
     if (!showSettings) return;
-    bool open = ImGui::Begin("Settings", &showSettings, ImGuiWindowFlags_AlwaysAutoResize);
+    bool open = ImGui::Begin("Settings", &showSettings, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav);
     if (open) {
         SelectedEffect().UpdateImGui();
 
