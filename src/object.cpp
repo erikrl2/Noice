@@ -57,8 +57,9 @@ void ObjectMode::Update(float dt) {
 void ObjectMode::RenderObject() {
     objectShader.Use();
     objectShader.SetMat4("viewproj", mvpState.currProj * mvpState.currView);
+    objectShader.SetMat4("view", mvpState.currView);
     objectShader.SetMat4("model", mvpState.currModel);
-    objectShader.SetMat4("normalMatrix", glm::transpose(glm::inverse(mvpState.currModel)));
+    objectShader.SetMat4("normalMatrix", glm::transpose(glm::inverse(mvpState.currModel)));  // TODO: remove
 
     objectFB.Clear();
 
