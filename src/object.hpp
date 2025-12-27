@@ -20,6 +20,7 @@ public:
     void OnResize(int width, int height);
     void OnMouseClicked(int button, int action);
     void OnMouseMoved(double xpos, double ypos);
+    void OnKeyPressed(int key, int action);
 
     Framebuffer& GetResultFB() { return objectFB; }
     const MvpState* GetMvpState() { return &mvpState; }
@@ -31,8 +32,9 @@ private:
     SimpleMesh& SelectedMesh();
 
 private:
-    enum class MeshType { Car = 0, Spider, Dragon, Alien, Head, Count };
+    enum class MeshType { Debug, Car, Spider, Dragon, Alien, Head, Count };
     MeshType meshSelect = MeshType::Car;
+    bool uniformFlow = false;
 
     std::array<SimpleMesh, (size_t)MeshType::Count> meshes;
 

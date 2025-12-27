@@ -65,7 +65,7 @@ void main() {
     }
 
 
-    vec2 flowDir = normalize(texture(flowTex, currUV).xy);
+    vec2 flowDir = texture(flowTex, currUV).xy;
     vec2 prevAcc = imageLoad(prevAccTex, prevPx).xy;
 
     vec2 flow = flowDir * scrollSpeed;
