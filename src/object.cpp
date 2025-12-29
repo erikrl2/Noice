@@ -70,7 +70,8 @@ void ObjectMode::RenderObject() {
 
     objectFB.Clear();
 
-    SelectedMesh().Draw(RenderFlag::DepthTest | RenderFlag::CullFace);
+    auto flags = RenderFlag::DepthTest;// | RenderFlag::CullFace;
+    SelectedMesh().Draw(flags);
 }
 
 void ObjectMode::UpdateTransformMatrices(float dt) {
@@ -93,7 +94,8 @@ void ObjectMode::UpdateTransformMatrices(float dt) {
         scale = glm::vec3(0.025f);
         break;
     case MeshType::Dragon:
-        rotation = glm::vec3(-90, 20, 0);
+        translation = glm::vec3(0, -0.5f, 0);
+        rotation = glm::vec3(0, 20, 0);
         scale = glm::vec3(0.07f);
         break;
     case MeshType::Alien:
