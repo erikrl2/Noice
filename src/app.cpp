@@ -176,8 +176,6 @@ void App::OnMouseMoved(GLFWwindow* window, double xpos, double ypos) {
     if (ImGui::GetIO().WantCaptureMouse) return;
     App& app = *(App*)glfwGetWindowUserPointer(window);
 
-    // TODO: calc and pass delta
-
     app.modePtr->OnMouseMoved(xpos, ypos);
 }
 

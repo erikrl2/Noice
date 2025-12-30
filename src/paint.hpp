@@ -20,19 +20,18 @@ public:
     Framebuffer& GetResultFB() override { return resultFB; }
 
 private:
-    void PaintSegment(double x0, double y0, double x1, double y1, float dt);
-    void StampAt(float cx, float cy, float dirX, float dirY);
+    void PaintSegment(const glm::vec2& from, const glm::vec2& to);
+    void StampAt(const glm::vec2& center, const glm::vec2& dir);
 
-    void ResolveToRG();
+    void Resolve();
 
 private:
-    float brushRadiusPx = 30.0f;
+    float brushRadius = 30.0f;
 
     bool leftDown = false;
-    bool rightDown = false;
     bool havePrev = false;
-    double mouseX = 0, mouseY = 0;
-    double prevX = 0, prevY = 0;
+    glm::vec2 mousePos{ 0.0f, 0.0f };
+    glm::vec2 prevPos{ 0.0f, 0.0f };
 
     Shader stampShader;
     Shader resolveShader;

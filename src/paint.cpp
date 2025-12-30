@@ -2,15 +2,14 @@
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
-
 #include <algorithm>
 #include <cmath>
 
 void PaintMode::Init(int w, int h) {
     quad = Mesh::CreateFullscreenQuad();
 
-    canvasFB.Create(w, h, GL_RGBA16F, GL_LINEAR, GL_CLAMP_TO_EDGE);
-    resultFB.Create(w, h, GL_RG16F, GL_LINEAR, GL_CLAMP_TO_EDGE);
+    canvasFB.Create(w, h, GL_RG16F);
+    resultFB.Create(w, h, GL_RG16F);
 
     stampShader.Create("assets/shaders/post.vert.glsl", "assets/shaders/paint_stamp.frag.glsl");
     resolveShader.Create("assets/shaders/post.vert.glsl", "assets/shaders/paint_resolve.frag.glsl");
@@ -27,67 +26,54 @@ void PaintMode::Destroy() {
 }
 
 void PaintMode::UpdateImGui() {
-    ImGui::SliderFloat("Brush Radius", &brushRadiusPx, 2.0f, 400.0f, "%.0f");
+    ImGui::SliderFloat("Brush Radius", &brushRadius, 1.0f, 100.0f, "%.0f");
 }
 
 void PaintMode::Update(float dt) {
     if (leftDown) {
         if (!havePrev) {
-            prevX = mouseX;
-            prevY = mouseY;
+            prevPos = mousePos;
             havePrev = true;
         }
         else {
-            PaintSegment(prevX, prevY, mouseX, mouseY, dt);
-            prevX = mouseX;
-            prevY = mouseY;
+            PaintSegment(prevPos, mousePos);
+            prevPos = mousePos;
         }
     }
 
-    ResolveToRG();
+    Resolve();
 }
 
-static inline void SafeNormalize(float& x, float& y) {
-    float l = std::sqrt(x * x + y * y);
-    if (l < 1e-6f) { x = y = 0.0f; return; }
-    x /= l; y /= l;
-}
-
-void PaintMode::PaintSegment(double x0, double y0, double x1, double y1, float dt) {
-    float dx = float(x1 - x0);
-    float dy = float(y1 - y0);
-    float dist = std::sqrt(dx * dx + dy * dy);
+void PaintMode::PaintSegment(const glm::vec2& from, const glm::vec2& to) {
+    glm::vec2 delta = to - from;
+    float dist = glm::length(delta);
     if (dist < 1e-4f) return;
 
-    float dirX = dx, dirY = dy;
-    SafeNormalize(dirX, dirY);
+    glm::vec2 dir = glm::normalize(delta);
 
-    float spacing = std::max(0.5f, brushRadiusPx * 0.25f);
+    float spacing = std::max(0.5f, brushRadius * 0.25f);
     int steps = std::max(1, (int)std::ceil(dist / spacing));
 
     for (int i = 0; i <= steps; i++) {
         float t = float(i) / float(steps);
-        float cx = float(x0) + dx * t;
-        float cy = float(y0) + dy * t;
-        StampAt(cx, cy, dirX, dirY);
+        glm::vec2 center = from + delta * t;
+        StampAt(center, dir);
     }
 }
 
-void PaintMode::StampAt(float cx, float cy, float dx, float dy) {
+void PaintMode::StampAt(const glm::vec2& center, const glm::vec2& dir) {
     canvasFB.Bind();
     stampShader.Use();
 
-    stampShader.SetVec2("uCenterPx", { cx, cy });
-    stampShader.SetFloat("uRadiusPx", brushRadiusPx);
-    stampShader.SetVec2("uDir", { dx, dy });
-    stampShader.SetFloat("uSoftness", 0.60f);
-    stampShader.SetFloat("uStrength", 0.55f);
+    stampShader.SetVec2("uCenter", center);
+    stampShader.SetFloat("uRadius", brushRadius);
+    stampShader.SetVec2("uDir", dir);
     stampShader.SetTexture("uCanvas", canvasFB.tex);
 
     quad.Draw();
 }
 
-void PaintMode::ResolveToRG() {
+void PaintMode::Resolve() {
     resultFB.Bind();
     resolveShader.Use();
     resolveShader.SetTexture("uCanvas", canvasFB.tex);
@@ -99,18 +85,17 @@ void PaintMode::OnResize(int w, int h) {
     resultFB.Resize(w, h);
 }
 
-void PaintMode::OnMouseMoved(double x, double y) {
-    mouseX = x;
-    mouseY = y;
+void PaintMode::OnMouseMoved(double xpos, double ypos) {
+    mousePos = glm::vec2(float(xpos), float(ypos));
 }
 
 void PaintMode::OnMouseScrolled(float offset) {
     if (offset > 0.0f) {
-        brushRadiusPx += 5.0f;
+        brushRadius += 5.0f;
     }
     else if (offset < 0.0f) {
-        brushRadiusPx -= 5.0f;
-        brushRadiusPx = std::max(2.0f, brushRadiusPx);
+        brushRadius -= 5.0f;
+        brushRadius = std::max(2.0f, brushRadius);
     }
 }
 
