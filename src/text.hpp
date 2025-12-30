@@ -15,13 +15,13 @@ public:
     void Init(int width, int height);
     void Destroy();
 
-    void UpdateImGui();
-    void Update(float dt);
+    void UpdateImGui() override;
+    void Update(float dt) override;
 
-    void OnResize(int width, int height);
-    void OnKeyPressed(int key, int action);
+    void OnResize(int width, int height) override;
+    void OnKeyPressed(int key, int action) override;
 
-    Framebuffer& GetResultFB() { return textFB; }
+    Framebuffer& GetResultFB() override { return textFB; }
 
 private:
     void LoadFontAtlas();
@@ -44,7 +44,7 @@ private:
     std::vector<unsigned char> ttfBuffer;
     std::vector<unsigned char> atlasPixels;
 
-    SimpleMesh textMesh;
+    Mesh textMesh;
     bool dirtyMesh = true;
 
     std::string text = "NOICE";

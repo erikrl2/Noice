@@ -25,8 +25,8 @@ struct Shader {
     void SetVec3(const std::string& name, const glm::vec3& v) const;
     void SetMat4(const std::string& name, const glm::mat4& m) const;
 
-    void SetTexture2D(const std::string& name, const Texture& texture, unsigned unit = 0) const;
+    void SetTexture(const std::string& name, const Texture& texture, unsigned unit = 0) const;
 
     void DispatchCompute(int width, int height, int groupSize, bool barrier = true) const;
-    void SetImage2D(const std::string& name, const Texture& texture, unsigned unit, GLenum access = GL_READ_WRITE) const;
+    void SetImage(const std::string& name, const Texture& texture, unsigned unit, GLenum access = GL_READ_WRITE) const;
 };

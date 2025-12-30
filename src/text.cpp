@@ -24,22 +24,7 @@ void TextMode::Destroy() {
     textFB.Destroy();
 }
 
-void TextMode::OnResize(int width, int height) {
-    textFB.Resize(width, height);
-    dirtyMesh = true;
-}
-
-void TextMode::OnKeyPressed(int key, int action) {
-    switch (key) {
-    case GLFW_KEY_C:
-        if (action == GLFW_PRESS) { center = !center; dirtyMesh = true; }
-        break;
-    }
-}
-
 void TextMode::UpdateImGui() {
-    ImGui::Text("Text Mode");
-
     if (ImGui::InputTextMultiline("Text", &text, ImVec2(0, 32), ImGuiInputTextFlags_WordWrap))
         dirtyMesh = true;
 
@@ -48,11 +33,14 @@ void TextMode::UpdateImGui() {
 
     dirtyMesh |= ImGui::SliderFloat("Scale", &scale, 0.1f, 5.0f, "%.2f");
     dirtyMesh |= ImGui::SliderFloat("Wrap width", &wrapWidthFrac, 0.1f, 1.0f, "%.2f");
-    dirtyMesh |= ImGui::Checkbox("Center", &center);
 
-    ImGui::Separator();
-    ImGuiDirection2D("Text Dir", direction); ImGui::SameLine();
-    ImGuiDirection2D("BG Dir", bgDir);
+    ImGuiDirection2D("Text", direction); ImGui::SameLine();
+    ImGuiDirection2D("Background", bgDir);
+
+    ImGui::SameLine();
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 39.0f);
+
+    dirtyMesh |= ImGui::Checkbox("Center", &center);
 }
 
 void TextMode::Update(float dt) {
@@ -69,7 +57,7 @@ void TextMode::Update(float dt) {
     textShader.Use();
     textShader.SetVec2("screenSize", glm::vec2((float)textFB.tex.width, (float)textFB.tex.height));
     textShader.SetVec2("dir", direction);
-    textShader.SetTexture2D("fontAtlas", fontAtlasTex);
+    textShader.SetTexture("fontAtlas", fontAtlasTex);
 
     textMesh.Draw();
 }
@@ -135,13 +123,13 @@ void TextMode::RebuildTextMesh() {
 
     float x = 0.0f;
     float y = 0.0f;
-    float minX =  1e9f, minY =  1e9f;
+    float minX = 1e9f, minY = 1e9f;
     float maxX = -1e9f, maxY = -1e9f;
 
     size_t i = 0;
     while (i < text.size()) {
         char c = text[i];
-        
+
         if (c == '\n') {
             x = 0.0f;
             y += bakeFontPx;
@@ -155,7 +143,7 @@ void TextMode::RebuildTextMesh() {
                 stbtt_aligned_quad q;
                 stbtt_GetBakedQuad(baked, atlasW, atlasH, code - firstChar, &x, &y, &q, 1);
                 quads.push_back(q);
-                
+
                 minX = (q.x0 < minX) ? q.x0 : minX;
                 minY = (q.y0 < minY) ? q.y0 : minY;
                 maxX = (q.x1 > maxX) ? q.x1 : maxX;
@@ -173,19 +161,19 @@ void TextMode::RebuildTextMesh() {
         float wordStartX = x;
         float tempX = x;
         float tempY = y;
-        
+
         std::vector<stbtt_aligned_quad> wordQuads;
         for (size_t j = wordStart; j < wordEnd; ++j) {
             int code = (unsigned char)text[j];
             if (code < firstChar || code >= firstChar + charCount) continue;
-            
+
             stbtt_aligned_quad q;
             stbtt_GetBakedQuad(baked, atlasW, atlasH, code - firstChar, &tempX, &tempY, &q, 1);
             wordQuads.push_back(q);
         }
-        
+
         float wordWidth = tempX - wordStartX;
-        
+
         if (x + wordWidth > wrapWidth && x > 0.0f) {
             x = 0.0f;
             y += bakeFontPx;
@@ -199,15 +187,15 @@ void TextMode::RebuildTextMesh() {
                 q.y0 += (y - tempY);
                 q.y1 += (y - tempY);
             }
-            
+
             quads.push_back(q);
-            
+
             minX = (q.x0 < minX) ? q.x0 : minX;
             minY = (q.y0 < minY) ? q.y0 : minY;
             maxX = (q.x1 > maxX) ? q.x1 : maxX;
             maxY = (q.y1 > maxY) ? q.y1 : maxY;
         }
-        
+
         x += wordWidth;
         i = wordEnd;
     }
@@ -252,4 +240,16 @@ static inline void AddQuad(std::vector<TextVertex>& v, std::vector<unsigned int>
     idx.push_back(base + 2);
     idx.push_back(base + 3);
     idx.push_back(base + 0);
+}
+
+void TextMode::OnResize(int width, int height) {
+    textFB.Resize(width, height);
+    dirtyMesh = true;
+}
+
+void TextMode::OnKeyPressed(int key, int action) {
+    if (key == GLFW_KEY_C && action == GLFW_PRESS) {
+        center = !center;
+        dirtyMesh = true;
+    }
 }

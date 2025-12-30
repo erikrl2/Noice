@@ -51,5 +51,5 @@ private:
     Shader scrollShader;
     Shader fillShader;
 
-    SimpleMesh quadMesh;
+    Mesh quadMesh;
 };

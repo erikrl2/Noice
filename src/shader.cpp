@@ -81,13 +81,13 @@ void Shader::SetMat4(const std::string& name, const glm::mat4& m) const {
     glUniformMatrix4fv(glGetUniformLocation(id, name.c_str()), 1, GL_FALSE, &m[0][0]);
 }
 
-void Shader::SetTexture2D(const std::string& name, const Texture& texture, unsigned unit) const {
+void Shader::SetTexture(const std::string& name, const Texture& texture, unsigned unit) const {
     glActiveTexture(GL_TEXTURE0 + (GLenum)unit);
     glBindTexture(GL_TEXTURE_2D, texture.id);
     SetInt(name, (int)unit);
 }
 
-void Shader::SetImage2D(const std::string& name, const Texture& texture, unsigned unit, GLenum access) const {
+void Shader::SetImage(const std::string& name, const Texture& texture, unsigned unit, GLenum access) const {
     glBindImageTexture(unit, texture.id, 0, GL_FALSE, 0, access, texture.internalFormat);
     SetInt(name, unit);
 }

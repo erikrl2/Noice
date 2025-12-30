@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <iostream>
 
-void SimpleMesh::UploadIndexed(const void* vertexData, size_t vertexBytes, const unsigned int* indices, size_t indexCount) {
+void Mesh::UploadIndexed(const void* vertexData, size_t vertexBytes, const unsigned int* indices, size_t indexCount) {
     this->indexCount = indexCount;
     vertexCount = 0;
     glGenVertexArrays(1, &vao);
@@ -21,7 +21,7 @@ void SimpleMesh::UploadIndexed(const void* vertexData, size_t vertexBytes, const
 }
 
 // unused
-void SimpleMesh::UploadArrays(const void* vertexData, size_t vertexBytes, size_t vertexCount) {
+void Mesh::UploadArrays(const void* vertexData, size_t vertexBytes, size_t vertexCount) {
     this->vertexCount = vertexCount;
     indexCount = 0;
     glGenVertexArrays(1, &vao);
@@ -32,7 +32,7 @@ void SimpleMesh::UploadArrays(const void* vertexData, size_t vertexBytes, size_t
     glBindVertexArray(0);
 }
 
-void SimpleMesh::SetAttrib(GLuint location, GLint components, GLenum type, GLboolean normalized, GLsizei stride, size_t offset) {
+void Mesh::SetAttrib(GLuint location, GLint components, GLenum type, GLboolean normalized, GLsizei stride, size_t offset) {
     glBindVertexArray(vao);
     // glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glVertexAttribPointer(location, components, type, normalized, stride, (void*)offset);
@@ -40,7 +40,7 @@ void SimpleMesh::SetAttrib(GLuint location, GLint components, GLenum type, GLboo
     glBindVertexArray(0);
 }
 
-void SimpleMesh::Draw(int renderFlags) const {
+void Mesh::Draw(int renderFlags) const {
     if (!vao) return;
     glBindVertexArray(vao);
 
@@ -58,18 +58,18 @@ void SimpleMesh::Draw(int renderFlags) const {
     if (renderFlags & RenderFlag::DepthTest) glDisable(GL_DEPTH_TEST);
 }
 
-void SimpleMesh::Destroy() {
+void Mesh::Destroy() {
     if (ebo) { glDeleteBuffers(1, &ebo); ebo = 0; }
     if (vbo) { glDeleteBuffers(1, &vbo); vbo = 0; }
     if (vao) { glDeleteVertexArrays(1, &vao); vao = 0; }
 }
 
-SimpleMesh::SimpleMesh(SimpleMesh&& other) noexcept
+Mesh::Mesh(Mesh&& other) noexcept
     : vao(other.vao), vbo(other.vbo), ebo(other.ebo), indexCount(other.indexCount), vertexCount(other.vertexCount) {
     other.vao = 0; other.vbo = 0; other.ebo = 0;
 }
 
-SimpleMesh& SimpleMesh::operator=(SimpleMesh&& other) noexcept {
+Mesh& Mesh::operator=(Mesh&& other) noexcept {
     if (this != &other) {
         Destroy();
         vao = other.vao; vbo = other.vbo; ebo = other.ebo;
@@ -79,7 +79,7 @@ SimpleMesh& SimpleMesh::operator=(SimpleMesh&& other) noexcept {
     return *this;
 }
 
-SimpleMesh SimpleMesh::CreateFullscreenQuad() {
+Mesh Mesh::CreateFullscreenQuad() {
     static const float quadVerts[] = {
         -1.0f, -1.0f,
          1.0f, -1.0f,
@@ -88,28 +88,30 @@ SimpleMesh SimpleMesh::CreateFullscreenQuad() {
     };
     static const unsigned int quadIdx[] = { 0,1,2, 2,3,0 };
 
-    SimpleMesh m;
+    Mesh m;
     m.UploadIndexed(quadVerts, sizeof(quadVerts), quadIdx, 6);
     m.SetAttrib(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0);
 
     return m;
 }
 
-SimpleMesh SimpleMesh::CreateTriangle() {
+Mesh Mesh::CreateTriangle() {
     static const float triVerts[] = {
         -0.5f, -0.5f, 0.0f,
          0.5f, -0.5f, 0.0f,
          0.0f,  0.5f, 0.0f
     };
 
-    SimpleMesh m;
+    Mesh m;
     m.UploadArrays(triVerts, sizeof(triVerts), 3);
     m.SetAttrib(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), 0);
 
     return m;
 }
 
-MeshData SimpleMesh::LoadFromOBJ(const std::string& path) {
+Mesh::MeshData Mesh::LoadFromOBJ(const std::string& path) {
+    if (!UploadQueue) return MeshData{};
+
     tinyobj::attrib_t attrib;
     std::vector<tinyobj::shape_t> shapes;
     std::vector<tinyobj::material_t> materials;
@@ -142,6 +144,8 @@ MeshData SimpleMesh::LoadFromOBJ(const std::string& path) {
     for (const auto& shape : shapes) {
         const auto& mesh = shape.mesh;
         for (size_t i = 0; i < mesh.indices.size(); ++i) {
+            if (!UploadQueue) return MeshData{};
+
             tinyobj::index_t idx = mesh.indices[i];
             Idx key{ idx.vertex_index, idx.normal_index };
 
@@ -182,7 +186,7 @@ MeshData SimpleMesh::LoadFromOBJ(const std::string& path) {
     return d;
 }
 
-void SimpleMesh::UploadDataFromOBJ(const MeshData& d) {
+void Mesh::UploadDataFromOBJ(const MeshData& d) {
     if (d.indices.empty()) return;
     UploadIndexed(d.verts.data(), d.verts.size() * sizeof(float), d.indices.data(), d.indices.size());
     SetAttrib(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), 0);

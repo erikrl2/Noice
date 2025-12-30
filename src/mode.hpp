@@ -10,6 +10,7 @@ public:
     virtual void OnResize(int width, int height) {}
     virtual void OnMouseClicked(int button, int action) {}
     virtual void OnMouseMoved(double xpos, double ypos) {}
+    virtual void OnMouseScrolled(float offset) {};
     virtual void OnKeyPressed(int key, int action) {}
 
     virtual Framebuffer& GetResultFB() = 0;

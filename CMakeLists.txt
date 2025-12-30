@@ -32,14 +32,12 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(imgui)
 
-# --- tinyobjloader hinzufügen ---
 FetchContent_Declare(
   tinyobjloader
   GIT_REPOSITORY https://github.com/tinyobjloader/tinyobjloader.git
   GIT_TAG release
 )
 FetchContent_MakeAvailable(tinyobjloader)
-# ---------------------------------
 
 set(IMGUI_SOURCES
     ${imgui_SOURCE_DIR}/imgui.cpp

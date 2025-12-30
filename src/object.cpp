@@ -1,7 +1,7 @@
 #include "object.hpp"
 #include "mesh.hpp"
-#include "util.hpp"
 
+#include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -9,16 +9,15 @@
 #include <thread>
 
 static std::thread meshLoaderThread;
-static ThreadQueue<MeshData> uploadQueue;
 
 void ObjectMode::Init(int width, int height) {
     meshLoaderThread = std::thread([&]() {
-        uploadQueue.push(SimpleMesh::LoadFromOBJ("assets/models/debug.obj"));
-        uploadQueue.push(SimpleMesh::LoadFromOBJ("assets/models/car.obj"));
-        uploadQueue.push(SimpleMesh::LoadFromOBJ("assets/models/spider.obj"));
-        uploadQueue.push(SimpleMesh::LoadFromOBJ("assets/models/dragon.obj"));
-        uploadQueue.push(SimpleMesh::LoadFromOBJ("assets/models/alien.obj"));
-        uploadQueue.push(SimpleMesh::LoadFromOBJ("assets/models/head.obj"));
+        Mesh::UploadQueue.Push(Mesh::LoadFromOBJ("assets/models/debug.obj"));
+        Mesh::UploadQueue.Push(Mesh::LoadFromOBJ("assets/models/car.obj"));
+        Mesh::UploadQueue.Push(Mesh::LoadFromOBJ("assets/models/spider.obj"));
+        Mesh::UploadQueue.Push(Mesh::LoadFromOBJ("assets/models/dragon.obj"));
+        Mesh::UploadQueue.Push(Mesh::LoadFromOBJ("assets/models/alien.obj"));
+        Mesh::UploadQueue.Push(Mesh::LoadFromOBJ("assets/models/head.obj"));
         });
 
     objectShader.Create("assets/shaders/object.vert.glsl", "assets/shaders/object.frag.glsl");
@@ -30,6 +29,7 @@ void ObjectMode::Destroy() {
     objectShader.Destroy();
     objectFB.Destroy();
 
+    Mesh::UploadQueue.Close();
     meshLoaderThread.join();
     for (auto& m : meshes) m.Destroy();
 }
@@ -37,7 +37,6 @@ void ObjectMode::Destroy() {
 #define IMGUI_MESH_RADIO(mesh) changed |= ImGui::RadioButton(#mesh, (int*)&meshSelect, (int)MeshType::mesh)
 
 void ObjectMode::UpdateImGui() {
-    ImGui::Text("Object Mode");
     bool changed = false;
     IMGUI_MESH_RADIO(Car); ImGui::SameLine();
     IMGUI_MESH_RADIO(Spider); ImGui::SameLine();
@@ -53,7 +52,7 @@ void ObjectMode::UpdateImGui() {
 void ObjectMode::Update(float dt) {
     static int meshesLoaded = 0;
     if (meshesLoaded < meshes.size())
-        while (auto d = uploadQueue.try_pop()) meshes[meshesLoaded++].UploadDataFromOBJ(*d);
+        while (auto d = Mesh::UploadQueue.TryPop()) meshes[meshesLoaded++].UploadDataFromOBJ(*d);
 
     camera.Update(dt);
     UpdateTransformMatrices(dt);
@@ -61,6 +60,8 @@ void ObjectMode::Update(float dt) {
 }
 
 void ObjectMode::RenderObject() {
+    objectFB.Clear();
+
     objectShader.Use();
     objectShader.SetMat4("model", mvpState.currModel);
     objectShader.SetMat4("view", mvpState.currView);
@@ -68,10 +69,7 @@ void ObjectMode::RenderObject() {
     objectShader.SetVec2("viewportSize", glm::vec2(objectFB.tex.width, objectFB.tex.height));
     objectShader.SetInt("uniformFlow", uniformFlow);
 
-    objectFB.Clear();
-
-    auto flags = RenderFlag::DepthTest;// | RenderFlag::CullFace;
-    SelectedMesh().Draw(flags);
+    SelectedMesh().Draw(RenderFlag::DepthTest);
 }
 
 void ObjectMode::UpdateTransformMatrices(float dt) {
@@ -150,13 +148,11 @@ void ObjectMode::OnMouseMoved(double xpos, double ypos) {
 }
 
 void ObjectMode::OnKeyPressed(int key, int action) {
-    if (key == GLFW_KEY_Q) {
-        if (action == GLFW_PRESS) {
-            uniformFlow = !uniformFlow;
-        }
+    if (key == GLFW_KEY_Q && action == GLFW_PRESS) {
+        uniformFlow = !uniformFlow;
     }
 }
 
-SimpleMesh& ObjectMode::SelectedMesh() {
+Mesh& ObjectMode::SelectedMesh() {
     return meshes[(int)meshSelect];
 }

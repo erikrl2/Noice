@@ -5,8 +5,6 @@
 #include "camera.hpp"
 #include "mode.hpp"
 
-#include <GLFW/glfw3.h>
-
 #include <array>
 
 class ObjectMode : public Mode {
@@ -14,29 +12,29 @@ public:
     void Init(int width, int height);
     void Destroy();
 
-    void UpdateImGui();
-    void Update(float dt);
+    void UpdateImGui() override;
+    void Update(float dt) override;
 
-    void OnResize(int width, int height);
-    void OnMouseClicked(int button, int action);
-    void OnMouseMoved(double xpos, double ypos);
-    void OnKeyPressed(int key, int action);
+    void OnResize(int width, int height) override;
+    void OnMouseClicked(int button, int action) override;
+    void OnMouseMoved(double xpos, double ypos) override;
+    void OnKeyPressed(int key, int action) override;
 
-    Framebuffer& GetResultFB() { return objectFB; }
-    const MvpState* GetMvpState() { return &mvpState; }
+    Framebuffer& GetResultFB() override { return objectFB; }
+    const MvpState* GetMvpState() override { return &mvpState; }
 
 private:
     void UpdateTransformMatrices(float dt);
     void RenderObject();
 
-    SimpleMesh& SelectedMesh();
+    Mesh& SelectedMesh();
 
 private:
     enum class MeshType { Debug, Car, Spider, Dragon, Alien, Head, Count };
     MeshType meshSelect = MeshType::Car;
     bool uniformFlow = false;
 
-    std::array<SimpleMesh, (size_t)MeshType::Count> meshes;
+    std::array<Mesh, (size_t)MeshType::Count> meshes;
 
     Shader objectShader;
     Framebuffer objectFB;

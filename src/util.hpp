@@ -18,12 +18,13 @@ void EnableOpenGLDebugOutput();
 template<typename T>
 class ThreadQueue {
 public:
-    void push(T&& item) {
+    void Push(T&& item) {
         std::lock_guard<std::mutex> lock(mutex);
+        if (closed) return;
         queue.push(std::move(item));
     }
 
-    std::optional<T> try_pop() {
+    std::optional<T> TryPop() {
         std::lock_guard<std::mutex> lock(mutex);
         if (queue.empty()) return std::nullopt;
 
@@ -32,7 +33,15 @@ public:
         return item;
     }
 
+    void Close() {
+        std::lock_guard<std::mutex> lock(mutex);
+        closed = true;
+    }
+
+    operator bool() { return !closed; }
+
 private:
     std::queue<T> queue;
     std::mutex mutex;
+    bool closed = false;
 };

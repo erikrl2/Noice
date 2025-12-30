@@ -3,6 +3,7 @@
 #include "effect.hpp"
 #include "object.hpp"
 #include "text.hpp"
+#include "paint.hpp"
 
 #include <GLFW/glfw3.h>
 
@@ -27,14 +28,14 @@ private:
 
     static void OnFramebufferResized(GLFWwindow* window, int w, int h);
     static void OnMouseMoved(GLFWwindow* window, double xpos, double ypos);
+    static void OnMouseScroll(GLFWwindow* window, double xoffset, double yoffset);
     static void OnMouseClicked(GLFWwindow* window, int button, int action, int mods);
     static void OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, int mods);
 
     void OnModeChange();
-    void CheckWindowSize();
+    void SetModePointer();
 
-    Effect& SelectedEffect();
-    Mode& SelectedMode();
+    void CheckWindowSize();
 
 private:
     GLFWwindow* win = nullptr;
@@ -42,16 +43,18 @@ private:
     int height = 720;
     bool minimized = false;
 
-    Effect scrollEffect;
+    Mesh quadMesh;
     Shader postShader;
-    SimpleMesh quadMesh;
 
-    enum class ModeType { Object, Text, Paint };
-    ModeType modeSelect = ModeType::Object;
+    Effect effect;
 
     ObjectMode objectMode;
     TextMode textMode;
-    // TODO: Paint
+    PaintMode paintMode;
+
+    enum class ModeType { Object, Text, Paint, Count };
+    ModeType modeSelect = ModeType::Paint;
+    Mode* modePtr = nullptr;
 
     bool showSettings = true;
 };

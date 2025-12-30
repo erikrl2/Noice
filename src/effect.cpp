@@ -35,7 +35,6 @@ void Effect::Destroy() {
 }
 
 void Effect::UpdateImGui() {
-    ImGui::Text("Effect:");
     ImGui::SliderFloat("Speed", &scrollSpeed, 0.0f, 500.0f, "%.1f");
     ImGui::SliderInt("Sync rate", &accResetInterval, 1, 100);
     if (ImGui::SliderInt("Downscale", &downscaleFactor, 1, 8)) OnResize(prevDepthTex.width, prevDepthTex.height);
@@ -58,16 +57,16 @@ void Effect::ScatterPass(Framebuffer& in, float dt, const MvpState* mats) {
 
     scrollShader.Use();
 
-    scrollShader.SetImage2D("currNoiseTex", currNoiseTex, 0, GL_WRITE_ONLY);
-    scrollShader.SetImage2D("prevNoiseTex", prevNoiseTex, 1, GL_READ_ONLY);
-    scrollShader.SetImage2D("currAccTex", currAccTex, 2, GL_WRITE_ONLY);
-    scrollShader.SetImage2D("prevAccTex", prevAccTex, 3, GL_READ_WRITE);
-    scrollShader.SetTexture2D("flowTex", in.tex, 0);
+    scrollShader.SetImage("currNoiseTex", currNoiseTex, 0, GL_WRITE_ONLY);
+    scrollShader.SetImage("prevNoiseTex", prevNoiseTex, 1, GL_READ_ONLY);
+    scrollShader.SetImage("currAccTex", currAccTex, 2, GL_WRITE_ONLY);
+    scrollShader.SetImage("prevAccTex", prevAccTex, 3, GL_READ_WRITE);
+    scrollShader.SetTexture("flowTex", in.tex, 0);
     scrollShader.SetFloat("scrollSpeed", scrollSpeed * dt / downscaleFactor * (int)!paused);
 
     if (mats != nullptr) {
-        scrollShader.SetTexture2D("currDepthTex", in.depthTex, 1);
-        scrollShader.SetTexture2D("prevDepthTex", prevDepthTex, 2);
+        scrollShader.SetTexture("currDepthTex", in.depthTex, 1);
+        scrollShader.SetTexture("prevDepthTex", prevDepthTex, 2);
 
         scrollShader.SetMat4("invPrevProj", glm::inverse(mats->prevProj));
         scrollShader.SetMat4("invPrevView", glm::inverse(mats->prevView));
@@ -83,10 +82,10 @@ void Effect::ScatterPass(Framebuffer& in, float dt, const MvpState* mats) {
 void Effect::FillPass() {
     fillShader.Use();
 
-    fillShader.SetImage2D("currNoiseTex", currNoiseTex, 0, GL_READ_WRITE);
-    fillShader.SetImage2D("prevNoiseTex", prevNoiseTex, 1, GL_WRITE_ONLY);
-    fillShader.SetImage2D("currAccTex", currAccTex, 2, GL_WRITE_ONLY);
-    fillShader.SetImage2D("prevAccTex", prevAccTex, 3, GL_READ_WRITE);
+    fillShader.SetImage("currNoiseTex", currNoiseTex, 0, GL_READ_WRITE);
+    fillShader.SetImage("prevNoiseTex", prevNoiseTex, 1, GL_WRITE_ONLY);
+    fillShader.SetImage("currAccTex", currAccTex, 2, GL_WRITE_ONLY);
+    fillShader.SetImage("prevAccTex", prevAccTex, 3, GL_READ_WRITE);
     fillShader.SetUint("seed", (uint32_t)rand());
 
     fillShader.DispatchCompute(currNoiseTex.width, currNoiseTex.height, 16);
@@ -117,10 +116,8 @@ void Effect::OnResize(int width, int height) {
 }
 
 void Effect::OnMouseClicked(int button, int action) {
-    if (button == GLFW_MOUSE_BUTTON_RIGHT) {
-        if (action == GLFW_PRESS) {
-            disabled = !disabled;
-        }
+    if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_PRESS) {
+        disabled = !disabled;
     }
 }
 

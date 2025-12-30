@@ -70,6 +70,7 @@ void App::InitWindow() {
     glfwSetCursorPosCallback(win, OnMouseMoved);
     glfwSetMouseButtonCallback(win, OnMouseClicked);
     glfwSetKeyCallback(win, OnKeyPressed);
+    glfwSetScrollCallback(win, OnMouseScroll);
 }
 
 void App::InitOpenGL() {
@@ -95,61 +96,63 @@ void App::InitImGui() {
 }
 
 void App::SetupResources() {
-    quadMesh = SimpleMesh::CreateFullscreenQuad();
+    quadMesh = Mesh::CreateFullscreenQuad();
+
     postShader.Create("assets/shaders/post.vert.glsl", "assets/shaders/post.frag.glsl");
-    scrollEffect.Init(width, height);
+
+    effect.Init(width, height);
+
     objectMode.Init(width, height);
     textMode.Init(width, height);
+    paintMode.Init(width, height);
+
+    SetModePointer();
 }
 
 void App::DestroyResources() {
     quadMesh.Destroy();
     postShader.Destroy();
-    scrollEffect.Destroy();
+    effect.Destroy();
     objectMode.Destroy();
     textMode.Destroy();
-}
-
-void App::Update(float dt) {
-    Effect& e = SelectedEffect();
-    Mode& m = SelectedMode();
-
-    m.Update(dt);
-    if (m.HasMvp()) e.Apply(m.GetResultFB(), dt, m.GetMvpState());
-    else e.Apply(m.GetResultFB(), dt);
-
-    RenderToScreen();
+    paintMode.Destroy();
 }
 
 void App::UpdateImGui() {
     if (!showSettings) return;
     bool open = ImGui::Begin("Settings", &showSettings, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav);
     if (open) {
-        SelectedEffect().UpdateImGui();
+        effect.UpdateImGui();
 
-        ImGui::Separator();
+        ImGui::NewLine();
+        ImGui::SeparatorText("Mode");
 
-        ImGui::Text("Mode:");
         bool changed = false;
         changed |= ImGui::RadioButton("Object##Mode", (int*)&modeSelect, (int)ModeType::Object); ImGui::SameLine();
-        changed |= ImGui::RadioButton("Text##Mode", (int*)&modeSelect, (int)ModeType::Text);
+        changed |= ImGui::RadioButton("Text##Mode", (int*)&modeSelect, (int)ModeType::Text); ImGui::SameLine();
+        changed |= ImGui::RadioButton("Paint##Mode", (int*)&modeSelect, (int)ModeType::Paint);
         if (changed) OnModeChange();
 
-        ImGui::Separator();
+        ImGui::NewLine();
 
-        SelectedMode().UpdateImGui();
+        modePtr->UpdateImGui();
     }
     ImGui::End();
 }
 
-void App::RenderToScreen() {
-    Effect& e = SelectedEffect();
-    Mode& m = SelectedMode();
+void App::Update(float dt) {
+    modePtr->Update(dt);
+    if (modePtr->HasMvp()) effect.Apply(modePtr->GetResultFB(), dt, modePtr->GetMvpState());
+    else effect.Apply(modePtr->GetResultFB(), dt);
 
+    RenderToScreen();
+}
+
+void App::RenderToScreen() {
     postShader.Use();
-    postShader.SetTexture2D("screenTex", !e.IsDisabled() ? e.GetResultTex() : m.GetResultFB().tex);
+    postShader.SetTexture("screenTex", !effect.IsDisabled() ? effect.GetResultTex() : modePtr->GetResultFB().tex);
     postShader.SetVec2("resolution", glm::vec2(width, height));
-    postShader.SetInt("showVectors", e.IsDisabled());
+    postShader.SetInt("showVectors", effect.IsDisabled());
 
     Framebuffer::BindDefault(width, height);
 
@@ -165,31 +168,40 @@ void App::OnFramebufferResized(GLFWwindow* window, int w, int h) {
     app.width = w;
     app.height = h;
 
-    app.SelectedEffect().OnResize(w, h);
-    app.SelectedMode().OnResize(w, h);
+    app.effect.OnResize(w, h);
+    app.modePtr->OnResize(w, h);
 }
 
 void App::OnMouseMoved(GLFWwindow* window, double xpos, double ypos) {
     if (ImGui::GetIO().WantCaptureMouse) return;
     App& app = *(App*)glfwGetWindowUserPointer(window);
 
-    app.SelectedMode().OnMouseMoved(xpos, ypos);
+    // TODO: calc and pass delta
+
+    app.modePtr->OnMouseMoved(xpos, ypos);
+}
+
+void App::OnMouseScroll(GLFWwindow* window, double xoffset, double yoffset) {
+    if (ImGui::GetIO().WantCaptureMouse) return;
+    App& app = *(App*)glfwGetWindowUserPointer(window);
+
+    app.modePtr->OnMouseScrolled((float)yoffset);
 }
 
 void App::OnMouseClicked(GLFWwindow* window, int button, int action, int mods) {
     if (ImGui::GetIO().WantCaptureMouse) return;
     App& app = *(App*)glfwGetWindowUserPointer(window);
 
-    app.SelectedEffect().OnMouseClicked(button, action);
-    app.SelectedMode().OnMouseClicked(button, action);
+    app.effect.OnMouseClicked(button, action);
+    app.modePtr->OnMouseClicked(button, action);
 }
 
 void App::OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (ImGui::GetIO().WantCaptureKeyboard) return;
     App& app = *(App*)glfwGetWindowUserPointer(window);
 
-    app.SelectedEffect().OnKeyPressed(key, action);
-    app.SelectedMode().OnKeyPressed(key, action);
+    app.effect.OnKeyPressed(key, action);
+    app.modePtr->OnKeyPressed(key, action);
 
     switch (key) {
     case GLFW_KEY_ESCAPE:
@@ -204,12 +216,24 @@ void App::OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, in
     case GLFW_KEY_T:
         if (action == GLFW_PRESS) { app.modeSelect = ModeType::Text; app.OnModeChange(); }
         break;
+    case GLFW_KEY_P:
+        if (action == GLFW_PRESS) { app.modeSelect = ModeType::Paint; app.OnModeChange(); }
+        break;
     }
 }
 
 void App::OnModeChange() {
-    SelectedMode().OnResize(width, height);
-    SelectedEffect().ClearBuffers();
+    SetModePointer();
+    modePtr->OnResize(width, height);
+    effect.ClearBuffers();
+}
+
+void App::SetModePointer() {
+    switch (modeSelect) {
+    case ModeType::Object: modePtr = &objectMode; break;
+    case ModeType::Text: modePtr = &textMode; break;
+    case ModeType::Paint: modePtr = &paintMode; break;
+    }
 }
 
 void App::CheckWindowSize() {
@@ -217,17 +241,4 @@ void App::CheckWindowSize() {
     glfwGetFramebufferSize(win, &w, &h);
     if (w != width || h != height)
         App::OnFramebufferResized(win, w, h);
-}
-
-Effect& App::SelectedEffect() {
-    return scrollEffect;
-}
-
-Mode& App::SelectedMode() {
-    switch (modeSelect) {
-    case ModeType::Object: return objectMode;
-    case ModeType::Text: return textMode;
-    case ModeType::Paint: break;
-    }
-    return textMode;
 }

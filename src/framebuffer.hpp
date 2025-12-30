@@ -40,6 +40,7 @@ struct Framebuffer {
     void Destroy();
     void Resize(int w, int h);
     void Clear(const glm::vec4& color = glm::vec4(0)) const;
+    void Bind() const;
 
     void SwapColorTex(Texture& other);
     void SwapDepthTex(Texture& other);

@@ -45,6 +45,11 @@ void Framebuffer::Clear(const glm::vec4& color) const {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
+void Framebuffer::Bind() const {
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glViewport(0, 0, tex.width, tex.height);
+}
+
 void Framebuffer::SwapColorTex(Texture& other) {
     assert(tex.width == other.width && tex.height == other.height);
     assert(tex.internalFormat == other.internalFormat);
@@ -77,7 +82,8 @@ namespace {
 
     FormatInfo GetFormatInfo(GLenum internalFormat) {
         switch (internalFormat) {
-        case GL_RG16F: return { GL_RG, GL_HALF_FLOAT }; 
+        case GL_RG16F: return { GL_RG, GL_HALF_FLOAT };
+        case GL_RGBA16F: return { GL_RGBA, GL_HALF_FLOAT };
         case GL_RG8: return { GL_RG, GL_UNSIGNED_BYTE };
         case GL_R8: return { GL_RED, GL_UNSIGNED_BYTE };
         case GL_DEPTH_COMPONENT24: return { GL_DEPTH_COMPONENT, GL_UNSIGNED_INT };
