@@ -2,95 +2,95 @@
 
 layout(local_size_x = 16, local_size_y = 16) in;
 
-layout(rg8, binding = 0) uniform writeonly image2D currNoiseTex;
-layout(rg8, binding = 1) uniform readonly image2D prevNoiseTex;
-layout(rg16f, binding = 2) uniform writeonly image2D currAccTex;
-layout(rg16f, binding = 3) uniform image2D prevAccTex;
+layout(rg8, binding = 0) uniform writeonly image2D uCurrNoiseTex;
+layout(rg8, binding = 1) uniform readonly image2D uPrevNoiseTex;
+layout(rg16f, binding = 2) uniform writeonly image2D uCurrAccTex;
+layout(rg16f, binding = 3) uniform image2D uPrevAccTex;
 
-uniform sampler2D flowTex;
-uniform sampler2D currDepthTex;
-uniform sampler2D prevDepthTex;
+uniform sampler2D uFlowTex;
+uniform sampler2D uCurrDepthTex;
+uniform sampler2D uPrevDepthTex;
 
-uniform mat4 invPrevProj;
-uniform mat4 invPrevView;
-uniform mat4 invPrevModel;
-uniform mat4 currModel;
-uniform mat4 currViewProj;
+uniform mat4 uInvPrevProj;
+uniform mat4 uInvPrevView;
+uniform mat4 uInvPrevModel;
+uniform mat4 uCurrModel;
+uniform mat4 uCurrViewProj;
 
-uniform float scrollSpeed;
-uniform bool reproject;
+uniform float uScrollSpeed;
+uniform bool uReproject;
 
 void main() {
-    ivec2 prevPx = ivec2(gl_GlobalInvocationID.xy);
-    ivec2 size = imageSize(prevNoiseTex);
-    if (prevPx.x >= size.x || prevPx.y >= size.y) return;
+  ivec2 prevPx = ivec2(gl_GlobalInvocationID.xy);
+  ivec2 size = imageSize(uPrevNoiseTex);
+  if (prevPx.x >= size.x || prevPx.y >= size.y) return;
 
-    vec2 prevNoise = imageLoad(prevNoiseTex, prevPx).rg;
-    if (prevNoise.g < 0.1) return;
+  vec2 prevNoise = imageLoad(uPrevNoiseTex, prevPx).rg;
+  if (prevNoise.g < 0.1) return;
 
-    vec2 prevUV = (vec2(prevPx) + 0.5) / vec2(size);
+  vec2 prevUV = (vec2(prevPx) + 0.5) / vec2(size);
     
-    vec2 currUV;
-    ivec2 currPx;
-    vec3 currNDC;
+  vec2 currUV;
+  ivec2 currPx;
+  vec3 currNDC;
 
-    if (reproject) {
-        float prevDepth = texture(prevDepthTex, prevUV).r;
-        if (prevDepth >= 1.0) {
-            imageStore(currNoiseTex, prevPx, vec4(prevNoise.r, 1, 0, 0));
-            return;
-        }
-
-        vec3 prevNDC = vec3(prevUV, prevDepth) * 2.0 - 1.0;
-        vec4 prevClip = vec4(prevNDC, 1.0);
-        vec4 prevViewPos = invPrevProj * prevClip;
-        prevViewPos /= prevViewPos.w;
-        vec4 prevWorldPos = invPrevView * vec4(prevViewPos.xyz, 1.0);
-
-        vec4 localPos = invPrevModel * prevWorldPos;
-        vec4 currWorldPos = currModel * localPos;
-        vec4 currClip = currViewProj * currWorldPos;
-
-        if (currClip.w <= 0.0) return;
-
-        currNDC = currClip.xyz / currClip.w;
-
-        if (abs(currNDC.x) > 1.0 || abs(currNDC.y) > 1.0 || abs(currNDC.z) > 1.0) return;
-
-        currUV = currNDC.xy * 0.5 + 0.5;
-        currPx = ivec2(currUV * vec2(size));
-    } else {
-        currUV = prevUV;
-        currPx = prevPx;
+  if (uReproject) {
+    float prevDepth = texture(uPrevDepthTex, prevUV).r;
+    if (prevDepth >= 1.0) {
+      imageStore(uCurrNoiseTex, prevPx, vec4(prevNoise.r, 1, 0, 0));
+      return;
     }
 
+    vec3 prevNDC = vec3(prevUV, prevDepth) * 2.0 - 1.0;
+    vec4 prevClip = vec4(prevNDC, 1);
+    vec4 prevViewPos = uInvPrevProj * prevClip;
+    prevViewPos /= prevViewPos.w;
+    vec4 prevWorldPos = uInvPrevView * vec4(prevViewPos.xyz, 1);
 
-    vec2 flowDir = texture(flowTex, currUV).xy;
-    vec2 prevAcc = imageLoad(prevAccTex, prevPx).xy;
+    vec4 localPos = uInvPrevModel * prevWorldPos;
+    vec4 currWorldPos = uCurrModel * localPos;
+    vec4 currClip = uCurrViewProj * currWorldPos;
 
-    vec2 flow = flowDir * scrollSpeed;
+    if (currClip.w <= 0.0) return;
 
-    vec2 totalMove = prevAcc + flow;
-    vec2 intStep = trunc(totalMove); // or floor(totalMove + 0.5 * sign(totalMove));
+    currNDC = currClip.xyz / currClip.w;
 
-    vec2 nextAcc = totalMove - intStep;
-    imageStore(prevAccTex, prevPx, vec4(nextAcc, 0, 0));
+    if (abs(currNDC.x) > 1.0 || abs(currNDC.y) > 1.0 || abs(currNDC.z) > 1.0) return;
 
-    ivec2 targetPx = currPx + ivec2(intStep);
-    vec2 targetUV = (vec2(targetPx) + 0.5) / vec2(size);
-
-
-    if (targetPx.x < 0 || targetPx.x >= size.x || targetPx.y < 0 || targetPx.y >= size.y) return;
-
-    if (reproject) {
-        float targetDepth = texture(currDepthTex, targetUV).r;
-        if (targetDepth >= 1.0) return;
-
-        float depthDiff = abs(currNDC.z - (targetDepth * 2.0 - 1.0));
-        if (depthDiff > 0.01) return; // TODO: experiment with smaller values
-    }
+    currUV = currNDC.xy * 0.5 + 0.5;
+    currPx = ivec2(currUV * vec2(size));
+  } else {
+    currUV = prevUV;
+    currPx = prevPx;
+  }
 
 
-    imageStore(currNoiseTex, targetPx, vec4(prevNoise.r, 1, 0, 0));
-    imageStore(currAccTex, targetPx, vec4(nextAcc, 0, 0));
+  vec2 flowDir = texture(uFlowTex, currUV).xy;
+  vec2 prevAcc = imageLoad(uPrevAccTex, prevPx).xy;
+
+  vec2 flow = flowDir * uScrollSpeed;
+
+  vec2 totalMove = prevAcc + flow;
+  vec2 intStep = trunc(totalMove); // or floor(totalMove + 0.5 * sign(totalMove));
+
+  vec2 nextAcc = totalMove - intStep;
+  imageStore(uPrevAccTex, prevPx, vec4(nextAcc, 0, 0));
+
+  ivec2 targetPx = currPx + ivec2(intStep);
+  vec2 targetUV = (vec2(targetPx) + 0.5) / vec2(size);
+
+
+  if (targetPx.x < 0 || targetPx.x >= size.x || targetPx.y < 0 || targetPx.y >= size.y) return;
+
+  if (uReproject) {
+    float targetDepth = texture(uCurrDepthTex, targetUV).r;
+    if (targetDepth >= 1.0) return;
+
+    float depthDiff = abs(currNDC.z - (targetDepth * 2.0 - 1.0));
+    if (depthDiff > 0.05) return;
+  }
+
+
+  imageStore(uCurrNoiseTex, targetPx, vec4(prevNoise.r, 1, 0, 0));
+  imageStore(uCurrAccTex, targetPx, vec4(nextAcc, 0, 0));
 }

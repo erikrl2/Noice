@@ -1,17 +1,17 @@
 #version 430 core
 
-layout(location=0) in vec2 pos;
-layout(location=1) in vec2 uvIn;
+layout(location = 0) in vec2 aPos;
+layout(location = 1) in vec2 aUV;
 
-out vec2 uv;
+out vec2 vUV;
 
-uniform vec2 screenSize;
+uniform vec2 uScreenSize;
 
 void main() {
-    uv = uvIn;
+  vUV = aUV;
 
-    vec2 ndc = (pos / screenSize) * 2.0 - 1.0;
-    ndc.y = -ndc.y;
+  vec2 ndc = (aPos / uScreenSize) * 2.0 - 1.0;
+  ndc.y = -ndc.y;
 
-    gl_Position = vec4(ndc, 0.0, 1.0);
+  gl_Position = vec4(ndc, 0, 1);
 }

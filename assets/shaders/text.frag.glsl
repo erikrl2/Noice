@@ -1,19 +1,17 @@
 #version 430 core
 
-in vec2 uv;
+in vec2 vUV;
 
-layout(location=0) out vec2 outRG;
+layout(location = 0) out vec2 oDir;
 
-uniform sampler2D fontAtlas;
-
-uniform vec2 dir;
+uniform sampler2D uFontAtlas;
+uniform vec2 uDir;
 
 void main() {
-    float a = texture(fontAtlas, uv).r;
-    float cov = smoothstep(0.4, 0.6, a);
+  float a = texture(uFontAtlas, vUV).r;
+  float cov = smoothstep(0.4, 0.6, a);
 
-    if (cov <= 0.0)
-        discard;
+  if (cov <= 0.0) discard;
 
-    outRG = dir * cov;
+  oDir = uDir * cov;
 }

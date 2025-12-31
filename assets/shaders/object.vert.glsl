@@ -1,19 +1,17 @@
 #version 430 core
 
-layout(location=0) in vec3 pos;
-layout(location=1) in vec3 tangent;
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec3 aTangent;
 
-uniform mat4 model;
-uniform mat4 viewproj;
+out vec3 vPosWorld;
+out vec3 vDirWorld;
 
-out VS_OUT {
-    vec3 pWorld;
-    vec3 tWorld;
-} vs_out;
+uniform mat4 uModel;
+uniform mat4 uViewproj;
 
 void main() {
-    vs_out.pWorld = (model * vec4(pos, 1.0)).xyz;
-    vs_out.tWorld = normalize(mat3(model) * tangent);
+  vPosWorld = (uModel * vec4(aPos, 1)).xyz;
+  vDirWorld = normalize(mat3(uModel) * aTangent);
 
-    gl_Position = viewproj * vec4(vs_out.pWorld, 1.0);
+  gl_Position = uViewproj * vec4(vPosWorld, 1);
 }

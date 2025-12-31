@@ -1,20 +1,20 @@
 #pragma once
-#include "framebuffer.hpp"
 #include "effect.hpp"
+#include "framebuffer.hpp"
 
 class Mode {
 public:
-    virtual void UpdateImGui() = 0;
-    virtual void Update(float dt) = 0;
+  virtual void UpdateImGui() = 0;
+  virtual void Update(float dt) = 0;
 
-    virtual void OnResize(int width, int height) {}
-    virtual void OnMouseClicked(int button, int action) {}
-    virtual void OnMouseMoved(double xpos, double ypos) {}
-    virtual void OnMouseScrolled(float offset) {};
-    virtual void OnKeyPressed(int key, int action) {}
+  virtual void OnResize(int width, int height) {}
+  virtual void OnMouseClicked(int button, int action) {}
+  virtual void OnMouseMoved(double xpos, double ypos) {}
+  virtual void OnMouseScrolled(float offset) {}
+  virtual void OnKeyPressed(int key, int action) {}
 
-    virtual Framebuffer& GetResultFB() = 0;
+  virtual Framebuffer& GetResultFB() = 0;
 
-    virtual const MvpState* GetMvpState() { return nullptr; }
-    bool HasMvp() { return (GetMvpState() != nullptr); }
+  virtual const MvpState* GetMvpState() { return nullptr; }
+  bool HasMvp() { return (GetMvpState() != nullptr); }
 };

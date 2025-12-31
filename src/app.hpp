@@ -1,60 +1,60 @@
 #pragma once
-#include "shader.hpp"
 #include "effect.hpp"
 #include "object.hpp"
-#include "text.hpp"
 #include "paint.hpp"
+#include "shader.hpp"
+#include "text.hpp"
 
 #include <GLFW/glfw3.h>
 
 class App {
 public:
-    App();
-    ~App();
+  App();
+  ~App();
 
-    void Run();
-
-private:
-    void InitWindow();
-    void InitOpenGL();
-    void InitImGui();
-    void SetupResources();
-    void DestroyResources();
-
-    void UpdateImGui();
-    void Update(float dt);
-
-    void RenderToScreen();
-
-    static void OnFramebufferResized(GLFWwindow* window, int w, int h);
-    static void OnMouseMoved(GLFWwindow* window, double xpos, double ypos);
-    static void OnMouseScroll(GLFWwindow* window, double xoffset, double yoffset);
-    static void OnMouseClicked(GLFWwindow* window, int button, int action, int mods);
-    static void OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, int mods);
-
-    void OnModeChange();
-    void SetModePointer();
-
-    void CheckWindowSize();
+  void Run();
 
 private:
-    GLFWwindow* win = nullptr;
-    int width = 1280;
-    int height = 720;
-    bool minimized = false;
+  void InitWindow();
+  void InitOpenGL();
+  void InitImGui();
+  void SetupResources();
+  void DestroyResources();
 
-    Mesh quadMesh;
-    Shader postShader;
+  void UpdateImGui();
+  void Update(float dt);
 
-    Effect effect;
+  void RenderToScreen();
 
-    ObjectMode objectMode;
-    TextMode textMode;
-    PaintMode paintMode;
+  static void OnFramebufferResized(GLFWwindow* window, int w, int h);
+  static void OnMouseMoved(GLFWwindow* window, double xpos, double ypos);
+  static void OnMouseScroll(GLFWwindow* window, double xoffset, double yoffset);
+  static void OnMouseClicked(GLFWwindow* window, int button, int action, int mods);
+  static void OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, int mods);
 
-    enum class ModeType { Object, Text, Paint, Count };
-    ModeType modeSelect = ModeType::Paint;
-    Mode* modePtr = nullptr;
+  void OnModeChange();
+  void SetModePointer();
 
-    bool showSettings = true;
+  void CheckWindowSize();
+
+private:
+  GLFWwindow* win = nullptr;
+  int width = 1280;
+  int height = 720;
+  bool minimized = false;
+
+  Mesh quadMesh;
+  Shader postShader;
+
+  Effect effect;
+
+  ObjectMode objectMode;
+  TextMode textMode;
+  PaintMode paintMode;
+
+  enum class ModeType { Object, Text, Paint, Count };
+  ModeType modeSelect = ModeType::Object;
+  Mode* modePtr = nullptr;
+
+  bool showSettings = true;
 };

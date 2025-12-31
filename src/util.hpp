@@ -1,11 +1,11 @@
 #pragma once
 #include <glm/glm.hpp>
 
-#include <vector>
-#include <string>
 #include <mutex>
 #include <optional>
 #include <queue>
+#include <string>
+#include <vector>
 
 bool ReadFileBytes(const char* path, std::vector<unsigned char>& out);
 
@@ -18,30 +18,30 @@ void EnableOpenGLDebugOutput();
 template<typename T>
 class ThreadQueue {
 public:
-    void Push(T&& item) {
-        std::lock_guard<std::mutex> lock(mutex);
-        if (closed) return;
-        queue.push(std::move(item));
-    }
+  void Push(T&& item) {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (closed) return;
+    queue.push(std::move(item));
+  }
 
-    std::optional<T> TryPop() {
-        std::lock_guard<std::mutex> lock(mutex);
-        if (queue.empty()) return std::nullopt;
+  std::optional<T> TryPop() {
+    std::lock_guard<std::mutex> lock(mutex);
+    if (queue.empty()) return std::nullopt;
 
-        T item = std::move(queue.front());
-        queue.pop();
-        return item;
-    }
+    T item = std::move(queue.front());
+    queue.pop();
+    return item;
+  }
 
-    void Close() {
-        std::lock_guard<std::mutex> lock(mutex);
-        closed = true;
-    }
+  void Close() {
+    std::lock_guard<std::mutex> lock(mutex);
+    closed = true;
+  }
 
-    operator bool() { return !closed; }
+  operator bool() { return !closed; }
 
 private:
-    std::queue<T> queue;
-    std::mutex mutex;
-    bool closed = false;
+  std::queue<T> queue;
+  std::mutex mutex;
+  bool closed = false;
 };

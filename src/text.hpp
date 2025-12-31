@@ -1,59 +1,59 @@
 #pragma once
-#include "shader.hpp"
 #include "framebuffer.hpp"
 #include "mesh.hpp"
 #include "mode.hpp"
+#include "shader.hpp"
 
-#include <stb_truetype.h>
 #include <glm/glm.hpp>
+#include <stb_truetype.h>
 
 #include <string>
 #include <vector>
 
 class TextMode : public Mode {
 public:
-    void Init(int width, int height);
-    void Destroy();
+  void Init(int width, int height);
+  void Destroy();
 
-    void UpdateImGui() override;
-    void Update(float dt) override;
+  void UpdateImGui() override;
+  void Update(float dt) override;
 
-    void OnResize(int width, int height) override;
-    void OnKeyPressed(int key, int action) override;
+  void OnResize(int width, int height) override;
+  void OnKeyPressed(int key, int action) override;
 
-    Framebuffer& GetResultFB() override { return textFB; }
-
-private:
-    void LoadFontAtlas();
-    void DestroyFontAtlas();
-
-    void RebuildTextMesh();
+  Framebuffer& GetResultFB() override { return textFB; }
 
 private:
-    Shader textShader;
-    Framebuffer textFB;
+  void LoadFontAtlas();
+  void DestroyFontAtlas();
 
-    Texture fontAtlasTex;
-    const int atlasW = 2048;
-    const int atlasH = 2048;
+  void RebuildTextMesh();
 
-    static const int firstChar = 32;
-    static const int charCount = 95;
-    stbtt_bakedchar baked[charCount]{};
+private:
+  Shader textShader;
+  Framebuffer textFB;
 
-    std::vector<unsigned char> ttfBuffer;
-    std::vector<unsigned char> atlasPixels;
+  Texture fontAtlasTex;
+  const int atlasW = 2048;
+  const int atlasH = 2048;
 
-    Mesh textMesh;
-    bool dirtyMesh = true;
+  static const int firstChar = 32;
+  static const int charCount = 95;
+  stbtt_bakedchar baked[charCount]{};
 
-    std::string text = "NOICE";
-    float bakeFontPx = 290.0f;
-    float scale = 1.0f;
-    bool center = true;
+  std::vector<unsigned char> ttfBuffer;
+  std::vector<unsigned char> atlasPixels;
 
-    glm::vec2 direction = glm::vec2(1.0f, 0.0f);
-    glm::vec2 bgDir = glm::vec2(0.0f, 0.0f);
+  Mesh textMesh;
+  bool dirtyMesh = true;
 
-    float wrapWidthFrac = 0.9f;
+  std::string text = "NOICE";
+  float bakeFontPx = 290.0f;
+  float scale = 1.0f;
+  bool center = true;
+
+  glm::vec2 direction = glm::vec2(1.0f, 0.0f);
+  glm::vec2 bgDir = glm::vec2(0.0f, 0.0f);
+
+  float wrapWidthFrac = 0.9f;
 };

@@ -1,242 +1,258 @@
 #include "app.hpp"
-#include "GLFW/glfw3.h"
+
 #include "framebuffer.hpp"
 #include "mesh.hpp"
 #include "util.hpp"
 
-#include <glad/glad.h>
-#include <imgui.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_opengl3.h>
+#include <glad/glad.h>
+#include <GLFW/glfw3.h>
+#include <imgui.h>
 
 App::App() {
-    InitWindow();
+  InitWindow();
 
-    InitOpenGL();
-    InitImGui();
+  InitOpenGL();
+  InitImGui();
 
-    SetupResources();
+  SetupResources();
 
-    CheckWindowSize();
+  CheckWindowSize();
 }
 
 void App::Run() {
-    while (!glfwWindowShouldClose(win)) {
-        if (minimized) {
-            glfwWaitEvents();
-            continue;
-        }
-        float dt = ImGui::GetIO().DeltaTime;
-
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-
-        ImGui::NewFrame();
-        UpdateImGui();
-        ImGui::Render();
-
-        Update(dt);
-
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-        glfwSwapBuffers(win);
-        glfwPollEvents();
+  while (!glfwWindowShouldClose(win)) {
+    if (minimized) {
+      glfwWaitEvents();
+      continue;
     }
+    float dt = ImGui::GetIO().DeltaTime;
+
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+
+    ImGui::NewFrame();
+    UpdateImGui();
+    ImGui::Render();
+
+    Update(dt);
+
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+    glfwSwapBuffers(win);
+    glfwPollEvents();
+  }
 }
 
 App::~App() {
-    DestroyResources();
+  DestroyResources();
 
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
+  ImGui_ImplOpenGL3_Shutdown();
+  ImGui_ImplGlfw_Shutdown();
+  ImGui::DestroyContext();
 
-    glfwTerminate();
+  glfwTerminate();
 }
 
 void App::InitWindow() {
-    glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwInit();
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    win = glfwCreateWindow(width, height, "Noice", nullptr, nullptr);
-    glfwMakeContextCurrent(win);
-    glfwSwapInterval(1);
+  win = glfwCreateWindow(width, height, "Noice", nullptr, nullptr);
+  glfwMakeContextCurrent(win);
+  glfwSwapInterval(1);
 
-    glfwSetWindowUserPointer(win, this);
+  glfwSetWindowUserPointer(win, this);
 
-    glfwSetFramebufferSizeCallback(win, OnFramebufferResized);
-    glfwSetCursorPosCallback(win, OnMouseMoved);
-    glfwSetMouseButtonCallback(win, OnMouseClicked);
-    glfwSetKeyCallback(win, OnKeyPressed);
-    glfwSetScrollCallback(win, OnMouseScroll);
+  glfwSetFramebufferSizeCallback(win, OnFramebufferResized);
+  glfwSetCursorPosCallback(win, OnMouseMoved);
+  glfwSetMouseButtonCallback(win, OnMouseClicked);
+  glfwSetKeyCallback(win, OnKeyPressed);
+  glfwSetScrollCallback(win, OnMouseScroll);
 }
 
 void App::InitOpenGL() {
-    gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
+  gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
 #ifndef NDEBUG
-    EnableOpenGLDebugOutput();
+  EnableOpenGLDebugOutput();
 #endif
 
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
+  glDisable(GL_DEPTH_TEST);
+  glDisable(GL_CULL_FACE);
 }
 
 void App::InitImGui() {
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
 
-    ImGui::StyleColorsDark();
-    ImGui::GetIO().IniFilename = nullptr;
+  ImGui::StyleColorsDark();
+  ImGui::GetIO().IniFilename = nullptr;
 
-    ImGui_ImplGlfw_InitForOpenGL(win, true);
-    ImGui_ImplOpenGL3_Init("#version 430 core");
+  ImGui_ImplGlfw_InitForOpenGL(win, true);
+  ImGui_ImplOpenGL3_Init("#version 430 core");
 }
 
 void App::SetupResources() {
-    quadMesh = Mesh::CreateFullscreenQuad();
+  quadMesh = Mesh::CreateFullscreenQuad();
 
-    postShader.Create("assets/shaders/post.vert.glsl", "assets/shaders/post.frag.glsl");
+  postShader.Create("assets/shaders/post.vert.glsl", "assets/shaders/post.frag.glsl");
 
-    effect.Init(width, height);
+  effect.Init(width, height);
 
-    objectMode.Init(width, height);
-    textMode.Init(width, height);
-    paintMode.Init(width, height);
+  objectMode.Init(width, height);
+  textMode.Init(width, height);
+  paintMode.Init(width, height);
 
-    SetModePointer();
+  SetModePointer();
 }
 
 void App::DestroyResources() {
-    quadMesh.Destroy();
-    postShader.Destroy();
-    effect.Destroy();
-    objectMode.Destroy();
-    textMode.Destroy();
-    paintMode.Destroy();
+  quadMesh.Destroy();
+  postShader.Destroy();
+  effect.Destroy();
+  objectMode.Destroy();
+  textMode.Destroy();
+  paintMode.Destroy();
 }
 
 void App::UpdateImGui() {
-    if (!showSettings) return;
-    bool open = ImGui::Begin("Settings", &showSettings, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav);
-    if (open) {
-        effect.UpdateImGui();
+  if (!showSettings) return;
+  bool open = ImGui::Begin("Settings", &showSettings, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav);
+  if (open) {
+    effect.UpdateImGui();
 
-        ImGui::NewLine();
-        ImGui::SeparatorText("Mode");
+    ImGui::NewLine();
+    ImGui::SeparatorText("Mode");
 
-        bool changed = false;
-        changed |= ImGui::RadioButton("Object##Mode", (int*)&modeSelect, (int)ModeType::Object); ImGui::SameLine();
-        changed |= ImGui::RadioButton("Text##Mode", (int*)&modeSelect, (int)ModeType::Text); ImGui::SameLine();
-        changed |= ImGui::RadioButton("Paint##Mode", (int*)&modeSelect, (int)ModeType::Paint);
-        if (changed) OnModeChange();
+    bool changed = false;
+    changed |= ImGui::RadioButton("Object##Mode", (int*)&modeSelect, (int)ModeType::Object);
+    ImGui::SameLine();
+    changed |= ImGui::RadioButton("Text##Mode", (int*)&modeSelect, (int)ModeType::Text);
+    ImGui::SameLine();
+    changed |= ImGui::RadioButton("Paint##Mode", (int*)&modeSelect, (int)ModeType::Paint);
+    if (changed) OnModeChange();
 
-        ImGui::NewLine();
+    ImGui::NewLine();
 
-        modePtr->UpdateImGui();
-    }
-    ImGui::End();
+    modePtr->UpdateImGui();
+  }
+  ImGui::End();
 }
 
 void App::Update(float dt) {
-    modePtr->Update(dt);
-    if (modePtr->HasMvp()) effect.Apply(modePtr->GetResultFB(), dt, modePtr->GetMvpState());
-    else effect.Apply(modePtr->GetResultFB(), dt);
+  modePtr->Update(dt);
+  if (modePtr->HasMvp())
+    effect.Apply(modePtr->GetResultFB(), dt, modePtr->GetMvpState());
+  else
+    effect.Apply(modePtr->GetResultFB(), dt);
 
-    RenderToScreen();
+  RenderToScreen();
 }
 
 void App::RenderToScreen() {
-    postShader.Use();
-    postShader.SetTexture("screenTex", !effect.IsDisabled() ? effect.GetResultTex() : modePtr->GetResultFB().tex);
-    postShader.SetVec2("resolution", glm::vec2(width, height));
-    postShader.SetInt("showVectors", effect.IsDisabled());
+  postShader.Use();
+  postShader.SetTexture("uScreenTex", !effect.IsDisabled() ? effect.GetResultTex() : modePtr->GetResultFB().tex);
+  postShader.SetVec2("uResolution", {width, height});
+  postShader.SetInt("uShowVectors", effect.IsDisabled());
 
-    Framebuffer::BindDefault(width, height);
+  Framebuffer::BindDefault(width, height);
 
-    quadMesh.Draw();
+  quadMesh.Draw();
 }
 
 void App::OnFramebufferResized(GLFWwindow* window, int w, int h) {
-    App& app = *(App*)glfwGetWindowUserPointer(window);
+  App& app = *(App*)glfwGetWindowUserPointer(window);
 
-    if (w == 0 || h == 0) { app.minimized = true; return; }
+  if (w == 0 || h == 0) {
+    app.minimized = true;
+    return;
+  }
 
-    app.minimized = false;
-    app.width = w;
-    app.height = h;
+  app.minimized = false;
+  app.width = w;
+  app.height = h;
 
-    app.effect.OnResize(w, h);
-    app.modePtr->OnResize(w, h);
+  app.effect.OnResize(w, h);
+  app.modePtr->OnResize(w, h);
 }
 
 void App::OnMouseMoved(GLFWwindow* window, double xpos, double ypos) {
-    if (ImGui::GetIO().WantCaptureMouse) return;
-    App& app = *(App*)glfwGetWindowUserPointer(window);
+  if (ImGui::GetIO().WantCaptureMouse) return;
+  App& app = *(App*)glfwGetWindowUserPointer(window);
 
-    app.modePtr->OnMouseMoved(xpos, ypos);
+  app.modePtr->OnMouseMoved(xpos, ypos);
 }
 
 void App::OnMouseScroll(GLFWwindow* window, double xoffset, double yoffset) {
-    if (ImGui::GetIO().WantCaptureMouse) return;
-    App& app = *(App*)glfwGetWindowUserPointer(window);
+  if (ImGui::GetIO().WantCaptureMouse) return;
+  App& app = *(App*)glfwGetWindowUserPointer(window);
 
-    app.modePtr->OnMouseScrolled((float)yoffset);
+  app.modePtr->OnMouseScrolled((float)yoffset);
 }
 
 void App::OnMouseClicked(GLFWwindow* window, int button, int action, int mods) {
-    if (ImGui::GetIO().WantCaptureMouse) return;
-    App& app = *(App*)glfwGetWindowUserPointer(window);
+  if (ImGui::GetIO().WantCaptureMouse) return;
+  App& app = *(App*)glfwGetWindowUserPointer(window);
 
-    app.effect.OnMouseClicked(button, action);
-    app.modePtr->OnMouseClicked(button, action);
+  app.effect.OnMouseClicked(button, action);
+  app.modePtr->OnMouseClicked(button, action);
 }
 
 void App::OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    if (ImGui::GetIO().WantCaptureKeyboard) return;
-    App& app = *(App*)glfwGetWindowUserPointer(window);
+  if (ImGui::GetIO().WantCaptureKeyboard) return;
+  App& app = *(App*)glfwGetWindowUserPointer(window);
 
-    app.effect.OnKeyPressed(key, action);
-    app.modePtr->OnKeyPressed(key, action);
+  app.effect.OnKeyPressed(key, action);
+  app.modePtr->OnKeyPressed(key, action);
 
-    switch (key) {
-    case GLFW_KEY_ESCAPE:
-        if (action == GLFW_PRESS) glfwSetWindowShouldClose(window, true);
-        break;
-    case GLFW_KEY_H:
-        if (action == GLFW_PRESS) app.showSettings = !app.showSettings;
-        break;
-    case GLFW_KEY_O:
-        if (action == GLFW_PRESS) { app.modeSelect = ModeType::Object; app.OnModeChange(); }
-        break;
-    case GLFW_KEY_T:
-        if (action == GLFW_PRESS) { app.modeSelect = ModeType::Text; app.OnModeChange(); }
-        break;
-    case GLFW_KEY_P:
-        if (action == GLFW_PRESS) { app.modeSelect = ModeType::Paint; app.OnModeChange(); }
-        break;
+  switch (key) {
+  case GLFW_KEY_ESCAPE:
+    if (action == GLFW_PRESS) glfwSetWindowShouldClose(window, true);
+    break;
+  case GLFW_KEY_H:
+    if (action == GLFW_PRESS) app.showSettings = !app.showSettings;
+    break;
+  case GLFW_KEY_O:
+    if (action == GLFW_PRESS) {
+      app.modeSelect = ModeType::Object;
+      app.OnModeChange();
     }
+    break;
+  case GLFW_KEY_T:
+    if (action == GLFW_PRESS) {
+      app.modeSelect = ModeType::Text;
+      app.OnModeChange();
+    }
+    break;
+  case GLFW_KEY_P:
+    if (action == GLFW_PRESS) {
+      app.modeSelect = ModeType::Paint;
+      app.OnModeChange();
+    }
+    break;
+  }
 }
 
 void App::OnModeChange() {
-    SetModePointer();
-    modePtr->OnResize(width, height);
-    effect.ClearBuffers();
+  SetModePointer();
+  modePtr->OnResize(width, height);
+  effect.ClearBuffers();
 }
 
 void App::SetModePointer() {
-    switch (modeSelect) {
-    case ModeType::Object: modePtr = &objectMode; break;
-    case ModeType::Text: modePtr = &textMode; break;
-    case ModeType::Paint: modePtr = &paintMode; break;
-    }
+  switch (modeSelect) {
+  case ModeType::Object: modePtr = &objectMode; break;
+  case ModeType::Text: modePtr = &textMode; break;
+  case ModeType::Paint: modePtr = &paintMode; break;
+  }
 }
 
 void App::CheckWindowSize() {
-    int w, h;
-    glfwGetFramebufferSize(win, &w, &h);
-    if (w != width || h != height)
-        App::OnFramebufferResized(win, w, h);
+  int w, h;
+  glfwGetFramebufferSize(win, &w, &h);
+  if (w != width || h != height) App::OnFramebufferResized(win, w, h);
 }

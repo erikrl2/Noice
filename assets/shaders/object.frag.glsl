@@ -1,36 +1,34 @@
 #version 430 core
 
-in VS_OUT {
-    vec3 pWorld;
-    vec3 tWorld;
-} fs_in;
+in vec3 vPosWorld;
+in vec3 vDirWorld;
 
-out vec2 outRG;
+layout(location = 0) out vec2 oDir;
 
-uniform mat4 viewproj;
-uniform vec2 viewportSize;
+uniform mat4 uViewproj;
+uniform vec2 uViewportSize;
 
-uniform bool uniformFlow;
-uniform mat4 view;
+uniform bool uUniformFlow;
+uniform mat4 uView;
 
 void main() {
-    if (uniformFlow) {
-        outRG = normalize(view * vec4(fs_in.tWorld, 0)).xy;
-        return;
-    }
+  if (uUniformFlow) {
+    oDir = normalize(uView * vec4(vDirWorld, 0)).xy;
+    return;
+  }
 
-    const float epsWorld = 0.002;
+  const float epsWorld = 0.002;
 
-    vec4 c0 = viewproj * vec4(fs_in.pWorld, 1.0);
-    vec4 c1 = viewproj * vec4(fs_in.pWorld + fs_in.tWorld * epsWorld, 1.0);
+  vec4 c0 = uViewproj * vec4(vPosWorld, 1);
+  vec4 c1 = uViewproj * vec4(vPosWorld + vDirWorld * epsWorld, 1);
 
-    vec2 ndc0 = c0.xy / c0.w;
-    vec2 ndc1 = c1.xy / c1.w;
+  vec2 ndc0 = c0.xy / c0.w;
+  vec2 ndc1 = c1.xy / c1.w;
 
-    vec2 dNdc = ndc1 - ndc0;
-    vec2 dPx  = dNdc * 0.5 * viewportSize;
+  vec2 dNdc = ndc1 - ndc0;
+  vec2 dPx  = dNdc * 0.5 * uViewportSize;
 
-    outRG = dPx / epsWorld;
+  oDir = dPx / epsWorld;
 
-    outRG /= 150.0;
+  oDir /= 150.0;
 }

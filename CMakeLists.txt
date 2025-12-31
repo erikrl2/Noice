@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.10)
 
 if (POLICY CMP0141)
   cmake_policy(SET CMP0141 NEW)
@@ -71,4 +71,10 @@ target_link_libraries(Noice PRIVATE glfw glad imgui glm tinyobjloader)
 add_custom_command(TARGET Noice POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         ${CMAKE_SOURCE_DIR}/assets ${CMAKE_BINARY_DIR}/assets
+)
+
+find_program(CLANG_FORMAT clang-format)
+add_custom_target(
+  format
+  COMMAND ${CLANG_FORMAT} -i ${SRC}
 )
