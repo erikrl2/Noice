@@ -1,5 +1,6 @@
 #include "object.hpp"
 
+#include "flowload/flowload.hpp"
 #include "mesh.hpp"
 
 #include <GLFW/glfw3.h>
@@ -7,19 +8,64 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <imgui.h>
 
+#include <iostream>
 #include <thread>
 
+// TODO: make static stuff non-static
 static std::thread meshLoaderThread;
 
+struct MeshLoadJob {
+  ObjectMode::MeshType type;
+  std::string path;
+  FlowfieldSettings settings;
+};
+static ThreadQueue<Mesh::MeshData> uploadQueue;
+static ThreadQueue<MeshLoadJob> meshJobQueue;
+
+static std::string GetMeshPath(ObjectMode::MeshType type) {
+  switch (type) {
+  case ObjectMode::MeshType::Debug: return "assets/models/debug.obj";
+  case ObjectMode::MeshType::Car: return "assets/models/car.obj";
+  case ObjectMode::MeshType::Spider: return "assets/models/spider.obj";
+  case ObjectMode::MeshType::Dragon: return "assets/models/dragon.obj";
+  case ObjectMode::MeshType::Alien: return "assets/models/alien.obj";
+  case ObjectMode::MeshType::Head: return "assets/models/head.obj";
+  default: return "";
+  }
+}
+
+static FlowfieldSettings flowSettings[(size_t)ObjectMode::MeshType::Count] = {
+    {'U', -1}, // Debug
+    {'V', 10}, // Car
+    {'V', -1}, // Spider
+    {'V', -1}, // Dragon
+    {'U', -1}, // Alien
+    {'V', -1} // Head
+};
+
+static void MeshLoaderThreadFunc() {
+  while (meshJobQueue) {
+    if (auto job = meshJobQueue.TryPop()) {
+      uploadQueue.Push(Mesh::LoadFromOBJ((int)job->type, job->path, job->settings));
+    } else {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+  }
+}
+
+static void EnqueueMeshLoad(ObjectMode::MeshType type) {
+  std::cout << "Enqueueing mesh load: " << GetMeshPath(type) << std::endl;
+  meshJobQueue.Push(MeshLoadJob{type, GetMeshPath(type), flowSettings[(int)type]});
+}
+
 void ObjectMode::Init(int width, int height) {
-  meshLoaderThread = std::thread([&]() {
-    Mesh::UploadQueue.Push(Mesh::LoadFromOBJ("assets/models/debug.obj"));
-    Mesh::UploadQueue.Push(Mesh::LoadFromOBJ("assets/models/car.obj"));
-    Mesh::UploadQueue.Push(Mesh::LoadFromOBJ("assets/models/spider.obj"));
-    Mesh::UploadQueue.Push(Mesh::LoadFromOBJ("assets/models/dragon.obj"));
-    Mesh::UploadQueue.Push(Mesh::LoadFromOBJ("assets/models/alien.obj"));
-    Mesh::UploadQueue.Push(Mesh::LoadFromOBJ("assets/models/head.obj"));
-  });
+  meshLoaderThread = std::thread(MeshLoaderThreadFunc);
+  EnqueueMeshLoad(MeshType::Debug);
+  EnqueueMeshLoad(MeshType::Car);
+  EnqueueMeshLoad(MeshType::Spider);
+  EnqueueMeshLoad(MeshType::Dragon);
+  EnqueueMeshLoad(MeshType::Alien);
+  EnqueueMeshLoad(MeshType::Head);
 
   objectShader.Create("assets/shaders/object.vert.glsl", "assets/shaders/object.frag.glsl");
 
@@ -30,34 +76,46 @@ void ObjectMode::Destroy() {
   objectShader.Destroy();
   objectFB.Destroy();
 
-  Mesh::UploadQueue.Close();
+  uploadQueue.Close();
+  meshJobQueue.Close();
   meshLoaderThread.join();
   for (auto& m : meshes) m.Destroy();
 }
 
-#define IMGUI_MESH_RADIO(mesh) changed |= ImGui::RadioButton(#mesh, (int*)&meshSelect, (int)MeshType::mesh)
-
 void ObjectMode::UpdateImGui() {
   bool changed = false;
-  IMGUI_MESH_RADIO(Car);
+  changed |= ImGui::RadioButton("Car", (int*)&currentMeshType, (int)MeshType::Car);
   ImGui::SameLine();
-  IMGUI_MESH_RADIO(Spider);
+  changed |= ImGui::RadioButton("Spider", (int*)&currentMeshType, (int)MeshType::Spider);
   ImGui::SameLine();
-  IMGUI_MESH_RADIO(Dragon);
-  IMGUI_MESH_RADIO(Alien);
+  changed |= ImGui::RadioButton("Dragon", (int*)&currentMeshType, (int)MeshType::Dragon);
+  changed |= ImGui::RadioButton("Alien", (int*)&currentMeshType, (int)MeshType::Alien);
   ImGui::SameLine();
-  IMGUI_MESH_RADIO(Head);
+  changed |= ImGui::RadioButton("Head", (int*)&currentMeshType, (int)MeshType::Head);
   ImGui::SameLine();
-  IMGUI_MESH_RADIO(Debug);
+  changed |= ImGui::RadioButton("Debug", (int*)&currentMeshType, (int)MeshType::Debug);
   if (changed) hasValidPrevMvp = false;
 
+  ImGui::NewLine();
   ImGui::Checkbox("Uniform Flow", &uniformFlow);
+
+  ImGui::NewLine();
+  FlowfieldSettings& stored = flowSettings[(int)currentMeshType];
+  ImGui::Text("Flow Settings (Axis: %c, CreaseAngle: %.0f)", stored.axis, stored.creaseThresholdAngle);
+  static FlowfieldSettings edit = stored;
+  if (changed) edit = stored;
+  if (ImGui::RadioButton("U", edit.axis == 'U')) edit.axis = 'U';
+  ImGui::SameLine();
+  if (ImGui::RadioButton("V", edit.axis == 'V')) edit.axis = 'V';
+  ImGui::SliderFloat("Crease Angle", &edit.creaseThresholdAngle, -1.0f, 90.0f, "%.0f");
+  if (ImGui::Button("Reload Mesh")) {
+    stored = edit;
+    EnqueueMeshLoad(currentMeshType);
+  }
 }
 
 void ObjectMode::Update(float dt) {
-  static int meshesLoaded = 0;
-  if (meshesLoaded < meshes.size())
-    while (auto d = Mesh::UploadQueue.TryPop()) meshes[meshesLoaded++].UploadDataFromOBJ(*d);
+  while (auto d = uploadQueue.TryPop()) meshes[d->slot].UploadDataFromOBJ(*d);
 
   camera.Update(dt);
   UpdateTransformMatrices(dt);
@@ -88,7 +146,7 @@ void ObjectMode::UpdateTransformMatrices(float dt) {
   glm::vec3 rotation = glm::vec3(0.0f);
   glm::vec3 scale = glm::vec3(1.0f);
 
-  switch (meshSelect) {
+  switch (currentMeshType) {
   case MeshType::Car: rotation = glm::vec3(0, 45, 0); break;
   case MeshType::Spider:
     rotation = glm::vec3(0, 180, 0);
@@ -154,5 +212,5 @@ void ObjectMode::OnKeyPressed(int key, int action) {
 }
 
 Mesh& ObjectMode::SelectedMesh() {
-  return meshes[(int)meshSelect];
+  return meshes[(int)currentMeshType];
 }

@@ -9,72 +9,35 @@ project(Noice C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
-include(FetchContent)
+add_subdirectory(external/glfw)
+add_subdirectory(external/glad)
+add_subdirectory(external/imgui)
+add_subdirectory(external/glm)
+add_subdirectory(external/stb)
 
-FetchContent_Declare(
-    glm
-    GIT_REPOSITORY https://github.com/g-truc/glm.git
-    GIT_TAG 1.0.2
+add_subdirectory(external/eigen)
+add_subdirectory(external/libigl)
+add_subdirectory(external/tinyobjloader)
+
+file(GLOB FLOWLOAD_SOURCES "src/flowload/*.cpp" "src/flowload/*.hpp")
+add_library(flowload STATIC ${FLOWLOAD_SOURCES})
+target_link_libraries(flowload PRIVATE igl::core Eigen3::Eigen tinyobjloader)
+
+file(GLOB NOICE_SOURCES "src/*.cpp" "src/*.hpp")
+add_executable(Noice ${NOICE_SOURCES})
+target_link_libraries(Noice PRIVATE flowload glfw glad imgui glm::glm stb)
+
+
+file(GLOB_RECURSE ASSETS CONFIGURE_DEPENDS "assets/*")
+add_custom_command(
+  OUTPUT "${CMAKE_BINARY_DIR}/assets/.assets_copied"
+  COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/assets" "${CMAKE_BINARY_DIR}/assets"
+  COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_BINARY_DIR}/assets/.assets_copied"
+  DEPENDS ${ASSETS}
 )
-FetchContent_MakeAvailable(glm)
+add_custom_target(copy_assets ALL DEPENDS "${CMAKE_BINARY_DIR}/assets/.assets_copied")
+add_dependencies(Noice copy_assets)
 
-FetchContent_Declare(
-  glfw
-  GIT_REPOSITORY https://github.com/glfw/glfw.git
-  GIT_TAG latest
-)
-FetchContent_MakeAvailable(glfw)
-
-FetchContent_Declare(
-  imgui
-  GIT_REPOSITORY https://github.com/ocornut/imgui.git
-  GIT_TAG v1.92.5
-)
-FetchContent_MakeAvailable(imgui)
-
-FetchContent_Declare(
-  tinyobjloader
-  GIT_REPOSITORY https://github.com/tinyobjloader/tinyobjloader.git
-  GIT_TAG release
-)
-FetchContent_MakeAvailable(tinyobjloader)
-
-set(IMGUI_SOURCES
-    ${imgui_SOURCE_DIR}/imgui.cpp
-    ${imgui_SOURCE_DIR}/imgui_draw.cpp
-    ${imgui_SOURCE_DIR}/imgui_tables.cpp
-    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-    ${imgui_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
-    ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
-)
-add_library(imgui STATIC ${IMGUI_SOURCES})
-target_include_directories(imgui PUBLIC
-    ${imgui_SOURCE_DIR}
-    ${imgui_SOURCE_DIR}/backends
-    ${glfw_SOURCE_DIR}/include
-)
-
-add_library(glad STATIC external/glad/src/glad.c)
-target_include_directories(glad PUBLIC external/glad/include)
-
-file(GLOB SRC
-    "src/*.cpp"
-    "src/*.hpp"
-)
-add_executable(Noice ${SRC})
-
-target_include_directories(Noice PRIVATE src external/stb)
-
-target_link_libraries(Noice PRIVATE glfw glad imgui glm tinyobjloader)
-
-add_custom_command(TARGET Noice POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_SOURCE_DIR}/assets ${CMAKE_BINARY_DIR}/assets
-)
 
 find_program(CLANG_FORMAT clang-format)
-add_custom_target(
-  format
-  COMMAND ${CLANG_FORMAT} -i ${SRC}
-)
+add_custom_target(format COMMAND ${CLANG_FORMAT} -i ${NOICE_SOURCES} ${FLOWLOAD_SOURCES})

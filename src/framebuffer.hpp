@@ -24,7 +24,7 @@ struct Texture {
   void Bind() const;
 
   void Swap(Texture& other);
-  void Upload(unsigned char* data);
+  void Upload(unsigned char* data) const;
 };
 
 struct Framebuffer {

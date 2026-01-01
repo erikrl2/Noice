@@ -155,7 +155,7 @@ void Texture::Swap(Texture& other) {
   std::swap(id, other.id);
 }
 
-void Texture::Upload(unsigned char* data) {
+void Texture::Upload(unsigned char* data) const {
   glBindTexture(GL_TEXTURE_2D, id);
   FormatInfo fi = GetFormatInfo(internalFormat);
   glPixelStorei(GL_UNPACK_ALIGNMENT, (fi.format == GL_RGBA) ? 4 : 1);

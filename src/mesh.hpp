@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+struct FlowfieldSettings;
+
 struct Mesh {
   GLuint vao = 0, vbo = 0, ebo = 0;
   size_t indexCount = 0;
@@ -19,7 +21,8 @@ struct Mesh {
   void UploadIndexed(const void* vertexData, size_t vertexBytes, const unsigned int* indices, size_t indexCount);
   void UploadArrays(const void* vertexData, size_t vertexBytes, size_t vertexCount);
 
-  void SetAttrib(GLuint location, GLint components, GLenum type, GLboolean normalized, GLsizei stride, size_t offset);
+  void SetAttrib(GLuint location, GLint components, GLenum type, GLboolean normalized, GLsizei stride, size_t offset)
+      const;
 
   void Draw(int renderFlags = 0) const;
   void Destroy();
@@ -30,10 +33,10 @@ struct Mesh {
   struct MeshData {
     std::vector<float> verts;
     std::vector<unsigned int> indices;
+    int slot = -1;
   };
-  inline static ThreadQueue<MeshData> UploadQueue;
+  static MeshData LoadFromOBJ(int slot, const std::string& path, const FlowfieldSettings& settings);
 
-  static MeshData LoadFromOBJ(const std::string& path);
   void UploadDataFromOBJ(const MeshData& data);
 };
 

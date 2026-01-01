@@ -89,7 +89,7 @@ IncludeCategories:
     Priority: 1
     SortPriority: 1
     CaseSensitive: false
-  - Regex: '<.*\.(h|hpp)>'
+  - Regex: '<.*(/.*|\.(h|hpp))>'
     Priority: 2
     SortPriority: 2
     CaseSensitive: false

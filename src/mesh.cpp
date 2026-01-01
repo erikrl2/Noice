@@ -1,7 +1,8 @@
 #include "mesh.hpp"
 
+#include "flowload/flowload.hpp"
+
 #include <glad/glad.h>
-#include <tiny_obj_loader.h>
 
 #include <iostream>
 #include <unordered_map>
@@ -34,7 +35,7 @@ void Mesh::UploadArrays(const void* vertexData, size_t vertexBytes, size_t verte
 
 void Mesh::SetAttrib(
     GLuint location, GLint components, GLenum type, GLboolean normalized, GLsizei stride, size_t offset
-) {
+) const {
   glBindVertexArray(vao);
   // glBindBuffer(GL_ARRAY_BUFFER, vbo);
   glVertexAttribPointer(location, components, type, normalized, stride, (void*)offset);
@@ -117,83 +118,19 @@ Mesh Mesh::CreateTriangle() {
   return m;
 }
 
-Mesh::MeshData Mesh::LoadFromOBJ(const std::string& path) {
-  if (!UploadQueue) return MeshData{};
+Mesh::MeshData Mesh::LoadFromOBJ(int slot, const std::string& path, const FlowfieldSettings& settings) {
+  MeshData data;
+  data.slot = slot;
 
-  tinyobj::attrib_t attrib;
-  std::vector<tinyobj::shape_t> shapes;
-  std::vector<tinyobj::material_t> materials;
-  std::string warn, err;
+  bool ok = ComputeUvFlowfieldFromOBJ(path, data.verts, data.indices, settings);
 
-  bool ok = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, path.c_str(), nullptr, true);
-  if (!warn.empty()) std::cerr << "tinyobj warning: " << warn << "\n";
-  if (!err.empty()) std::cerr << "tinyobj error: " << err << "\n";
-  if (!ok) return MeshData{};
-
-  // Only position + normal (no texcoords)
-  struct Idx {
-    int v, n;
-  };
-  struct IdxHash {
-    size_t operator()(const Idx& a) const noexcept { return ((size_t)a.v * 73856093u) ^ ((size_t)a.n * 83492791u); }
-  };
-  struct IdxEq {
-    bool operator()(const Idx& a, const Idx& b) const noexcept { return a.v == b.v && a.n == b.n; }
-  };
-
-  MeshData d;
-  std::unordered_map<Idx, unsigned int, IdxHash, IdxEq> cache;
-
-  d.verts.reserve(attrib.vertices.size() / 3 * 6);
-  d.indices.reserve(shapes.size() * 3 * 100); // rough estimate
-
-  for (const auto& shape : shapes) {
-    const auto& mesh = shape.mesh;
-    for (size_t i = 0; i < mesh.indices.size(); ++i) {
-      if (!UploadQueue) return MeshData{};
-
-      tinyobj::index_t idx = mesh.indices[i];
-      Idx key{idx.vertex_index, idx.normal_index};
-
-      auto it = cache.find(key);
-      if (it != cache.end()) {
-        d.indices.push_back(it->second);
-        continue;
-      }
-
-      unsigned int newIndex = (unsigned int)(d.verts.size() / 6);
-
-      if (key.v >= 0 && (size_t)(3 * key.v + 2) < attrib.vertices.size()) {
-        d.verts.push_back(attrib.vertices[3 * key.v + 0]);
-        d.verts.push_back(attrib.vertices[3 * key.v + 1]);
-        d.verts.push_back(attrib.vertices[3 * key.v + 2]);
-      } else {
-        d.verts.push_back(0.0f);
-        d.verts.push_back(0.0f);
-        d.verts.push_back(0.0f);
-      }
-
-      if (key.n >= 0 && (size_t)(3 * key.n + 2) < attrib.normals.size()) {
-        d.verts.push_back(attrib.normals[3 * key.n + 0]);
-        d.verts.push_back(attrib.normals[3 * key.n + 1]);
-        d.verts.push_back(attrib.normals[3 * key.n + 2]);
-      } else {
-        d.verts.push_back(0.0f);
-        d.verts.push_back(0.0f);
-        d.verts.push_back(0.0f);
-      }
-
-      cache.emplace(key, newIndex);
-      d.indices.push_back(newIndex);
-    }
+  if (ok) {
+    std::cout
+        << "Loaded " << path << " (" << (data.verts.size() / 6) << " vertices, " << data.indices.size() << " indices)"
+        << std::endl;
   }
 
-  if (d.verts.empty() || d.indices.empty()) {
-    std::cerr << "OBJ produced no geometry: " << path << "\n";
-    return MeshData{};
-  }
-
-  return d;
+  return data;
 }
 
 void Mesh::UploadDataFromOBJ(const MeshData& d) {

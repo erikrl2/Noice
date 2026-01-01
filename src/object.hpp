@@ -5,8 +5,6 @@
 #include "mode.hpp"
 #include "shader.hpp"
 
-#include <array>
-
 class ObjectMode : public Mode {
 public:
   void Init(int width, int height);
@@ -23,6 +21,9 @@ public:
   Framebuffer& GetResultFB() override { return objectFB; }
   const MvpState* GetMvpState() override { return &mvpState; }
 
+public:
+  enum class MeshType { Debug, Car, Spider, Dragon, Alien, Head, Count };
+
 private:
   void UpdateTransformMatrices(float dt);
   void RenderObject();
@@ -30,11 +31,10 @@ private:
   Mesh& SelectedMesh();
 
 private:
-  enum class MeshType { Debug, Car, Spider, Dragon, Alien, Head, Count };
-  MeshType meshSelect = MeshType::Car;
+  MeshType currentMeshType = MeshType::Car;
   bool uniformFlow = false;
 
-  std::array<Mesh, (size_t)MeshType::Count> meshes;
+  Mesh meshes[(size_t)MeshType::Count];
 
   Shader objectShader;
   Framebuffer objectFB;
