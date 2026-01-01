@@ -27,10 +27,11 @@ void TextMode::Destroy() {
 void TextMode::UpdateImGui() {
   if (ImGui::InputTextMultiline("Text", &text, ImVec2(0, 32), ImGuiInputTextFlags_WordWrap)) dirtyMesh = true;
 
-  if (ImGui::SliderFloat("Font Size", &bakeFontPx, 20.0f, 290.0f, "%.0f")) LoadFontAtlas();
+  if (ImGui::SliderFloat("Font Size", &bakeFontPx, 20.0f, 290.0f, "%.0f", ImGuiSliderFlags_NoInput)) LoadFontAtlas();
 
-  dirtyMesh |= ImGui::SliderFloat("Scale", &scale, 0.1f, 5.0f, "%.2f");
-  dirtyMesh |= ImGui::SliderFloat("Wrap width", &wrapWidthFrac, 0.1f, 1.0f, "%.2f");
+  int scaleSliderFlags = ImGuiSliderFlags_NoInput | ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat;
+  dirtyMesh |= ImGui::DragFloat("Scale", &scale, 0.1f, 0.1f, 100.0f, "%.2f", scaleSliderFlags);
+  dirtyMesh |= ImGui::SliderFloat("Wrap width", &wrapWidthFrac, 0.1f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput);
 
   ImGuiDirection2D("Text", direction);
   ImGui::SameLine();
@@ -38,7 +39,6 @@ void TextMode::UpdateImGui() {
 
   ImGui::SameLine();
   ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 39.0f);
-
   dirtyMesh |= ImGui::Checkbox("Center", &center);
 }
 

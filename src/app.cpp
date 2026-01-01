@@ -72,6 +72,7 @@ void App::InitWindow() {
   glfwSetMouseButtonCallback(win, OnMouseClicked);
   glfwSetKeyCallback(win, OnKeyPressed);
   glfwSetScrollCallback(win, OnMouseScroll);
+  glfwSetDropCallback(win, OnFileDrop);
 }
 
 void App::InitOpenGL() {
@@ -235,6 +236,11 @@ void App::OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, in
     }
     break;
   }
+}
+
+void App::OnFileDrop(GLFWwindow* window, int count, const char** paths) {
+  App& app = *(App*)glfwGetWindowUserPointer(window);
+  app.modePtr->OnFileDrop(paths[0]);
 }
 
 void App::OnModeChange() {

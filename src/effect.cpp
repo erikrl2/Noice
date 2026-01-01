@@ -37,9 +37,10 @@ void Effect::Destroy() {
 }
 
 void Effect::UpdateImGui() {
-  ImGui::SliderFloat("Speed", &scrollSpeed, 0.0f, 500.0f, "%.1f");
-  ImGui::SliderInt("Sync rate", &accResetInterval, 1, 100);
-  if (ImGui::SliderInt("Downscale", &downscaleFactor, 1, 8)) OnResize(prevDepthTex.width, prevDepthTex.height);
+  ImGui::DragFloat("Speed", &scrollSpeed, 2.0f, 0.0f, 0.0f, "%.0f");
+  ImGui::DragInt("Sync rate", &accResetInterval, 0.1f, 1, 999, "%d", ImGuiSliderFlags_NoInput);
+  if (ImGui::SliderInt("Downscale", &downscaleFactor, 1, 8, "%d", ImGuiSliderFlags_NoInput))
+    OnResize(prevDepthTex.width, prevDepthTex.height);
   ImGui::Checkbox("Disable", &disabled);
   ImGui::SameLine();
   ImGui::Checkbox("Pause", &paused);

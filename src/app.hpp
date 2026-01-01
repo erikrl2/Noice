@@ -31,6 +31,7 @@ private:
   static void OnMouseScroll(GLFWwindow* window, double xoffset, double yoffset);
   static void OnMouseClicked(GLFWwindow* window, int button, int action, int mods);
   static void OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, int mods);
+  static void OnFileDrop(GLFWwindow* window, int count, const char** paths);
 
   void OnModeChange();
   void SetModePointer();

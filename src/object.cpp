@@ -8,64 +8,22 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <imgui.h>
 
-#include <iostream>
 #include <thread>
 
-// TODO: make static stuff non-static
-static std::thread meshLoaderThread;
-
-struct MeshLoadJob {
-  ObjectMode::MeshType type;
-  std::string path;
-  FlowfieldSettings settings;
-};
-static ThreadQueue<Mesh::MeshData> uploadQueue;
-static ThreadQueue<MeshLoadJob> meshJobQueue;
-
-static std::string GetMeshPath(ObjectMode::MeshType type) {
-  switch (type) {
-  case ObjectMode::MeshType::Debug: return "assets/models/debug.obj";
-  case ObjectMode::MeshType::Car: return "assets/models/car.obj";
-  case ObjectMode::MeshType::Spider: return "assets/models/spider.obj";
-  case ObjectMode::MeshType::Dragon: return "assets/models/dragon.obj";
-  case ObjectMode::MeshType::Alien: return "assets/models/alien.obj";
-  case ObjectMode::MeshType::Head: return "assets/models/head.obj";
-  default: return "";
-  }
-}
-
-static FlowfieldSettings flowSettings[(size_t)ObjectMode::MeshType::Count] = {
-    {'U', -1}, // Debug
-    {'V', 10}, // Car
-    {'V', -1}, // Spider
-    {'V', -1}, // Dragon
-    {'U', -1}, // Alien
-    {'V', -1} // Head
-};
-
-static void MeshLoaderThreadFunc() {
-  while (meshJobQueue) {
-    if (auto job = meshJobQueue.TryPop()) {
-      uploadQueue.Push(Mesh::LoadFromOBJ((int)job->type, job->path, job->settings));
-    } else {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-  }
-}
-
-static void EnqueueMeshLoad(ObjectMode::MeshType type) {
-  std::cout << "Enqueueing mesh load: " << GetMeshPath(type) << std::endl;
-  meshJobQueue.Push(MeshLoadJob{type, GetMeshPath(type), flowSettings[(int)type]});
-}
+static std::string meshFilePaths[(size_t)ObjectType::Count] = {
+    "assets/models/debug.obj",
+    "assets/models/car.obj",
+    "assets/models/spider.obj",
+    "assets/models/dragon.obj",
+    "assets/models/alien.obj",
+    "assets/models/head.obj"};
 
 void ObjectMode::Init(int width, int height) {
-  meshLoaderThread = std::thread(MeshLoaderThreadFunc);
-  EnqueueMeshLoad(MeshType::Debug);
-  EnqueueMeshLoad(MeshType::Car);
-  EnqueueMeshLoad(MeshType::Spider);
-  EnqueueMeshLoad(MeshType::Dragon);
-  EnqueueMeshLoad(MeshType::Alien);
-  EnqueueMeshLoad(MeshType::Head);
+  SetInitialFlowfieldSettings();
+  SetInitialObjectTransforms();
+
+  meshLoaderThread = std::thread(MeshLoaderThreadFunc, std::ref(meshJobQueue), std::ref(uploadQueue));
+  for (int type = 0; type < (int)ObjectType::Count; type++) LoadMeshAsync((ObjectType)type);
 
   objectShader.Create("assets/shaders/object.vert.glsl", "assets/shaders/object.frag.glsl");
 
@@ -82,40 +40,55 @@ void ObjectMode::Destroy() {
   for (auto& m : meshes) m.Destroy();
 }
 
+static bool meshChanged = false;
+
 void ObjectMode::UpdateImGui() {
-  bool changed = false;
-  changed |= ImGui::RadioButton("Car", (int*)&currentMeshType, (int)MeshType::Car);
+  meshChanged |= ImGui::RadioButton("Car", (int*)&currentObject, (int)ObjectType::Car);
   ImGui::SameLine();
-  changed |= ImGui::RadioButton("Spider", (int*)&currentMeshType, (int)MeshType::Spider);
+  meshChanged |= ImGui::RadioButton("Spider", (int*)&currentObject, (int)ObjectType::Spider);
   ImGui::SameLine();
-  changed |= ImGui::RadioButton("Dragon", (int*)&currentMeshType, (int)MeshType::Dragon);
-  changed |= ImGui::RadioButton("Alien", (int*)&currentMeshType, (int)MeshType::Alien);
+  meshChanged |= ImGui::RadioButton("Dragon", (int*)&currentObject, (int)ObjectType::Dragon);
+  meshChanged |= ImGui::RadioButton("Alien", (int*)&currentObject, (int)ObjectType::Alien);
   ImGui::SameLine();
-  changed |= ImGui::RadioButton("Head", (int*)&currentMeshType, (int)MeshType::Head);
+  meshChanged |= ImGui::RadioButton("Head", (int*)&currentObject, (int)ObjectType::Head);
   ImGui::SameLine();
-  changed |= ImGui::RadioButton("Debug", (int*)&currentMeshType, (int)MeshType::Debug);
-  if (changed) hasValidPrevMvp = false;
+  meshChanged |= ImGui::RadioButton("Custom", (int*)&currentObject, (int)ObjectType::Custom);
+  if (meshChanged) hasValidPrevMvp = false;
 
   ImGui::NewLine();
-  ImGui::Checkbox("Uniform Flow", &uniformFlow);
+  ImGui::DragFloat3("Translation", (float*)&objectTransforms[(int)currentObject].translation.x, 0.1f);
+  ImGui::DragFloat3("Rotation", (float*)&objectTransforms[(int)currentObject].rotation.x, 0.5f);
+  ImGui::DragFloat("Scale", &objectTransforms[(int)currentObject].scale, 0.02f);
 
   ImGui::NewLine();
-  FlowfieldSettings& stored = flowSettings[(int)currentMeshType];
-  ImGui::Text("Flow Settings (Axis: %c, CreaseAngle: %.0f)", stored.axis, stored.creaseThresholdAngle);
+  ImGui::Checkbox("Simple Flow", &uniformFlow);
+  ImGui::NewLine();
+
+  FlowfieldSettings& stored = flowSettings[(int)currentObject];
   static FlowfieldSettings edit = stored;
-  if (changed) edit = stored;
+  if (meshChanged) edit = stored;
+
+  ImGui::Text("Flow Settings [current: %c, %.0f]", stored.axis, stored.creaseThresholdAngle);
+
   if (ImGui::RadioButton("U", edit.axis == 'U')) edit.axis = 'U';
   ImGui::SameLine();
   if (ImGui::RadioButton("V", edit.axis == 'V')) edit.axis = 'V';
-  ImGui::SliderFloat("Crease Angle", &edit.creaseThresholdAngle, -1.0f, 90.0f, "%.0f");
+
+  ImGui::DragFloat("CreaseDeg", &edit.creaseThresholdAngle, 0.1f, -1.0f, 90.0f, "%.0f", ImGuiSliderFlags_NoInput);
+
+  bool differs = (edit.axis != stored.axis) || (edit.creaseThresholdAngle != stored.creaseThresholdAngle);
+  if (!differs) ImGui::BeginDisabled();
   if (ImGui::Button("Reload Mesh")) {
     stored = edit;
-    EnqueueMeshLoad(currentMeshType);
+    LoadMeshAsync(currentObject);
   }
+  if (!differs) ImGui::EndDisabled();
+
+  meshChanged = false;
 }
 
 void ObjectMode::Update(float dt) {
-  while (auto d = uploadQueue.TryPop()) meshes[d->slot].UploadDataFromOBJ(*d);
+  while (auto d = uploadQueue.TryPop()) meshes[d->slot].UploadFlowfieldMesh(*d);
 
   camera.Update(dt);
   UpdateTransformMatrices(dt);
@@ -132,7 +105,7 @@ void ObjectMode::RenderObject() {
   objectShader.SetVec2("uViewportSize", {objectFB.tex.width, objectFB.tex.height});
   objectShader.SetInt("uUniformFlow", uniformFlow);
 
-  SelectedMesh().Draw(RenderFlag::DepthTest);
+  meshes[(int)currentObject].Draw(RenderFlag::DepthTest);
 }
 
 void ObjectMode::UpdateTransformMatrices(float dt) {
@@ -140,42 +113,15 @@ void ObjectMode::UpdateTransformMatrices(float dt) {
   float aspect = (height > 0) ? width / height : 1.0f;
   glm::mat4 proj = camera.GetProjection(aspect);
   glm::mat4 view = camera.GetView();
+
+  ObjectTransform& t = objectTransforms[(int)currentObject];
+
   glm::mat4 m = glm::mat4(1.0f);
-
-  glm::vec3 translation = glm::vec3(0.0f);
-  glm::vec3 rotation = glm::vec3(0.0f);
-  glm::vec3 scale = glm::vec3(1.0f);
-
-  switch (currentMeshType) {
-  case MeshType::Car: rotation = glm::vec3(0, 45, 0); break;
-  case MeshType::Spider:
-    rotation = glm::vec3(0, 180, 0);
-    scale = glm::vec3(0.025f);
-    break;
-  case MeshType::Dragon:
-    translation = glm::vec3(0, -0.5f, 0);
-    rotation = glm::vec3(0, 20, 0);
-    scale = glm::vec3(0.07f);
-    break;
-  case MeshType::Alien:
-    translation = glm::vec3(0, -0.5f, 0);
-    rotation = glm::vec3(0, 60, 0);
-    scale = glm::vec3(0.12f);
-    break;
-  case MeshType::Head:
-    translation = glm::vec3(0, -1.0f, 0);
-    rotation = glm::vec3(-90, -135, 0);
-    scale = glm::vec3(0.20f);
-    break;
-  case MeshType::Debug: translation = glm::vec3(0, 1.0f, 0); break;
-  default: break;
-  }
-
-  m = glm::translate(m, translation);
-  // m = glm::rotate(m, glm::radians(rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
-  m = glm::rotate(m, glm::radians(rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-  m = glm::rotate(m, glm::radians(rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-  m = glm::scale(m, glm::vec3(scale));
+  m = glm::translate(m, t.translation);
+  m = glm::rotate(m, glm::radians(t.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+  m = glm::rotate(m, glm::radians(t.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+  m = glm::rotate(m, glm::radians(t.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+  m = glm::scale(m, glm::vec3(t.scale));
 
   if (hasValidPrevMvp) {
     mvpState.prevProj = mvpState.currProj;
@@ -211,6 +157,57 @@ void ObjectMode::OnKeyPressed(int key, int action) {
   }
 }
 
-Mesh& ObjectMode::SelectedMesh() {
-  return meshes[(int)currentMeshType];
+void ObjectMode::OnFileDrop(const std::string& path) {
+  if (path.size() > 4 && path.substr(path.size() - 4) == ".obj") {
+    if (currentObject != ObjectType::Custom) {
+      currentObject = ObjectType::Custom;
+      meshChanged = true;
+    }
+    meshFilePaths[(int)ObjectType::Custom] = path;
+    LoadMeshAsync(ObjectType::Custom);
+  }
+}
+
+void ObjectMode::SetInitialObjectTransforms() {
+  objectTransforms[(int)ObjectType::Car].rotation.y = 45.0f;
+  objectTransforms[(int)ObjectType::Car].scale = 10.0f;
+
+  objectTransforms[(int)ObjectType::Spider].rotation.y = 180.0f;
+  objectTransforms[(int)ObjectType::Spider].scale = 0.25f;
+
+  objectTransforms[(int)ObjectType::Dragon].rotation.y = 20.0f;
+  objectTransforms[(int)ObjectType::Dragon].scale = 0.7f;
+
+  objectTransforms[(int)ObjectType::Alien].rotation.y = 60.0f;
+  objectTransforms[(int)ObjectType::Alien].scale = 1.2f;
+
+  objectTransforms[(int)ObjectType::Head].translation.y = -5.0f;
+  objectTransforms[(int)ObjectType::Head].rotation.x = -90.0f;
+  objectTransforms[(int)ObjectType::Head].rotation.y = -135.0f;
+  objectTransforms[(int)ObjectType::Head].scale = 2.0f;
+}
+
+void ObjectMode::SetInitialFlowfieldSettings() {
+  flowSettings[(int)ObjectType::Custom] = {'U', -1};
+  flowSettings[(int)ObjectType::Car] = {'V', 12};
+  flowSettings[(int)ObjectType::Spider] = {'V', 25};
+  flowSettings[(int)ObjectType::Dragon] = {'V', 15};
+  flowSettings[(int)ObjectType::Alien] = {'U', 45};
+  flowSettings[(int)ObjectType::Head] = {'V', -1};
+}
+
+void ObjectMode::LoadMeshAsync(ObjectType type) {
+  std::string& path = meshFilePaths[(int)type];
+  FlowfieldSettings& settings = flowSettings[(int)type];
+  meshJobQueue.Push(ObjectLoadJob{type, path, settings});
+}
+
+void ObjectMode::MeshLoaderThreadFunc(Queue<ObjectLoadJob>& meshJobQueue, Queue<MeshFlowfieldData>& uploadQueue) {
+  while (meshJobQueue) {
+    if (auto job = meshJobQueue.TryPop()) {
+      uploadQueue.Push(Mesh::CreateFlowfieldDataFromOBJ((int)job->type, job->path, job->settings));
+    } else {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+  }
 }

@@ -1,12 +1,16 @@
 #pragma once
-#include "util.hpp"
-
 #include <glad/glad.h>
 
 #include <string>
 #include <vector>
 
 struct FlowfieldSettings;
+
+struct MeshFlowfieldData {
+  std::vector<float> verts;
+  std::vector<unsigned int> indices;
+  int slot = -1;
+};
 
 struct Mesh {
   GLuint vao = 0, vbo = 0, ebo = 0;
@@ -21,8 +25,7 @@ struct Mesh {
   void UploadIndexed(const void* vertexData, size_t vertexBytes, const unsigned int* indices, size_t indexCount);
   void UploadArrays(const void* vertexData, size_t vertexBytes, size_t vertexCount);
 
-  void SetAttrib(GLuint location, GLint components, GLenum type, GLboolean normalized, GLsizei stride, size_t offset)
-      const;
+  void SetAttrib(GLuint location, GLint components, GLenum type, GLboolean normalized, GLsizei stride, size_t offset);
 
   void Draw(int renderFlags = 0) const;
   void Destroy();
@@ -30,14 +33,11 @@ struct Mesh {
   static Mesh CreateFullscreenQuad();
   static Mesh CreateTriangle();
 
-  struct MeshData {
-    std::vector<float> verts;
-    std::vector<unsigned int> indices;
-    int slot = -1;
-  };
-  static MeshData LoadFromOBJ(int slot, const std::string& path, const FlowfieldSettings& settings);
+  static MeshFlowfieldData CreateFlowfieldDataFromOBJ(
+      int slot, const std::string& path, const FlowfieldSettings& settings
+  );
 
-  void UploadDataFromOBJ(const MeshData& data);
+  void UploadFlowfieldMesh(const MeshFlowfieldData& data);
 };
 
 enum RenderFlag { DepthTest = 1 << 0, CullFace = 1 << 1 };

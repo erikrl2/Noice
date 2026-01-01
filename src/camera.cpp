@@ -11,7 +11,7 @@ void Camera::Update(float dt) {
   if (ImGui::GetIO().WantCaptureKeyboard) return;
   GLFWwindow* win = glfwGetCurrentContext();
 
-  float camSpeed = 5.0f * dt;
+  float camSpeed = 50.0f * dt;
   glm::vec3 front = GetFront();
   glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
   glm::vec3 right = glm::normalize(glm::cross(front, worldUp));
@@ -23,7 +23,7 @@ void Camera::Update(float dt) {
   if (glfwGetKey(win, GLFW_KEY_D) == GLFW_PRESS) moveDir += right;
   if (glfwGetKey(win, GLFW_KEY_SPACE) == GLFW_PRESS) moveDir += worldUp;
   if (glfwGetKey(win, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) moveDir -= worldUp;
-  if (glfwGetKey(win, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) camSpeed *= 2.0f;
+  if (glfwGetKey(win, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) camSpeed *= 0.5f;
 
   if (glm::length(moveDir) > 0.001f) {
     moveDir = glm::normalize(moveDir);

@@ -27,7 +27,8 @@ void PaintMode::Destroy() {
 }
 
 void PaintMode::UpdateImGui() {
-  ImGui::SliderFloat("Brush Radius", &brushRadius, 1.0f, 100.0f, "%.0f");
+  ImGui::DragFloat("Brush Radius", &brushRadius, 0.1f, 1.0f, 100.0f, "%.0f", ImGuiSliderFlags_NoInput);
+  if (ImGui::Button("Clear Canvas")) canvasFB.Clear();
 }
 
 void PaintMode::Update(float dt) {

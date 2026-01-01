@@ -5,7 +5,6 @@
 #include <glad/glad.h>
 
 #include <iostream>
-#include <unordered_map>
 
 void Mesh::UploadIndexed(const void* vertexData, size_t vertexBytes, const unsigned int* indices, size_t indexCount) {
   this->indexCount = indexCount;
@@ -35,7 +34,7 @@ void Mesh::UploadArrays(const void* vertexData, size_t vertexBytes, size_t verte
 
 void Mesh::SetAttrib(
     GLuint location, GLint components, GLenum type, GLboolean normalized, GLsizei stride, size_t offset
-) const {
+) {
   glBindVertexArray(vao);
   // glBindBuffer(GL_ARRAY_BUFFER, vbo);
   glVertexAttribPointer(location, components, type, normalized, stride, (void*)offset);
@@ -118,22 +117,20 @@ Mesh Mesh::CreateTriangle() {
   return m;
 }
 
-Mesh::MeshData Mesh::LoadFromOBJ(int slot, const std::string& path, const FlowfieldSettings& settings) {
-  MeshData data;
-  data.slot = slot;
+MeshFlowfieldData Mesh::CreateFlowfieldDataFromOBJ(
+    int slot, const std::string& path, const FlowfieldSettings& settings
+) {
+  MeshFlowfieldData data;
 
   bool ok = ComputeUvFlowfieldFromOBJ(path, data.verts, data.indices, settings);
 
-  if (ok) {
-    std::cout
-        << "Loaded " << path << " (" << (data.verts.size() / 6) << " vertices, " << data.indices.size() << " indices)"
-        << std::endl;
-  }
+  if (ok) std::cout << "Loaded " << path << " (" << (data.verts.size() / 6) << " vertices)" << std::endl;
 
+  data.slot = slot;
   return data;
 }
 
-void Mesh::UploadDataFromOBJ(const MeshData& d) {
+void Mesh::UploadFlowfieldMesh(const MeshFlowfieldData& d) {
   if (d.indices.empty()) return;
   UploadIndexed(d.verts.data(), d.verts.size() * sizeof(float), d.indices.data(), d.indices.size());
   SetAttrib(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), 0);

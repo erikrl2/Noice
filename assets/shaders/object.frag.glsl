@@ -30,5 +30,5 @@ void main() {
 
   oDir = dPx / epsWorld;
 
-  oDir /= 150.0;
+  oDir /= 15.0;
 }

@@ -16,7 +16,7 @@ bool ImGuiDirection2D(const char* label, glm::vec2& dir, float radius = 32.0f);
 void EnableOpenGLDebugOutput();
 
 template<typename T>
-class ThreadQueue {
+class Queue {
 public:
   void Push(T&& item) {
     std::lock_guard<std::mutex> lock(mutex);

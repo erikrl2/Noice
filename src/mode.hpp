@@ -12,6 +12,7 @@ public:
   virtual void OnMouseMoved(double xpos, double ypos) {}
   virtual void OnMouseScrolled(float offset) {}
   virtual void OnKeyPressed(int key, int action) {}
+  virtual void OnFileDrop(const std::string& path) {}
 
   virtual Framebuffer& GetResultFB() = 0;
 
