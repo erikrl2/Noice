@@ -1,13 +1,13 @@
 #pragma once
 #include "camera.hpp"
-#include "flowload/flowload.hpp"
+#include "flowfield/flowfield.hpp"
 #include "framebuffer.hpp"
 #include "mesh.hpp"
 #include "mode.hpp"
 #include "shader.hpp"
 #include "util.hpp"
 
-enum class ObjectType { Custom, Car, Spider, Dragon, Alien, Head, Count };
+enum class ObjectType { Custom, Car, Interior, Dragon, Alien, Head, Count };
 
 struct ObjectTransform {
   glm::vec3 translation = {0.0f, 0.0f, 0.0f};

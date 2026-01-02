@@ -28,6 +28,7 @@ public:
 
   void OnResize(int width, int height);
   void OnMouseClicked(int button, int action);
+  void OnMouseScrolled(float offset);
   void OnKeyPressed(int key, int action);
 
 private:

@@ -19,13 +19,13 @@ add_subdirectory(external/eigen)
 add_subdirectory(external/libigl)
 add_subdirectory(external/tinyobjloader)
 
-file(GLOB FLOWLOAD_SOURCES "src/flowload/*.cpp" "src/flowload/*.hpp")
-add_library(flowload STATIC ${FLOWLOAD_SOURCES})
-target_link_libraries(flowload PRIVATE igl::core Eigen3::Eigen tinyobjloader)
+file(GLOB FLOWFIELD_SOURCES "src/flowfield/*.cpp" "src/flowfield/*.hpp")
+add_library(flowfield STATIC ${FLOWFIELD_SOURCES})
+target_link_libraries(flowfield PRIVATE igl::core Eigen3::Eigen tinyobjloader)
 
 file(GLOB NOICE_SOURCES "src/*.cpp" "src/*.hpp")
 add_executable(Noice ${NOICE_SOURCES})
-target_link_libraries(Noice PRIVATE flowload glfw glad imgui glm::glm stb)
+target_link_libraries(Noice PRIVATE flowfield glfw glad imgui glm::glm stb)
 
 
 file(GLOB_RECURSE ASSETS CONFIGURE_DEPENDS "assets/*")
@@ -40,4 +40,4 @@ add_dependencies(Noice copy_assets)
 
 
 find_program(CLANG_FORMAT clang-format)
-add_custom_target(format COMMAND ${CLANG_FORMAT} -i ${NOICE_SOURCES} ${FLOWLOAD_SOURCES})
+add_custom_target(format COMMAND ${CLANG_FORMAT} -i ${NOICE_SOURCES} ${FLOWFIELD_SOURCES})

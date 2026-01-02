@@ -1,6 +1,6 @@
 #include "mesh.hpp"
 
-#include "flowload/flowload.hpp"
+#include "flowfield/flowfield.hpp"
 
 #include <glad/glad.h>
 

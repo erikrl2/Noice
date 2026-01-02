@@ -91,12 +91,12 @@ void PaintMode::OnMouseMoved(double xpos, double ypos) {
 }
 
 void PaintMode::OnMouseScrolled(float offset) {
-  if (offset > 0.0f) {
-    brushRadius += 2.0f;
-  } else if (offset < 0.0f) {
-    brushRadius -= 2.0f;
-    brushRadius = std::max(2.0f, brushRadius);
-  }
+  // if (offset > 0.0f) {
+  //   brushRadius += 2.0f;
+  // } else if (offset < 0.0f) {
+  //   brushRadius -= 2.0f;
+  //   brushRadius = std::max(2.0f, brushRadius);
+  // }
 }
 
 void PaintMode::OnMouseClicked(int button, int action) {

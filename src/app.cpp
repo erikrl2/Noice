@@ -192,6 +192,7 @@ void App::OnMouseScroll(GLFWwindow* window, double xoffset, double yoffset) {
   if (ImGui::GetIO().WantCaptureMouse) return;
   App& app = *(App*)glfwGetWindowUserPointer(window);
 
+  app.effect.OnMouseScrolled((float)yoffset);
   app.modePtr->OnMouseScrolled((float)yoffset);
 }
 

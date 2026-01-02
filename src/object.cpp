@@ -1,6 +1,6 @@
 #include "object.hpp"
 
-#include "flowload/flowload.hpp"
+#include "flowfield/flowfield.hpp"
 #include "mesh.hpp"
 
 #include <GLFW/glfw3.h>
@@ -13,7 +13,7 @@
 static std::string meshFilePaths[(size_t)ObjectType::Count] = {
     "assets/models/debug.obj",
     "assets/models/car.obj",
-    "assets/models/spider.obj",
+    "assets/models/interior.obj", // spider.obj
     "assets/models/dragon.obj",
     "assets/models/alien.obj",
     "assets/models/head.obj"};
@@ -45,7 +45,7 @@ static bool meshChanged = false;
 void ObjectMode::UpdateImGui() {
   meshChanged |= ImGui::RadioButton("Car", (int*)&currentObject, (int)ObjectType::Car);
   ImGui::SameLine();
-  meshChanged |= ImGui::RadioButton("Spider", (int*)&currentObject, (int)ObjectType::Spider);
+  meshChanged |= ImGui::RadioButton("Interior", (int*)&currentObject, (int)ObjectType::Interior);
   ImGui::SameLine();
   meshChanged |= ImGui::RadioButton("Dragon", (int*)&currentObject, (int)ObjectType::Dragon);
   meshChanged |= ImGui::RadioButton("Alien", (int*)&currentObject, (int)ObjectType::Alien);
@@ -62,17 +62,17 @@ void ObjectMode::UpdateImGui() {
 
   ImGui::NewLine();
   ImGui::Checkbox("Simple Flow", &uniformFlow);
-  ImGui::NewLine();
 
   FlowfieldSettings& stored = flowSettings[(int)currentObject];
   static FlowfieldSettings edit = stored;
   if (meshChanged) edit = stored;
 
-  ImGui::Text("Flow Settings [current: %c, %.0f]", stored.axis, stored.creaseThresholdAngle);
-
+  ImGui::NewLine();
   if (ImGui::RadioButton("U", edit.axis == 'U')) edit.axis = 'U';
   ImGui::SameLine();
   if (ImGui::RadioButton("V", edit.axis == 'V')) edit.axis = 'V';
+  ImGui::SameLine();
+  if (ImGui::RadioButton("A", edit.axis == 'A')) edit.axis = 'A';
 
   ImGui::DragFloat("CreaseDeg", &edit.creaseThresholdAngle, 0.1f, -1.0f, 90.0f, "%.0f", ImGuiSliderFlags_NoInput);
 
@@ -172,8 +172,8 @@ void ObjectMode::SetInitialObjectTransforms() {
   objectTransforms[(int)ObjectType::Car].rotation.y = 45.0f;
   objectTransforms[(int)ObjectType::Car].scale = 10.0f;
 
-  objectTransforms[(int)ObjectType::Spider].rotation.y = 180.0f;
-  objectTransforms[(int)ObjectType::Spider].scale = 0.25f;
+  objectTransforms[(int)ObjectType::Interior].rotation.y = 0.0f;
+  objectTransforms[(int)ObjectType::Interior].scale = 20.0f;
 
   objectTransforms[(int)ObjectType::Dragon].rotation.y = 20.0f;
   objectTransforms[(int)ObjectType::Dragon].scale = 0.7f;
@@ -189,11 +189,11 @@ void ObjectMode::SetInitialObjectTransforms() {
 
 void ObjectMode::SetInitialFlowfieldSettings() {
   flowSettings[(int)ObjectType::Custom] = {'U', -1};
-  flowSettings[(int)ObjectType::Car] = {'V', 12};
-  flowSettings[(int)ObjectType::Spider] = {'V', 25};
-  flowSettings[(int)ObjectType::Dragon] = {'V', 15};
-  flowSettings[(int)ObjectType::Alien] = {'U', 45};
-  flowSettings[(int)ObjectType::Head] = {'V', -1};
+  flowSettings[(int)ObjectType::Car] = {'A', 12};
+  flowSettings[(int)ObjectType::Interior] = {'A', 80};
+  flowSettings[(int)ObjectType::Dragon] = {'A', 15};
+  flowSettings[(int)ObjectType::Alien] = {'A', 45};
+  flowSettings[(int)ObjectType::Head] = {'A', -1};
 }
 
 void ObjectMode::LoadMeshAsync(ObjectType type) {
