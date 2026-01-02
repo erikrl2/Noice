@@ -16,7 +16,8 @@ static std::string meshFilePaths[(size_t)ObjectType::Count] = {
     "assets/models/interior.obj", // spider.obj
     "assets/models/dragon.obj",
     "assets/models/alien.obj",
-    "assets/models/head.obj"};
+    "assets/models/head.obj"
+};
 
 void ObjectMode::Init(int width, int height) {
   SetInitialFlowfieldSettings();
@@ -60,8 +61,8 @@ void ObjectMode::UpdateImGui() {
   ImGui::DragFloat3("Rotation", (float*)&objectTransforms[(int)currentObject].rotation.x, 0.5f);
   ImGui::DragFloat("Scale", &objectTransforms[(int)currentObject].scale, 0.02f);
 
-  ImGui::NewLine();
-  ImGui::Checkbox("Simple Flow", &uniformFlow);
+  // ImGui::NewLine();
+  // ImGui::Checkbox("Simple Flow", &uniformFlow);
 
   FlowfieldSettings& stored = flowSettings[(int)currentObject];
   static FlowfieldSettings edit = stored;
