@@ -7,21 +7,22 @@
 #include "shader.hpp"
 #include "util.hpp"
 
-enum class ObjectType { Custom, Car, Interior, Dragon, Alien, Head, Count };
+class ObjectMode: public Mode {
+public:
+  enum class Model { Custom, Car, Interior, Dragon, Alien, Head, Count };
 
-struct ObjectTransform {
-  glm::vec3 translation = {0.0f, 0.0f, 0.0f};
-  glm::vec3 rotation = {0.0f, 0.0f, 0.0f};
-  float scale = 1.0f;
-};
+  struct Transform {
+    glm::vec3 translation = {0.0f, 0.0f, 0.0f};
+    glm::vec3 rotation = {0.0f, 0.0f, 0.0f};
+    float scale = 1.0f;
+  };
 
-struct ObjectLoadJob {
-  ObjectType type;
-  std::string path;
-  FlowfieldSettings settings;
-};
+  struct ModelLoadJob {
+    Model type;
+    std::string path;
+    FlowfieldSettings settings;
+  };
 
-class ObjectMode : public Mode {
 public:
   void Init(int width, int height);
   void Destroy();
@@ -46,14 +47,14 @@ private:
   void SetInitialFlowfieldSettings();
 
 private:
-  ObjectType currentObject = ObjectType::Car;
+  Model objectSelect = Model::Car;
 
-  ObjectTransform objectTransforms[(size_t)ObjectType::Count];
-  FlowfieldSettings flowSettings[(size_t)ObjectType::Count];
+  Transform transforms[(size_t)Model::Count];
+  FlowfieldSettings flowSettings[(size_t)Model::Count];
 
   bool uniformFlow = false;
 
-  Mesh meshes[(size_t)ObjectType::Count];
+  Mesh meshes[(size_t)Model::Count];
 
   Shader objectShader;
   Framebuffer objectFB;
@@ -65,10 +66,10 @@ private:
 private:
   std::thread meshLoaderThread;
 
-  Queue<ObjectLoadJob> meshJobQueue;
+  Queue<ModelLoadJob> meshJobQueue;
   Queue<MeshFlowfieldData> uploadQueue;
 
-  void LoadMeshAsync(ObjectType type);
+  void LoadMeshAsync(Model type);
 
-  static void MeshLoaderThreadFunc(Queue<ObjectLoadJob>& meshJobQueue, Queue<MeshFlowfieldData>& uploadQueue);
+  static void MeshLoaderThreadFunc(Queue<ModelLoadJob>& meshJobQueue, Queue<MeshFlowfieldData>& uploadQueue);
 };

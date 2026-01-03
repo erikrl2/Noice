@@ -90,6 +90,7 @@ namespace {
 
   FormatInfo GetFormatInfo(GLenum internalFormat) {
     switch (internalFormat) {
+    case GL_R16F: return {GL_RED, GL_HALF_FLOAT};
     case GL_RG16F: return {GL_RG, GL_HALF_FLOAT};
     case GL_RGBA16F: return {GL_RGBA, GL_HALF_FLOAT};
     case GL_RG8: return {GL_RG, GL_UNSIGNED_BYTE};
@@ -160,4 +161,12 @@ void Texture::Upload(unsigned char* data) const {
   FormatInfo fi = GetFormatInfo(internalFormat);
   glPixelStorei(GL_UNPACK_ALIGNMENT, (fi.format == GL_RGBA) ? 4 : 1);
   glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, fi.format, fi.type, data);
+}
+
+std::vector<unsigned char> Texture::Download() const {
+  std::vector<unsigned char> data(width * height * 4);
+  glBindTexture(GL_TEXTURE_2D, id);
+  FormatInfo fi = GetFormatInfo(internalFormat);
+  glGetTexImage(GL_TEXTURE_2D, 0, fi.format, fi.type, data.data());
+  return data;
 }

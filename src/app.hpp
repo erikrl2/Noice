@@ -2,6 +2,7 @@
 #include "effect.hpp"
 #include "object.hpp"
 #include "paint.hpp"
+#include "screenshot.hpp"
 #include "shader.hpp"
 #include "text.hpp"
 
@@ -56,6 +57,8 @@ private:
   enum class ModeType { Object, Text, Paint, Count };
   ModeType modeSelect = ModeType::Object;
   Mode* modePtr = nullptr;
+
+  Screenshot screenshot;
 
   bool showSettings = true;
 };

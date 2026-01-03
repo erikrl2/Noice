@@ -4,7 +4,7 @@
 #include "mode.hpp"
 #include "shader.hpp"
 
-class PaintMode : public Mode {
+class PaintMode: public Mode {
 public:
   void Init(int width, int height);
   void Destroy();

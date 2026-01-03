@@ -10,21 +10,20 @@
 
 #include <thread>
 
-static std::string meshFilePaths[(size_t)ObjectType::Count] = {
+static std::string meshFilePaths[(size_t)ObjectMode::Model::Count] = {
     "assets/models/debug.obj",
     "assets/models/car.obj",
-    "assets/models/interior.obj", // spider.obj
+    "assets/models/interior.obj",
     "assets/models/dragon.obj",
     "assets/models/alien.obj",
-    "assets/models/head.obj"
-};
+    "assets/models/head.obj"};
 
 void ObjectMode::Init(int width, int height) {
   SetInitialFlowfieldSettings();
   SetInitialObjectTransforms();
 
   meshLoaderThread = std::thread(MeshLoaderThreadFunc, std::ref(meshJobQueue), std::ref(uploadQueue));
-  for (int type = 0; type < (int)ObjectType::Count; type++) LoadMeshAsync((ObjectType)type);
+  for (int type = 0; type < (int)Model::Count; type++) LoadMeshAsync((Model)type);
 
   objectShader.Create("assets/shaders/object.vert.glsl", "assets/shaders/object.frag.glsl");
 
@@ -44,46 +43,40 @@ void ObjectMode::Destroy() {
 static bool meshChanged = false;
 
 void ObjectMode::UpdateImGui() {
-  meshChanged |= ImGui::RadioButton("Car", (int*)&currentObject, (int)ObjectType::Car);
-  ImGui::SameLine();
-  meshChanged |= ImGui::RadioButton("Interior", (int*)&currentObject, (int)ObjectType::Interior);
-  ImGui::SameLine();
-  meshChanged |= ImGui::RadioButton("Dragon", (int*)&currentObject, (int)ObjectType::Dragon);
-  meshChanged |= ImGui::RadioButton("Alien", (int*)&currentObject, (int)ObjectType::Alien);
-  ImGui::SameLine();
-  meshChanged |= ImGui::RadioButton("Head", (int*)&currentObject, (int)ObjectType::Head);
-  ImGui::SameLine();
-  meshChanged |= ImGui::RadioButton("Custom", (int*)&currentObject, (int)ObjectType::Custom);
-  if (meshChanged) hasValidPrevMvp = false;
+  static const char* objects[] = {"Custom", "Car", "Interior", "Dragon", "Alien", "Head"};
+  int o = (int)objectSelect;
 
-  ImGui::NewLine();
-  ImGui::DragFloat3("Translation", (float*)&objectTransforms[(int)currentObject].translation.x, 0.1f);
-  ImGui::DragFloat3("Rotation", (float*)&objectTransforms[(int)currentObject].rotation.x, 0.5f);
-  ImGui::DragFloat("Scale", &objectTransforms[(int)currentObject].scale, 0.02f);
+  if (ImGui::Combo("Object", &o, objects, (int)Model::Count)) {
+    objectSelect = (Model)o;
+    meshChanged = true;
+    hasValidPrevMvp = false;
+  }
 
-  // ImGui::NewLine();
-  // ImGui::Checkbox("Simple Flow", &uniformFlow);
+  ImGui::SeparatorText("Transform");
+  ImGui::DragFloat3("Translation", (float*)&transforms[(int)objectSelect].translation.x, 0.1f, 0, 0, "%.1f");
+  ImGui::DragFloat3("Rotation", (float*)&transforms[(int)objectSelect].rotation.x, 0.5f, 0, 0, "%.1f");
+  ImGui::DragFloat("Scale", &transforms[(int)objectSelect].scale, 0.02f, 0, 0, "%.2f");
 
-  FlowfieldSettings& stored = flowSettings[(int)currentObject];
+  FlowfieldSettings& stored = flowSettings[(int)objectSelect];
   static FlowfieldSettings edit = stored;
   if (meshChanged) edit = stored;
 
-  ImGui::NewLine();
+  ImGui::SeparatorText("Flow Settings");
   if (ImGui::RadioButton("U", edit.axis == 'U')) edit.axis = 'U';
   ImGui::SameLine();
   if (ImGui::RadioButton("V", edit.axis == 'V')) edit.axis = 'V';
   ImGui::SameLine();
-  if (ImGui::RadioButton("A", edit.axis == 'A')) edit.axis = 'A';
+  if (ImGui::RadioButton("Auto", edit.axis == 'A')) edit.axis = 'A';
 
-  ImGui::DragFloat("CreaseDeg", &edit.creaseThresholdAngle, 0.1f, -1.0f, 90.0f, "%.0f", ImGuiSliderFlags_NoInput);
+  ImGui::DragFloat("Crease Angle", &edit.creaseThresholdAngle, 0.1f, -1.0f, 90.0f, "%.0f", ImGuiSliderFlags_NoInput);
 
   bool differs = (edit.axis != stored.axis) || (edit.creaseThresholdAngle != stored.creaseThresholdAngle);
-  if (!differs) ImGui::BeginDisabled();
+  ImGui::BeginDisabled(!differs);
   if (ImGui::Button("Reload Mesh")) {
     stored = edit;
-    LoadMeshAsync(currentObject);
+    LoadMeshAsync(objectSelect);
   }
-  if (!differs) ImGui::EndDisabled();
+  ImGui::EndDisabled();
 
   meshChanged = false;
 }
@@ -106,7 +99,7 @@ void ObjectMode::RenderObject() {
   objectShader.SetVec2("uViewportSize", {objectFB.tex.width, objectFB.tex.height});
   objectShader.SetInt("uUniformFlow", uniformFlow);
 
-  meshes[(int)currentObject].Draw(RenderFlag::DepthTest);
+  meshes[(int)objectSelect].Draw(RenderFlag::DepthTest);
 }
 
 void ObjectMode::UpdateTransformMatrices(float dt) {
@@ -115,7 +108,7 @@ void ObjectMode::UpdateTransformMatrices(float dt) {
   glm::mat4 proj = camera.GetProjection(aspect);
   glm::mat4 view = camera.GetView();
 
-  ObjectTransform& t = objectTransforms[(int)currentObject];
+  Transform& t = transforms[(int)objectSelect];
 
   glm::mat4 m = glm::mat4(1.0f);
   m = glm::translate(m, t.translation);
@@ -160,50 +153,50 @@ void ObjectMode::OnKeyPressed(int key, int action) {
 
 void ObjectMode::OnFileDrop(const std::string& path) {
   if (path.size() > 4 && path.substr(path.size() - 4) == ".obj") {
-    if (currentObject != ObjectType::Custom) {
-      currentObject = ObjectType::Custom;
+    if (objectSelect != Model::Custom) {
+      objectSelect = Model::Custom;
       meshChanged = true;
     }
-    meshFilePaths[(int)ObjectType::Custom] = path;
-    LoadMeshAsync(ObjectType::Custom);
+    meshFilePaths[(int)Model::Custom] = path;
+    LoadMeshAsync(Model::Custom);
   }
 }
 
 void ObjectMode::SetInitialObjectTransforms() {
-  objectTransforms[(int)ObjectType::Car].rotation.y = 45.0f;
-  objectTransforms[(int)ObjectType::Car].scale = 10.0f;
+  transforms[(int)Model::Car].rotation.y = 45.0f;
+  transforms[(int)Model::Car].scale = 10.0f;
 
-  objectTransforms[(int)ObjectType::Interior].rotation.y = 0.0f;
-  objectTransforms[(int)ObjectType::Interior].scale = 20.0f;
+  transforms[(int)Model::Interior].rotation.y = 0.0f;
+  transforms[(int)Model::Interior].scale = 20.0f;
 
-  objectTransforms[(int)ObjectType::Dragon].rotation.y = 20.0f;
-  objectTransforms[(int)ObjectType::Dragon].scale = 0.7f;
+  transforms[(int)Model::Dragon].rotation.y = 20.0f;
+  transforms[(int)Model::Dragon].scale = 0.7f;
 
-  objectTransforms[(int)ObjectType::Alien].rotation.y = 60.0f;
-  objectTransforms[(int)ObjectType::Alien].scale = 1.2f;
+  transforms[(int)Model::Alien].rotation.y = 60.0f;
+  transforms[(int)Model::Alien].scale = 1.2f;
 
-  objectTransforms[(int)ObjectType::Head].translation.y = -5.0f;
-  objectTransforms[(int)ObjectType::Head].rotation.x = -90.0f;
-  objectTransforms[(int)ObjectType::Head].rotation.y = -135.0f;
-  objectTransforms[(int)ObjectType::Head].scale = 2.0f;
+  transforms[(int)Model::Head].translation.y = -5.0f;
+  transforms[(int)Model::Head].rotation.x = -90.0f;
+  transforms[(int)Model::Head].rotation.y = -135.0f;
+  transforms[(int)Model::Head].scale = 2.0f;
 }
 
 void ObjectMode::SetInitialFlowfieldSettings() {
-  flowSettings[(int)ObjectType::Custom] = {'U', -1};
-  flowSettings[(int)ObjectType::Car] = {'A', 12};
-  flowSettings[(int)ObjectType::Interior] = {'A', 80};
-  flowSettings[(int)ObjectType::Dragon] = {'A', 15};
-  flowSettings[(int)ObjectType::Alien] = {'A', 45};
-  flowSettings[(int)ObjectType::Head] = {'A', -1};
+  flowSettings[(int)Model::Custom] = {'U', -1};
+  flowSettings[(int)Model::Car] = {'A', 12};
+  flowSettings[(int)Model::Interior] = {'A', 80};
+  flowSettings[(int)Model::Dragon] = {'A', 15};
+  flowSettings[(int)Model::Alien] = {'A', 45};
+  flowSettings[(int)Model::Head] = {'A', -1};
 }
 
-void ObjectMode::LoadMeshAsync(ObjectType type) {
+void ObjectMode::LoadMeshAsync(Model type) {
   std::string& path = meshFilePaths[(int)type];
   FlowfieldSettings& settings = flowSettings[(int)type];
-  meshJobQueue.Push(ObjectLoadJob{type, path, settings});
+  meshJobQueue.Push(ModelLoadJob{type, path, settings});
 }
 
-void ObjectMode::MeshLoaderThreadFunc(Queue<ObjectLoadJob>& meshJobQueue, Queue<MeshFlowfieldData>& uploadQueue) {
+void ObjectMode::MeshLoaderThreadFunc(Queue<ModelLoadJob>& meshJobQueue, Queue<MeshFlowfieldData>& uploadQueue) {
   while (meshJobQueue) {
     if (auto job = meshJobQueue.TryPop()) {
       uploadQueue.Push(Mesh::CreateFlowfieldDataFromOBJ((int)job->type, job->path, job->settings));

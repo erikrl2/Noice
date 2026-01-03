@@ -10,8 +10,8 @@ static void printShaderLog(GLuint shader, const char* name);
 static void printProgramLog(GLuint prog, const char* name);
 
 void Shader::Create(const char* v, const char* f) {
-  std::string vs = ReadFileString(v);
-  std::string fs = ReadFileString(f);
+  std::string vs = util::ReadFileString(v);
+  std::string fs = util::ReadFileString(f);
   const char* vc = vs.c_str();
   const char* fc = fs.c_str();
 
@@ -36,7 +36,7 @@ void Shader::Create(const char* v, const char* f) {
 }
 
 void Shader::CreateCompute(const char* c) {
-  std::string cs = ReadFileString(c);
+  std::string cs = util::ReadFileString(c);
   const char* cc = cs.c_str();
 
   unsigned int comp = glCreateShader(GL_COMPUTE_SHADER);

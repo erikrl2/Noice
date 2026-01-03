@@ -2,6 +2,8 @@
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 
+#include <vector>
+
 struct Texture {
   GLuint id = 0;
   int width = 0;
@@ -25,6 +27,7 @@ struct Texture {
 
   void Swap(Texture& other);
   void Upload(unsigned char* data) const;
+  std::vector<unsigned char> Download() const;
 };
 
 struct Framebuffer {

@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-class TextMode : public Mode {
+class TextMode: public Mode {
 public:
   void Init(int width, int height);
   void Destroy();

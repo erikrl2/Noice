@@ -33,9 +33,9 @@ void TextMode::UpdateImGui() {
   dirtyMesh |= ImGui::DragFloat("Scale", &scale, 0.1f, 0.1f, 100.0f, "%.2f", scaleSliderFlags);
   dirtyMesh |= ImGui::SliderFloat("Wrap width", &wrapWidthFrac, 0.1f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput);
 
-  ImGuiDirection2D("Text", direction);
+  util::ImGuiDirection2D("Text", direction);
   ImGui::SameLine();
-  ImGuiDirection2D("Background", bgDir);
+  util::ImGuiDirection2D("Background", bgDir);
 
   ImGui::SameLine();
   ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 39.0f);
@@ -69,7 +69,7 @@ void TextMode::Update(float dt) {
 
 void TextMode::LoadFontAtlas() {
   std::vector<unsigned char> newTtf;
-  if (!ReadFileBytes(fontPath, newTtf)) return;
+  if (!util::ReadFileBytes(fontPath, newTtf)) return;
 
   ttfBuffer.swap(newTtf);
 
@@ -271,7 +271,7 @@ void TextMode::OnResize(int width, int height) {
 }
 
 void TextMode::OnKeyPressed(int key, int action) {
-  if (key == GLFW_KEY_C && action == GLFW_PRESS) {
+  if (key == GLFW_KEY_R && action == GLFW_PRESS) {
     center = !center;
     dirtyMesh = true;
   }

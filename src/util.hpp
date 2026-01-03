@@ -7,13 +7,17 @@
 #include <string>
 #include <vector>
 
-bool ReadFileBytes(const char* path, std::vector<unsigned char>& out);
+namespace util {
 
-std::string ReadFileString(const char* path);
+  bool ReadFileBytes(const char* path, std::vector<unsigned char>& out);
 
-bool ImGuiDirection2D(const char* label, glm::vec2& dir, float radius = 32.0f);
+  std::string ReadFileString(const char* path);
 
-void EnableOpenGLDebugOutput();
+  bool ImGuiDirection2D(const char* label, glm::vec2& dir, float radius = 32.0f);
+
+  void EnableOpenGLDebugOutput();
+
+} // namespace util
 
 template<typename T>
 class Queue {

@@ -79,7 +79,7 @@ void App::InitOpenGL() {
   gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
 #ifndef NDEBUG
-  EnableOpenGLDebugOutput();
+  util::EnableOpenGLDebugOutput();
 #endif
 
   glDisable(GL_DEPTH_TEST);
@@ -108,6 +108,8 @@ void App::SetupResources() {
   textMode.Init(width, height);
   paintMode.Init(width, height);
 
+  screenshot.Init(width, height);
+
   SetModePointer();
 }
 
@@ -118,28 +120,32 @@ void App::DestroyResources() {
   objectMode.Destroy();
   textMode.Destroy();
   paintMode.Destroy();
+  screenshot.Destroy();
 }
 
 void App::UpdateImGui() {
   if (!showSettings) return;
   bool open = ImGui::Begin("Settings", &showSettings, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav);
   if (open) {
-    effect.UpdateImGui();
+    if (ImGui::CollapsingHeader("Effect", ImGuiTreeNodeFlags_DefaultOpen)) {
+      effect.UpdateImGui();
+    }
 
-    ImGui::NewLine();
-    ImGui::SeparatorText("Mode");
+    if (ImGui::CollapsingHeader("Mode", ImGuiTreeNodeFlags_DefaultOpen)) {
+      bool changed = false;
+      changed |= ImGui::RadioButton("Object##Mode", (int*)&modeSelect, (int)ModeType::Object);
+      ImGui::SameLine();
+      changed |= ImGui::RadioButton("Text##Mode", (int*)&modeSelect, (int)ModeType::Text);
+      ImGui::SameLine();
+      changed |= ImGui::RadioButton("Paint##Mode", (int*)&modeSelect, (int)ModeType::Paint);
+      if (changed) OnModeChange();
 
-    bool changed = false;
-    changed |= ImGui::RadioButton("Object##Mode", (int*)&modeSelect, (int)ModeType::Object);
-    ImGui::SameLine();
-    changed |= ImGui::RadioButton("Text##Mode", (int*)&modeSelect, (int)ModeType::Text);
-    ImGui::SameLine();
-    changed |= ImGui::RadioButton("Paint##Mode", (int*)&modeSelect, (int)ModeType::Paint);
-    if (changed) OnModeChange();
+      modePtr->UpdateImGui();
+    }
 
-    ImGui::NewLine();
-
-    modePtr->UpdateImGui();
+    if (ImGui::CollapsingHeader("Motion Screenshot", ImGuiTreeNodeFlags_DefaultOpen)) {
+      screenshot.UpdateImGui();
+    }
   }
   ImGui::End();
 }
@@ -151,12 +157,18 @@ void App::Update(float dt) {
   else
     effect.Apply(modePtr->GetResultFB(), dt);
 
+  screenshot.Update(effect.GetResultTex());
+
   RenderToScreen();
 }
 
 void App::RenderToScreen() {
+  // TODO: make this cleaner
+  const Texture* src = &effect.GetResultTex();
+  if (screenshot.HasResult()) src = &screenshot.GetResultTex();
+
   postShader.Use();
-  postShader.SetTexture("uScreenTex", !effect.IsDisabled() ? effect.GetResultTex() : modePtr->GetResultFB().tex);
+  postShader.SetTexture("uScreenTex", !effect.IsDisabled() ? *src : modePtr->GetResultFB().tex);
   postShader.SetVec2("uResolution", {width, height});
   postShader.SetInt("uShowVectors", effect.IsDisabled());
 
@@ -202,6 +214,7 @@ void App::OnMouseClicked(GLFWwindow* window, int button, int action, int mods) {
 
   app.effect.OnMouseClicked(button, action);
   app.modePtr->OnMouseClicked(button, action);
+  app.screenshot.OnMouseClicked(button, action);
 }
 
 void App::OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -210,6 +223,7 @@ void App::OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, in
 
   app.effect.OnKeyPressed(key, action);
   app.modePtr->OnKeyPressed(key, action);
+  app.screenshot.OnKeyPressed(key, action);
 
   switch (key) {
   case GLFW_KEY_ESCAPE:
