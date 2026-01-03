@@ -2,10 +2,8 @@
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
-layout(r16f, binding = 0) uniform readonly image2D uSumTex;
-layout(r16f, binding = 1) uniform readonly image2D uDiffSumTex;
-
-layout(r8, binding = 2) uniform writeonly image2D uOutTex;
+layout(r16f, binding = 0) uniform readonly image2D uAccumTex;
+layout(r8, binding = 1) uniform writeonly image2D uOutTex;
 
 uniform int uMethod;
 uniform int uFrames;
@@ -21,13 +19,12 @@ float applyGamma(float x, float g) {
 void main() {
   ivec2 px = ivec2(gl_GlobalInvocationID.xy);
 
+  float acc = imageLoad(uAccumTex, px).r;
   float v = 0.0;
 
   if (uMethod == 0) {
-    float sum = imageLoad(uSumTex, px).r;
-    v = sum / float(max(1, uFrames));
+    v = acc / float(max(1, uFrames));
   } else {
-    float acc = imageLoad(uDiffSumTex, px).r;
     v = acc / float(max(1, uFrames - 1));
   }
 

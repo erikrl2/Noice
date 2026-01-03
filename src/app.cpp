@@ -221,13 +221,9 @@ void App::OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, in
   if (ImGui::GetIO().WantCaptureKeyboard) return;
   App& app = *(App*)glfwGetWindowUserPointer(window);
 
-  app.effect.OnKeyPressed(key, action);
-  app.modePtr->OnKeyPressed(key, action);
-  app.screenshot.OnKeyPressed(key, action);
-
   switch (key) {
   case GLFW_KEY_ESCAPE:
-    if (action == GLFW_PRESS) glfwSetWindowShouldClose(window, true);
+    if (!app.screenshot.HasResult() && action == GLFW_PRESS) glfwSetWindowShouldClose(window, true);
     break;
   case GLFW_KEY_H:
     if (action == GLFW_PRESS) app.showSettings = !app.showSettings;
@@ -251,6 +247,10 @@ void App::OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, in
     }
     break;
   }
+
+  app.effect.OnKeyPressed(key, action);
+  app.modePtr->OnKeyPressed(key, action);
+  app.screenshot.OnKeyPressed(key, action);
 }
 
 void App::OnFileDrop(GLFWwindow* window, int count, const char** paths) {

@@ -8,5 +8,11 @@ uniform bool uShowVectors;
 
 void main() {
   vec2 v = texture(uScreenTex, gl_FragCoord.xy / uResolution).rg;
-  oColor = !uShowVectors ? vec4(vec3(v.r), 1) : vec4(v * 0.5 + 0.5, 0, 1);
+
+  if (!uShowVectors) {
+    oColor = vec4(v.r, v.r, v.r, 1);
+  } else {
+    if (v != vec2(0)) v = normalize(v);
+    oColor = vec4(v * 0.5 + 0.5, 0, 1);
+  }
 }

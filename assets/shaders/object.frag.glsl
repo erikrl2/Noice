@@ -8,15 +8,7 @@ layout(location = 0) out vec2 oDir;
 uniform mat4 uViewproj;
 uniform vec2 uViewportSize;
 
-uniform bool uUniformFlow;
-uniform mat4 uView;
-
 void main() {
-  if (uUniformFlow) {
-    oDir = normalize(uView * vec4(vDirWorld, 0)).xy;
-    return;
-  }
-
   const float epsWorld = 0.002;
 
   vec4 c0 = uViewproj * vec4(vPosWorld, 1);
@@ -29,6 +21,4 @@ void main() {
   vec2 dPx  = dNdc * 0.5 * uViewportSize;
 
   oDir = dPx / epsWorld;
-
-  oDir /= 15.0;
 }

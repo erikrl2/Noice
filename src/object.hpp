@@ -52,8 +52,6 @@ private:
   Transform transforms[(size_t)Model::Count];
   FlowfieldSettings flowSettings[(size_t)Model::Count];
 
-  bool uniformFlow = false;
-
   Mesh meshes[(size_t)Model::Count];
 
   Shader objectShader;

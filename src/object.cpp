@@ -16,7 +16,8 @@ static std::string meshFilePaths[(size_t)ObjectMode::Model::Count] = {
     "assets/models/interior.obj",
     "assets/models/dragon.obj",
     "assets/models/alien.obj",
-    "assets/models/head.obj"};
+    "assets/models/head.obj"
+};
 
 void ObjectMode::Init(int width, int height) {
   SetInitialFlowfieldSettings();
@@ -94,10 +95,8 @@ void ObjectMode::RenderObject() {
 
   objectShader.Use();
   objectShader.SetMat4("uModel", mvpState.currModel);
-  objectShader.SetMat4("uView", mvpState.currView);
   objectShader.SetMat4("uViewproj", mvpState.currProj * mvpState.currView);
   objectShader.SetVec2("uViewportSize", {objectFB.tex.width, objectFB.tex.height});
-  objectShader.SetInt("uUniformFlow", uniformFlow);
 
   meshes[(int)objectSelect].Draw(RenderFlag::DepthTest);
 }
@@ -145,11 +144,7 @@ void ObjectMode::OnMouseMoved(double xpos, double ypos) {
   camera.OnMouseMoved(xpos, ypos);
 }
 
-void ObjectMode::OnKeyPressed(int key, int action) {
-  if (key == GLFW_KEY_Q && action == GLFW_PRESS) {
-    uniformFlow = !uniformFlow;
-  }
-}
+void ObjectMode::OnKeyPressed(int key, int action) {}
 
 void ObjectMode::OnFileDrop(const std::string& path) {
   if (path.size() > 4 && path.substr(path.size() - 4) == ".obj") {

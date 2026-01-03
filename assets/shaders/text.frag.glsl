@@ -13,5 +13,5 @@ void main() {
 
   if (cov <= 0.0) discard;
 
-  oDir = uDir * cov;
+  oDir = uDir * cov * 20.0;
 }

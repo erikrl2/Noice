@@ -12,8 +12,7 @@ void Screenshot::Init(int width, int height) {
   accumShader.CreateCompute("assets/shaders/screenshot_accum.comp.glsl");
   finalizeShader.CreateCompute("assets/shaders/screenshot_finalize.comp.glsl");
 
-  sumTex.Create(width, height, GL_R16F, GL_NEAREST);
-  diffSumTex.Create(width, height, GL_R16F, GL_NEAREST);
+  accumTex.Create(width, height, GL_R16F, GL_NEAREST);
   prevTex.Create(width, height, GL_R8, GL_NEAREST);
   outTex.Create(width, height, GL_R8, GL_NEAREST);
 
@@ -25,8 +24,7 @@ void Screenshot::Destroy() {
   accumShader.Destroy();
   finalizeShader.Destroy();
 
-  sumTex.Destroy();
-  diffSumTex.Destroy();
+  accumTex.Destroy();
   prevTex.Destroy();
   outTex.Destroy();
 }
@@ -83,9 +81,8 @@ void Screenshot::Accumulate(const Texture& source) {
 
   accumShader.SetTexture("uSourceTex", source, 0);
 
-  accumShader.SetImage("uSumTex", sumTex, 0, GL_READ_WRITE);
-  accumShader.SetImage("uDiffSumTex", diffSumTex, 1, GL_READ_WRITE);
-  accumShader.SetImage("uPrevTex", prevTex, 2, GL_READ_WRITE);
+  accumShader.SetImage("uAccumTex", accumTex, 0, GL_READ_WRITE);
+  accumShader.SetImage("uPrevTex", prevTex, 1, GL_READ_WRITE);
 
   accumShader.SetInt("uMethod", (int)options.method);
   accumShader.SetInt("uFrameIndex", collectedFrames);
@@ -96,10 +93,8 @@ void Screenshot::Accumulate(const Texture& source) {
 void Screenshot::FinalizeToRGBA8() {
   finalizeShader.Use();
 
-  finalizeShader.SetImage("uSumTex", sumTex, 0, GL_READ_ONLY);
-  finalizeShader.SetImage("uDiffSumTex", diffSumTex, 1, GL_READ_ONLY);
-
-  finalizeShader.SetImage("uOutTex", outTex, 2, GL_WRITE_ONLY);
+  finalizeShader.SetImage("uAccumTex", accumTex, 0, GL_READ_ONLY);
+  finalizeShader.SetImage("uOutTex", outTex, 1, GL_WRITE_ONLY);
 
   finalizeShader.SetInt("uMethod", (int)options.method);
   finalizeShader.SetInt("uFrames", std::max(1, collectedFrames));
@@ -123,8 +118,7 @@ void Screenshot::Cancel() {
 }
 
 void Screenshot::ResetBuffers() {
-  sumTex.Clear();
-  diffSumTex.Clear();
+  accumTex.Clear();
   prevTex.Clear();
   outTex.Clear();
 }
@@ -132,8 +126,7 @@ void Screenshot::ResetBuffers() {
 void Screenshot::ResizeBuffers(int w, int h) {
   width = w, height = h;
 
-  sumTex.Resize(width, height);
-  diffSumTex.Resize(width, height);
+  accumTex.Resize(width, height);
   prevTex.Resize(width, height);
   outTex.Resize(width, height);
 
@@ -143,14 +136,15 @@ void Screenshot::ResizeBuffers(int w, int h) {
 }
 
 void Screenshot::OnMouseClicked(int button, int action) {
-  hasResult = false;
+  if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) hasResult = false;
 }
 
 void Screenshot::OnKeyPressed(int key, int action) {
   if (key == GLFW_KEY_C && action == GLFW_PRESS) {
-    hasResult = false;
+    // hasResult = false;
     Begin();
   }
+  if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) hasResult = false;
 }
 
 void Screenshot::SavePNG() {

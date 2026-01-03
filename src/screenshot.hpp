@@ -10,7 +10,7 @@ public:
 
   struct Options {
     Method method = Method::Average;
-    int targetFrames = 120;
+    int targetFrames = 30;
     float gain = 1.0f;
     float gamma = 1.0f;
     std::string baseName = "capture";
@@ -55,8 +55,7 @@ private:
   Shader accumShader;
   Shader finalizeShader;
 
-  Texture sumTex;
-  Texture diffSumTex;
+  Texture accumTex;
   Texture prevTex;
   Texture outTex;
 };

@@ -37,7 +37,7 @@ private:
   void SwapBuffers(Framebuffer& in);
 
 private:
-  float scrollSpeed = 150.0f;
+  float scrollSpeed = 7.0f;
   int accResetInterval = 10;
   int downscaleFactor = 1;
   bool disabled = false;

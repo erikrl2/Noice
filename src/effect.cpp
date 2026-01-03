@@ -37,7 +37,7 @@ void Effect::Destroy() {
 }
 
 void Effect::UpdateImGui() {
-  ImGui::DragFloat("Speed", &scrollSpeed, 1.0f, 0.0f, 0.0f, "%.0f");
+  ImGui::DragFloat("Speed", &scrollSpeed, 0.1f, 0.0f, 0.0f, "%.1f");
   ImGui::DragInt("Sync rate", &accResetInterval, 0.1f, 1, 999, "%d", ImGuiSliderFlags_NoInput);
   if (ImGui::SliderInt("Downscale", &downscaleFactor, 1, 8, "%d", ImGuiSliderFlags_NoInput))
     OnResize(prevDepthTex.width, prevDepthTex.height);
@@ -128,7 +128,7 @@ void Effect::OnMouseClicked(int button, int action) {
 }
 
 void Effect::OnMouseScrolled(float offset) {
-  scrollSpeed += offset * 10.0f;
+  scrollSpeed += offset * 0.5f;
 }
 
 void Effect::OnKeyPressed(int key, int action) {
