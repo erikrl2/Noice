@@ -10,8 +10,11 @@
 namespace util {
 
   bool ReadFileBytes(const char* path, std::vector<unsigned char>& out);
-
   std::string ReadFileString(const char* path);
+
+  bool IsMouseButtonPressed(int button);
+  bool IsKeyPressed(int key);
+  void SetCursorDisabled(bool hide);
 
   bool ImGuiDirection2D(const char* label, glm::vec2& dir, float radius = 32.0f);
 

@@ -1,6 +1,7 @@
 #include "util.hpp"
 
 #include <glad/glad.h>
+#include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <imgui_internal.h>
 
@@ -30,6 +31,25 @@ namespace util {
     return ss.str();
   }
 
+  bool IsMouseButtonPressed(int button) {
+    return glfwGetMouseButton(glfwGetCurrentContext(), button) == GLFW_PRESS;
+  }
+
+  bool IsKeyPressed(int key) {
+    return glfwGetKey(glfwGetCurrentContext(), key) == GLFW_PRESS;
+  }
+
+  void SetCursorDisabled(bool disable) {
+    glfwSetInputMode(glfwGetCurrentContext(), GLFW_CURSOR, disable ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+  }
+
+  static ImU32 ApplyAlpha(ImU32 col, float alpha) {
+    ImVec4 c = ImGui::ColorConvertU32ToFloat4(col);
+    c.w *= alpha;
+    return ImGui::ColorConvertFloat4ToU32(c);
+  }
+
+  // AI generated
   bool ImGuiDirection2D(const char* label, glm::vec2& dir, float radius) {
     ImGui::BeginGroup();
     ImGui::Text("%s", label);
@@ -38,14 +58,24 @@ namespace util {
     float diameter = radius * 2.0f;
     ImVec2 center = ImVec2(pad.x + radius, pad.y + radius);
 
+    float alpha = ImGui::GetStyle().Alpha;
+
     ImGui::InvisibleButton((std::string(label) + "##dirpad").c_str(), ImVec2(diameter, diameter));
     ImDrawList* dl = ImGui::GetWindowDrawList();
 
-    dl->AddCircleFilled(center, radius, IM_COL32(48, 48, 48, 255));
-    dl->AddCircle(center, radius, IM_COL32(200, 200, 200, 120), 32, 1.0f);
+    dl->AddCircleFilled(center, radius, ApplyAlpha(IM_COL32(48, 48, 48, 255), alpha));
+    dl->AddCircle(center, radius, ApplyAlpha(IM_COL32(200, 200, 200, 120), alpha), 32, 1.0f);
 
-    dl->AddLine(ImVec2(center.x - radius, center.y), ImVec2(center.x + radius, center.y), IM_COL32(120, 120, 120, 90));
-    dl->AddLine(ImVec2(center.x, center.y - radius), ImVec2(center.x, center.y + radius), IM_COL32(120, 120, 120, 90));
+    dl->AddLine(
+        ImVec2(center.x - radius, center.y),
+        ImVec2(center.x + radius, center.y),
+        ApplyAlpha(IM_COL32(120, 120, 120, 90), alpha)
+    );
+    dl->AddLine(
+        ImVec2(center.x, center.y - radius),
+        ImVec2(center.x, center.y + radius),
+        ApplyAlpha(IM_COL32(120, 120, 120, 90), alpha)
+    );
 
     const float center_btn_r = 9.0f;
     bool changed = false;
@@ -53,17 +83,13 @@ namespace util {
 
     const bool center_hovered
         = (ImLengthSqr(ImVec2(io.MousePos.x - center.x, io.MousePos.y - center.y)) <= center_btn_r * center_btn_r);
-    ImU32 center_col = center_hovered ? IM_COL32(80, 80, 80, 255) : IM_COL32(70, 70, 70, 255);
-    dl->AddCircleFilled(center, center_btn_r, center_col);
-    dl->AddCircle(center, center_btn_r, IM_COL32(220, 220, 220, 120), 24, 1.0f);
 
-    if ((ImGui::IsItemHovered() || ImGui::IsItemActive() || center_hovered) && center_hovered
-        && ImGui::IsMouseClicked(0)) {
-      if (dir.x != 0.0f || dir.y != 0.0f) {
-        dir = glm::vec2(0.0f, 0.0f);
-        changed = true;
-      }
-    }
+    ImU32 center_col = center_hovered
+        ? ApplyAlpha(IM_COL32(80, 80, 80, 255), alpha)
+        : ApplyAlpha(IM_COL32(70, 70, 70, 255), alpha);
+
+    dl->AddCircleFilled(center, center_btn_r, center_col);
+    dl->AddCircle(center, center_btn_r, ApplyAlpha(IM_COL32(220, 220, 220, 120), alpha), 24, 1.0f);
 
     const float eps = 0.0001f;
     const float thumb_track = radius - 8.0f;
@@ -73,23 +99,33 @@ namespace util {
       glm::vec2 n = glm::normalize(dir);
       thumb = ImVec2(center.x + n.x * thumb_track, center.y - n.y * thumb_track);
 
-      dl->AddLine(center, thumb, IM_COL32(240, 120, 80, 200), 2.0f);
-      dl->AddCircleFilled(thumb, 6.0f, IM_COL32(240, 120, 80, 255));
+      dl->AddLine(center, thumb, ApplyAlpha(IM_COL32(240, 120, 80, 200), alpha), 2.0f);
+      dl->AddCircleFilled(thumb, 6.0f, ApplyAlpha(IM_COL32(240, 120, 80, 255), alpha));
     } else {
-      dl->AddCircleFilled(thumb, 5.0f, IM_COL32(240, 120, 80, 200));
+      dl->AddCircleFilled(thumb, 5.0f, ApplyAlpha(IM_COL32(240, 120, 80, 200), alpha));
     }
 
-    if ((ImGui::IsItemActive() || ImGui::IsItemHovered()) && io.MouseDown[0]) {
-      const bool pressing_center
-          = (ImLengthSqr(ImVec2(io.MousePos.x - center.x, io.MousePos.y - center.y)) <= center_btn_r * center_btn_r);
-      if (!pressing_center) {
-        ImVec2 m = io.MousePos;
-        glm::vec2 delta = glm::vec2(m.x - center.x, center.y - m.y);
-        if (glm::length(delta) > eps) {
-          glm::vec2 newDir = glm::normalize(delta);
-          if (newDir != dir) {
-            dir = newDir;
-            changed = true;
+    if (alpha > 0.6f) {
+      if ((ImGui::IsItemHovered() || ImGui::IsItemActive() || center_hovered) && center_hovered
+          && ImGui::IsMouseClicked(0)) {
+        if (dir.x != 0.0f || dir.y != 0.0f) {
+          dir = glm::vec2(0.0f, 0.0f);
+          changed = true;
+        }
+      }
+
+      if ((ImGui::IsItemActive() || ImGui::IsItemHovered()) && io.MouseDown[0]) {
+        const bool pressing_center
+            = (ImLengthSqr(ImVec2(io.MousePos.x - center.x, io.MousePos.y - center.y)) <= center_btn_r * center_btn_r);
+        if (!pressing_center) {
+          ImVec2 m = io.MousePos;
+          glm::vec2 delta = glm::vec2(m.x - center.x, center.y - m.y);
+          if (glm::length(delta) > eps) {
+            glm::vec2 newDir = glm::normalize(delta);
+            if (newDir != dir) {
+              dir = newDir;
+              changed = true;
+            }
           }
         }
       }

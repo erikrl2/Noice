@@ -23,11 +23,12 @@ void main() {
   if (uMethod == 0) {
     imageStore(uAccumTex, px, vec4(acc + cur, 0, 0, 0));
   } else {
-    float prev = imageLoad(uPrevTex, px).r;
-    float diff = abs(cur - prev);
-
+    float diff = 0.0;
+    if (uFrameIndex > 0) {
+      float prev = imageLoad(uPrevTex, px).r;
+      diff = abs(cur - prev);
+    }
     imageStore(uAccumTex, px, vec4(acc + diff, 0, 0, 0));
-
     imageStore(uPrevTex, px, vec4(cur, 0, 0, 0));
   }
 }

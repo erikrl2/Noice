@@ -1,7 +1,8 @@
 #include "camera.hpp"
 
-#include "GLFW/glfw3.h"
+#include "util.hpp"
 
+#include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <imgui.h>
 
@@ -9,7 +10,6 @@ static bool mouseDown = false;
 
 void Camera::Update(float dt) {
   if (ImGui::GetIO().WantCaptureKeyboard) return;
-  GLFWwindow* win = glfwGetCurrentContext();
 
   float camSpeed = 50.0f * dt;
   glm::vec3 front = GetFront();
@@ -17,13 +17,13 @@ void Camera::Update(float dt) {
   glm::vec3 right = glm::normalize(glm::cross(front, worldUp));
 
   glm::vec3 moveDir(0.0f);
-  if (glfwGetKey(win, GLFW_KEY_W) == GLFW_PRESS) moveDir += front;
-  if (glfwGetKey(win, GLFW_KEY_S) == GLFW_PRESS) moveDir -= front;
-  if (glfwGetKey(win, GLFW_KEY_A) == GLFW_PRESS) moveDir -= right;
-  if (glfwGetKey(win, GLFW_KEY_D) == GLFW_PRESS) moveDir += right;
-  if (glfwGetKey(win, GLFW_KEY_SPACE) == GLFW_PRESS) moveDir += worldUp;
-  if (glfwGetKey(win, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) moveDir -= worldUp;
-  if (glfwGetKey(win, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) camSpeed *= 0.5f;
+  if (util::IsKeyPressed(GLFW_KEY_W)) moveDir += front;
+  if (util::IsKeyPressed(GLFW_KEY_S)) moveDir -= front;
+  if (util::IsKeyPressed(GLFW_KEY_A)) moveDir -= right;
+  if (util::IsKeyPressed(GLFW_KEY_D)) moveDir += right;
+  if (util::IsKeyPressed(GLFW_KEY_SPACE)) moveDir += worldUp;
+  if (util::IsKeyPressed(GLFW_KEY_LEFT_CONTROL)) moveDir -= worldUp;
+  if (util::IsKeyPressed(GLFW_KEY_LEFT_SHIFT)) camSpeed *= 0.5f;
 
   if (glm::length(moveDir) > 0.001f) {
     moveDir = glm::normalize(moveDir);
@@ -32,15 +32,14 @@ void Camera::Update(float dt) {
 }
 
 void Camera::OnMouseClicked(int button, int action) {
-  GLFWwindow* win = glfwGetCurrentContext();
   switch (button) {
   case GLFW_MOUSE_BUTTON_LEFT: {
     if (action == GLFW_PRESS) {
       mouseDown = true;
-      glfwSetInputMode(win, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+      util::SetCursorDisabled(true);
     } else if (action == GLFW_RELEASE) {
       mouseDown = false;
-      glfwSetInputMode(win, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+      util::SetCursorDisabled(false);
     }
     break;
   }

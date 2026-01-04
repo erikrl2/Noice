@@ -19,7 +19,8 @@ public:
 
   void UpdateImGui();
 
-  void Apply(Framebuffer& in, float dt, const MvpState* mats = nullptr);
+  void ApplyAttached(Framebuffer& in, float dt, const MvpState* mats);
+  void Apply(Framebuffer& in, float dt);
 
   void ClearBuffers();
 
@@ -32,7 +33,7 @@ public:
   void OnKeyPressed(int key, int action);
 
 private:
-  void ScatterPass(Framebuffer& in, float dt, const MvpState* mats);
+  void ScatterPass(Framebuffer& in, float dt, const MvpState* mats = nullptr);
   void FillPass();
   void SwapBuffers(Framebuffer& in);
 

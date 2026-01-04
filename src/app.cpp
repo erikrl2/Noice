@@ -128,10 +128,14 @@ void App::UpdateImGui() {
   bool open = ImGui::Begin("Settings", &showSettings, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav);
   if (open) {
     if (ImGui::CollapsingHeader("Effect", ImGuiTreeNodeFlags_DefaultOpen)) {
+      ImGui::BeginDisabled(screenshot.IsActive());
       effect.UpdateImGui();
+      ImGui::EndDisabled();
     }
 
     if (ImGui::CollapsingHeader("Mode", ImGuiTreeNodeFlags_DefaultOpen)) {
+      ImGui::BeginDisabled(screenshot.IsActive());
+
       bool changed = false;
       changed |= ImGui::RadioButton("Object##Mode", (int*)&modeSelect, (int)ModeType::Object);
       ImGui::SameLine();
@@ -141,9 +145,11 @@ void App::UpdateImGui() {
       if (changed) OnModeChange();
 
       modePtr->UpdateImGui();
+
+      ImGui::EndDisabled();
     }
 
-    if (ImGui::CollapsingHeader("Motion Screenshot", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::CollapsingHeader("Screenshot", ImGuiTreeNodeFlags_DefaultOpen)) {
       screenshot.UpdateImGui();
     }
   }
@@ -151,11 +157,17 @@ void App::UpdateImGui() {
 }
 
 void App::Update(float dt) {
-  modePtr->Update(dt);
-  if (modePtr->HasMvp())
-    effect.Apply(modePtr->GetResultFB(), dt, modePtr->GetMvpState());
-  else
-    effect.Apply(modePtr->GetResultFB(), dt);
+  if (!screenshot.IsActive()) {
+    modePtr->Update(dt);
+  }
+
+  if (!effect.IsDisabled() || screenshot.IsActive()) {
+    if (modeSelect == ModeType::Object) {
+      effect.ApplyAttached(modePtr->GetResultFB(), dt, objectMode.GetMvpState());
+    } else {
+      effect.Apply(modePtr->GetResultFB(), dt);
+    }
+  }
 
   screenshot.Update(effect.GetResultTex());
 
@@ -163,14 +175,20 @@ void App::Update(float dt) {
 }
 
 void App::RenderToScreen() {
-  // TODO: make this cleaner
-  const Texture* src = &effect.GetResultTex();
-  if (screenshot.HasResult()) src = &screenshot.GetResultTex();
+  const Texture* src = nullptr;
+
+  if (screenshot.IsActive()) {
+    src = &screenshot.GetResultTex();
+  } else if (effect.IsDisabled()) {
+    src = &modePtr->GetResultFB().tex;
+  } else {
+    src = &effect.GetResultTex();
+  }
 
   postShader.Use();
-  postShader.SetTexture("uScreenTex", !effect.IsDisabled() ? *src : modePtr->GetResultFB().tex);
+  postShader.SetTexture("uScreenTex", *src);
   postShader.SetVec2("uResolution", {width, height});
-  postShader.SetInt("uShowVectors", effect.IsDisabled());
+  postShader.SetInt("uShowVectors", effect.IsDisabled() && !screenshot.IsActive());
 
   Framebuffer::BindDefault(width, height);
 
@@ -197,23 +215,29 @@ void App::OnMouseMoved(GLFWwindow* window, double xpos, double ypos) {
   if (ImGui::GetIO().WantCaptureMouse) return;
   App& app = *(App*)glfwGetWindowUserPointer(window);
 
-  app.modePtr->OnMouseMoved(xpos, ypos);
+  if (!app.screenshot.IsActive()) {
+    app.modePtr->OnMouseMoved(xpos, ypos);
+  }
 }
 
 void App::OnMouseScroll(GLFWwindow* window, double xoffset, double yoffset) {
   if (ImGui::GetIO().WantCaptureMouse) return;
   App& app = *(App*)glfwGetWindowUserPointer(window);
 
-  app.effect.OnMouseScrolled((float)yoffset);
-  app.modePtr->OnMouseScrolled((float)yoffset);
+  if (!app.screenshot.IsActive()) {
+    app.effect.OnMouseScrolled((float)yoffset);
+    app.modePtr->OnMouseScrolled((float)yoffset);
+  }
 }
 
 void App::OnMouseClicked(GLFWwindow* window, int button, int action, int mods) {
   if (ImGui::GetIO().WantCaptureMouse) return;
   App& app = *(App*)glfwGetWindowUserPointer(window);
 
-  app.effect.OnMouseClicked(button, action);
-  app.modePtr->OnMouseClicked(button, action);
+  if (!app.screenshot.IsActive()) {
+    app.effect.OnMouseClicked(button, action);
+    app.modePtr->OnMouseClicked(button, action);
+  }
   app.screenshot.OnMouseClicked(button, action);
 }
 
@@ -223,7 +247,7 @@ void App::OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, in
 
   switch (key) {
   case GLFW_KEY_ESCAPE:
-    if (!app.screenshot.HasResult() && action == GLFW_PRESS) glfwSetWindowShouldClose(window, true);
+    if (!app.screenshot.IsActive() && action == GLFW_PRESS) glfwSetWindowShouldClose(window, true);
     break;
   case GLFW_KEY_H:
     if (action == GLFW_PRESS) app.showSettings = !app.showSettings;
@@ -248,8 +272,10 @@ void App::OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, in
     break;
   }
 
-  app.effect.OnKeyPressed(key, action);
-  app.modePtr->OnKeyPressed(key, action);
+  if (!app.screenshot.IsActive()) {
+    app.effect.OnKeyPressed(key, action);
+    app.modePtr->OnKeyPressed(key, action);
+  }
   app.screenshot.OnKeyPressed(key, action);
 }
 

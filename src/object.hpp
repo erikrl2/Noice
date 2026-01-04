@@ -1,5 +1,6 @@
 #pragma once
 #include "camera.hpp"
+#include "effect.hpp"
 #include "flowfield/flowfield.hpp"
 #include "framebuffer.hpp"
 #include "mesh.hpp"
@@ -37,7 +38,7 @@ public:
   void OnFileDrop(const std::string& path) override;
 
   Framebuffer& GetResultFB() override { return objectFB; }
-  const MvpState* GetMvpState() override { return &mvpState; }
+  const MvpState* GetMvpState() { return &mvpState; }
 
 private:
   void UpdateTransformMatrices(float dt);

@@ -46,9 +46,15 @@ void Effect::UpdateImGui() {
   ImGui::Checkbox("Pause", &paused);
 }
 
-void Effect::Apply(Framebuffer& in, float dt, const MvpState* mats) {
-  assert((mats == nullptr) | in.hasDepth); // mats => depth
+void Effect::ApplyAttached(Framebuffer& in, float dt, const MvpState* mats) {
+  assert(mats && in.hasDepth);
   ScatterPass(in, dt, mats);
+  FillPass();
+  SwapBuffers(in);
+}
+
+void Effect::Apply(Framebuffer& in, float dt) {
+  ScatterPass(in, dt);
   FillPass();
   SwapBuffers(in);
 }
@@ -59,6 +65,9 @@ void Effect::ScatterPass(Framebuffer& in, float dt, const MvpState* mats) {
   static unsigned frameCount = 0;
   if (++frameCount % accResetInterval == 0) prevAccTex.Clear();
 
+  bool attachedEffect = (mats != nullptr);
+  float speed = scrollSpeed * dt / downscaleFactor * (int)!paused;
+
   scrollShader.Use();
 
   scrollShader.SetImage("uCurrNoiseTex", currNoiseTex, 0, GL_WRITE_ONLY);
@@ -66,9 +75,9 @@ void Effect::ScatterPass(Framebuffer& in, float dt, const MvpState* mats) {
   scrollShader.SetImage("uCurrAccTex", currAccTex, 2, GL_WRITE_ONLY);
   scrollShader.SetImage("uPrevAccTex", prevAccTex, 3, GL_READ_WRITE);
   scrollShader.SetTexture("uFlowTex", in.tex, 0);
-  scrollShader.SetFloat("uScrollSpeed", scrollSpeed * dt / downscaleFactor * (int)!paused);
 
-  if (mats != nullptr) {
+  scrollShader.SetInt("uReproject", attachedEffect);
+  if (attachedEffect) {
     scrollShader.SetTexture("uCurrDepthTex", in.depthTex, 1);
     scrollShader.SetTexture("uPrevDepthTex", prevDepthTex, 2);
 
@@ -77,8 +86,12 @@ void Effect::ScatterPass(Framebuffer& in, float dt, const MvpState* mats) {
     scrollShader.SetMat4("uInvPrevModel", glm::inverse(mats->prevModel));
     scrollShader.SetMat4("uCurrModel", mats->currModel);
     scrollShader.SetMat4("uCurrViewProj", mats->currProj * mats->currView);
+
+    scrollShader.SetFloat("uScrollSpeed", speed);
+  } else {
+    // speed adjustment: scrollspeed unit here is [pixels per second] and not [pixels per worldspace-unit per second]
+    scrollShader.SetFloat("uScrollSpeed", speed * 20.0f);
   }
-  scrollShader.SetInt("uReproject", (mats != nullptr));
 
   scrollShader.DispatchCompute(currNoiseTex.width, currNoiseTex.height, 16);
 }

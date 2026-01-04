@@ -1,5 +1,4 @@
 #pragma once
-#include "effect.hpp"
 #include "framebuffer.hpp"
 
 class Mode {
@@ -15,7 +14,4 @@ public:
   virtual void OnFileDrop(const std::string& path) {}
 
   virtual Framebuffer& GetResultFB() = 0;
-
-  virtual const MvpState* GetMvpState() { return nullptr; }
-  bool HasMvp() { return (GetMvpState() != nullptr); }
 };

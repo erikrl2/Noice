@@ -29,16 +29,16 @@ public:
   void OnMouseClicked(int button, int action);
   void OnKeyPressed(int key, int action);
 
-  bool HasResult() const { return hasResult; }
+  bool IsActive() const { return hasResult || capturing; }
   const Texture& GetResultTex() const { return outTex; }
 
 private:
   void Begin();
-  void Cancel();
+  void Reset();
 
   void Accumulate(const Texture& source);
-  void FinalizeToRGBA8();
-  void ResetBuffers();
+  void Finalize();
+  void ClearBuffers();
   void ResizeBuffers(int w, int h);
 
   void SavePNG();

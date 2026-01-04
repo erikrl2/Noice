@@ -1,5 +1,7 @@
 #include "screenshot.hpp"
 
+#include "util.hpp"
+
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
 #include <GLFW/glfw3.h>
@@ -30,14 +32,14 @@ void Screenshot::Destroy() {
 }
 
 void Screenshot::UpdateImGui() {
-  const char* methods[] = {"Average", "AbsDiffSum"};
+  const char* methods[] = {"Average", "Average of changes"};
   int m = (int)options.method;
 
   ImGui::BeginDisabled(capturing);
   if (ImGui::Combo("Method", &m, methods, (int)Method::Count)) {
     options.method = (Method)m;
   }
-  ImGui::DragInt("Frames", &options.targetFrames, 1.0f, 1, 5000, "%d", ImGuiSliderFlags_NoInput);
+  ImGui::DragInt("Frames", &options.targetFrames, 0.25f, 1, 1000, "%d", ImGuiSliderFlags_NoInput);
   ImGui::DragFloat("Gain", &options.gain, 0.01f, 0.0f, 100.0f, "%.2f", ImGuiSliderFlags_NoInput);
   ImGui::DragFloat("Gamma", &options.gamma, 0.01f, 0.1f, 5.0f, "%.2f", ImGuiSliderFlags_NoInput);
   ImGui::EndDisabled();
@@ -51,14 +53,16 @@ void Screenshot::UpdateImGui() {
     if (!hasResult)
       if (ImGui::Button("Start capture")) Begin();
   } else {
-    if (ImGui::Button("Cancel capture")) Cancel();
+    if (ImGui::Button("Cancel capture")) Reset();
     ImGui::Text("Capturing: %d / %d", collectedFrames, options.targetFrames);
   }
 
   if (hasResult) {
     if (ImGui::Button("Save PNG")) SavePNG();
     ImGui::SameLine();
-    if (ImGui::Button("Close preview")) hasResult = false;
+    if (ImGui::Button("Recapture")) Begin();
+    ImGui::SameLine();
+    if (ImGui::Button("Close preview")) Reset();
   }
 }
 
@@ -69,8 +73,9 @@ void Screenshot::Update(const Texture& source) {
   Accumulate(source);
   collectedFrames++;
 
+  Finalize();
+
   if (collectedFrames >= options.targetFrames) {
-    FinalizeToRGBA8();
     capturing = false;
     hasResult = true;
   }
@@ -90,14 +95,14 @@ void Screenshot::Accumulate(const Texture& source) {
   accumShader.DispatchCompute(outTex.width, outTex.height, 16);
 }
 
-void Screenshot::FinalizeToRGBA8() {
+void Screenshot::Finalize() {
   finalizeShader.Use();
 
   finalizeShader.SetImage("uAccumTex", accumTex, 0, GL_READ_ONLY);
   finalizeShader.SetImage("uOutTex", outTex, 1, GL_WRITE_ONLY);
 
   finalizeShader.SetInt("uMethod", (int)options.method);
-  finalizeShader.SetInt("uFrames", std::max(1, collectedFrames));
+  finalizeShader.SetInt("uFrames", collectedFrames);
   finalizeShader.SetFloat("uGain", options.gain);
   finalizeShader.SetFloat("uGamma", options.gamma);
 
@@ -106,18 +111,19 @@ void Screenshot::FinalizeToRGBA8() {
 
 void Screenshot::Begin() {
   capturing = true;
+  hasResult = false;
   collectedFrames = 0;
 
-  ResetBuffers();
+  ClearBuffers();
 }
 
-void Screenshot::Cancel() {
+void Screenshot::Reset() {
   capturing = false;
   hasResult = false;
   collectedFrames = 0;
 }
 
-void Screenshot::ResetBuffers() {
+void Screenshot::ClearBuffers() {
   accumTex.Clear();
   prevTex.Clear();
   outTex.Clear();
@@ -130,21 +136,22 @@ void Screenshot::ResizeBuffers(int w, int h) {
   prevTex.Resize(width, height);
   outTex.Resize(width, height);
 
-  if (capturing) Cancel();
-
-  hasResult = false;
+  Reset();
 }
 
 void Screenshot::OnMouseClicked(int button, int action) {
-  if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) hasResult = false;
+  if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
+    if (IsActive()) Reset();
+  }
 }
 
 void Screenshot::OnKeyPressed(int key, int action) {
   if (key == GLFW_KEY_C && action == GLFW_PRESS) {
-    // hasResult = false;
-    Begin();
+    if (!util::IsMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT)) Begin();
   }
-  if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) hasResult = false;
+  if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+    if (IsActive()) Reset();
+  }
 }
 
 void Screenshot::SavePNG() {
