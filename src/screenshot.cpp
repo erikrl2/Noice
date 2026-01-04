@@ -140,14 +140,14 @@ void Screenshot::ResizeBuffers(int w, int h) {
 }
 
 void Screenshot::OnMouseClicked(int button, int action) {
-  if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
+  if (action == GLFW_PRESS) {
     if (IsActive()) Reset();
   }
 }
 
 void Screenshot::OnKeyPressed(int key, int action) {
   if (key == GLFW_KEY_C && action == GLFW_PRESS) {
-    if (!util::IsMouseButtonPressed(GLFW_MOUSE_BUTTON_RIGHT)) Begin();
+    if (!util::IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT)) Begin();
   }
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
     if (IsActive()) Reset();

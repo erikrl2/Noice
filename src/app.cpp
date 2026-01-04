@@ -161,12 +161,10 @@ void App::Update(float dt) {
     modePtr->Update(!screenshot.IsActive() ? dt : 0.0f);
   }
 
-  if (!effect.IsDisabled() || screenshot.IsActive()) {
-    if (modeSelect == ModeType::Object) {
-      effect.ApplyAttached(modePtr->GetResultFB(), dt, objectMode.GetMvpState());
-    } else {
-      effect.Apply(modePtr->GetResultFB(), dt);
-    }
+  if (modeSelect == ModeType::Object) {
+    effect.ApplyAttached(modePtr->GetResultFB(), dt, objectMode.GetMvpState());
+  } else {
+    effect.Apply(modePtr->GetResultFB(), dt);
   }
 
   screenshot.Update(effect.GetResultTex());
