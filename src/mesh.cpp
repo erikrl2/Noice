@@ -7,6 +7,8 @@
 #include <iostream>
 
 void Mesh::UploadIndexed(const void* vertexData, size_t vertexBytes, const unsigned int* indices, size_t indexCount) {
+  Destroy();
+
   this->indexCount = indexCount;
   vertexCount = 0;
   glGenVertexArrays(1, &vao);
@@ -22,6 +24,8 @@ void Mesh::UploadIndexed(const void* vertexData, size_t vertexBytes, const unsig
 
 // unused
 void Mesh::UploadArrays(const void* vertexData, size_t vertexBytes, size_t vertexCount) {
+  Destroy();
+
   this->vertexCount = vertexCount;
   indexCount = 0;
   glGenVertexArrays(1, &vao);
