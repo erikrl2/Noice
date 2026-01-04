@@ -39,9 +39,9 @@ void Screenshot::UpdateImGui() {
   if (ImGui::Combo("Method", &m, methods, (int)Method::Count)) {
     options.method = (Method)m;
   }
-  ImGui::DragInt("Frames", &options.targetFrames, 0.25f, 1, 1000, "%d", ImGuiSliderFlags_NoInput);
-  ImGui::DragFloat("Gain", &options.gain, 0.01f, 0.0f, 100.0f, "%.2f", ImGuiSliderFlags_NoInput);
-  ImGui::DragFloat("Gamma", &options.gamma, 0.01f, 0.1f, 5.0f, "%.2f", ImGuiSliderFlags_NoInput);
+  ImGui::DragInt("Frames", &options.targetFrames, 0.25f, 1, 1000, "%d", ImGuiSliderFlags_ClampOnInput);
+  ImGui::DragFloat("Gain", &options.gain, 0.01f, 0.0f, 5.0f, "%.2f", ImGuiSliderFlags_ClampOnInput);
+  ImGui::DragFloat("Gamma", &options.gamma, 0.01f, 0.1f, 5.0f, "%.2f", ImGuiSliderFlags_ClampOnInput);
   ImGui::EndDisabled();
 
   static char baseNameBuf[128] = "capture";

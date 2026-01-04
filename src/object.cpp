@@ -69,7 +69,7 @@ void ObjectMode::UpdateImGui() {
   ImGui::SameLine();
   if (ImGui::RadioButton("Auto", edit.axis == 'A')) edit.axis = 'A';
 
-  ImGui::DragFloat("Crease Angle", &edit.creaseThresholdAngle, 0.1f, -1.0f, 90.0f, "%.0f", ImGuiSliderFlags_NoInput);
+  ImGui::DragFloat("Crease Deg", &edit.creaseThresholdAngle, 0.1f, 0.0f, 90.0f, "%.0f", ImGuiSliderFlags_ClampOnInput);
 
   bool differs = (edit.axis != stored.axis) || (edit.creaseThresholdAngle != stored.creaseThresholdAngle);
   ImGui::BeginDisabled(!differs);
@@ -177,12 +177,12 @@ void ObjectMode::SetInitialObjectTransforms() {
 }
 
 void ObjectMode::SetInitialFlowfieldSettings() {
-  flowSettings[(int)Model::Custom] = {'U', -1};
+  flowSettings[(int)Model::Custom] = {'U', 0};
   flowSettings[(int)Model::Car] = {'A', 12};
   flowSettings[(int)Model::Interior] = {'A', 80};
   flowSettings[(int)Model::Dragon] = {'A', 15};
   flowSettings[(int)Model::Alien] = {'A', 45};
-  flowSettings[(int)Model::Head] = {'A', -1};
+  flowSettings[(int)Model::Head] = {'A', 0};
 }
 
 void ObjectMode::LoadMeshAsync(Model type) {

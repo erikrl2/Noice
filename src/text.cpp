@@ -29,8 +29,8 @@ void TextMode::UpdateImGui() {
 
   if (ImGui::SliderFloat("Font Size", &bakeFontPx, 20.0f, 290.0f, "%.0f", ImGuiSliderFlags_NoInput)) LoadFontAtlas();
 
-  int scaleSliderFlags = ImGuiSliderFlags_NoInput | ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat;
-  dirtyMesh |= ImGui::DragFloat("Scale", &scale, 0.1f, 0.1f, 100.0f, "%.2f", scaleSliderFlags);
+  int scaleSliderFlag = ImGuiSliderFlags_ClampOnInput | ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat;
+  dirtyMesh |= ImGui::DragFloat("Scale", &scale, 0.1f, 0.1f, 100.0f, "%.2f", scaleSliderFlag);
   dirtyMesh |= ImGui::SliderFloat("Wrap width", &wrapWidthFrac, 0.1f, 1.0f, "%.2f", ImGuiSliderFlags_NoInput);
 
   util::ImGuiDirection2D("Text", direction);

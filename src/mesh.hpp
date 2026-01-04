@@ -10,6 +10,10 @@ struct MeshFlowfieldData {
   std::vector<float> verts;
   std::vector<unsigned int> indices;
   int slot = -1;
+
+  MeshFlowfieldData() = default;
+  MeshFlowfieldData(const MeshFlowfieldData&) = delete;
+  MeshFlowfieldData(MeshFlowfieldData&&) = default;
 };
 
 struct Mesh {

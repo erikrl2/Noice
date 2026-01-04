@@ -29,6 +29,7 @@ public:
   void OnMouseClicked(int button, int action);
   void OnKeyPressed(int key, int action);
 
+  bool IsCapturing() const { return capturing; }
   bool IsActive() const { return hasResult || capturing; }
   const Texture& GetResultTex() const { return outTex; }
 

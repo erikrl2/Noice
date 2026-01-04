@@ -128,13 +128,13 @@ void App::UpdateImGui() {
   bool open = ImGui::Begin("Settings", &showSettings, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav);
   if (open) {
     if (ImGui::CollapsingHeader("Effect", ImGuiTreeNodeFlags_DefaultOpen)) {
-      ImGui::BeginDisabled(screenshot.IsActive());
+      ImGui::BeginDisabled(screenshot.IsCapturing());
       effect.UpdateImGui();
       ImGui::EndDisabled();
     }
 
     if (ImGui::CollapsingHeader("Mode", ImGuiTreeNodeFlags_DefaultOpen)) {
-      ImGui::BeginDisabled(screenshot.IsActive());
+      ImGui::BeginDisabled(screenshot.IsCapturing());
 
       bool changed = false;
       changed |= ImGui::RadioButton("Object##Mode", (int*)&modeSelect, (int)ModeType::Object);
@@ -157,8 +157,8 @@ void App::UpdateImGui() {
 }
 
 void App::Update(float dt) {
-  if (!screenshot.IsActive()) {
-    modePtr->Update(dt);
+  if (!screenshot.IsCapturing()) {
+    modePtr->Update(!screenshot.IsActive() ? dt : 0.0f);
   }
 
   if (!effect.IsDisabled() || screenshot.IsActive()) {

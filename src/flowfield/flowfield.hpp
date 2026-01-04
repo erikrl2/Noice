@@ -7,7 +7,7 @@
 
 struct FlowfieldSettings {
   char axis = 'V';
-  float creaseThresholdAngle = -1.0;
+  float creaseThresholdAngle = 0.0;
 };
 
 bool ComputeUvFlowfieldFromOBJ(

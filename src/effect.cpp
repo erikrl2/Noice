@@ -18,10 +18,7 @@ void Effect::Init(int width, int height) {
 
   prevDepthTex.Create(width, height, GL_DEPTH_COMPONENT24, GL_LINEAR);
 
-  currNoiseTex.Clear();
-  prevNoiseTex.Clear();
-  currAccTex.Clear();
-  prevAccTex.Clear();
+  ClearBuffers();
 }
 
 void Effect::Destroy() {
@@ -38,7 +35,7 @@ void Effect::Destroy() {
 
 void Effect::UpdateImGui() {
   ImGui::DragFloat("Speed", &scrollSpeed, 0.1f, 0.0f, 0.0f, "%.1f");
-  ImGui::DragInt("Sync rate", &accResetInterval, 0.1f, 1, 999, "%d", ImGuiSliderFlags_NoInput);
+  ImGui::DragInt("Sync rate", &accResetInterval, 0.1f, 0, 1000, "%d", ImGuiSliderFlags_ClampOnInput);
   if (ImGui::SliderInt("Downscale", &downscaleFactor, 1, 8, "%d", ImGuiSliderFlags_NoInput))
     OnResize(prevDepthTex.width, prevDepthTex.height);
   ImGui::Checkbox("Disable", &disabled);
@@ -62,8 +59,10 @@ void Effect::Apply(Framebuffer& in, float dt) {
 void Effect::ScatterPass(Framebuffer& in, float dt, const MvpState* mats) {
   assert(in.tex.internalFormat == GL_RG16F);
 
-  static unsigned frameCount = 0;
-  if (++frameCount % accResetInterval == 0) prevAccTex.Clear();
+  if (accResetInterval > 0) {
+    static unsigned frameCount = 0;
+    if (++frameCount % accResetInterval == 0) prevAccTex.Clear();
+  }
 
   bool attachedEffect = (mats != nullptr);
   float speed = scrollSpeed * dt / downscaleFactor * (int)!paused;
