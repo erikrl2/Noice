@@ -8,6 +8,8 @@
 #include "shader.hpp"
 #include "util.hpp"
 
+#include <thread>
+
 class ObjectMode: public Mode {
 public:
   enum class Model { Custom, Car, Interior, Dragon, Alien, Head, Count };

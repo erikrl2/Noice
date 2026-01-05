@@ -19,13 +19,21 @@ add_subdirectory(external/eigen)
 add_subdirectory(external/libigl)
 add_subdirectory(external/tinyobjloader)
 
+
+add_library(compile_options INTERFACE)
+target_compile_options(compile_options INTERFACE
+  $<$<AND:$<CONFIG:Release>,$<CXX_COMPILER_ID:GNU>>:-march=native>
+  $<$<AND:$<CONFIG:Release>,$<CXX_COMPILER_ID:GNU>>:-mtune=native>
+  $<$<AND:$<CONFIG:Release>,$<CXX_COMPILER_ID:MSVC>>:/arch:AVX2>
+)
+
 file(GLOB FLOWFIELD_SOURCES "src/flowfield/*.cpp" "src/flowfield/*.hpp")
 add_library(flowfield STATIC ${FLOWFIELD_SOURCES})
-target_link_libraries(flowfield PRIVATE igl::core Eigen3::Eigen tinyobjloader)
+target_link_libraries(flowfield PRIVATE igl::core Eigen3::Eigen tinyobjloader compile_options)
 
 file(GLOB NOICE_SOURCES "src/*.cpp" "src/*.hpp")
 add_executable(Noice ${NOICE_SOURCES})
-target_link_libraries(Noice PRIVATE flowfield glfw glad imgui glm::glm stb)
+target_link_libraries(Noice PRIVATE flowfield glfw glad imgui glm::glm stb compile_options)
 
 
 file(GLOB_RECURSE ASSETS CONFIGURE_DEPENDS "assets/*")
