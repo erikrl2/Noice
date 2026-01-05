@@ -15,6 +15,7 @@ namespace util {
   bool IsMouseButtonPressed(int button);
   bool IsKeyPressed(int key);
   void SetCursorDisabled(bool hide);
+  glm::vec2 GetDpiScaleFactor();
 
   bool ImGuiDirection2D(const char* label, glm::vec2& dir, float radius = 32.0f);
 

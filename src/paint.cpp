@@ -1,5 +1,7 @@
 #include "paint.hpp"
 
+#include "util.hpp"
+
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 
@@ -87,7 +89,7 @@ void PaintMode::OnResize(int w, int h) {
 }
 
 void PaintMode::OnMouseMoved(double xpos, double ypos) {
-  mousePos = glm::vec2(float(xpos), float(ypos));
+  mousePos = glm::vec2(float(xpos), float(ypos)) * util::GetDpiScaleFactor();
 }
 
 void PaintMode::OnMouseScrolled(float offset) {

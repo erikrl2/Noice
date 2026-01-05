@@ -43,6 +43,13 @@ namespace util {
     glfwSetInputMode(glfwGetCurrentContext(), GLFW_CURSOR, disable ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
   }
 
+  glm::vec2 GetDpiScaleFactor() {
+    glm::ivec2 winSize, fbSize;
+    glfwGetWindowSize(glfwGetCurrentContext(), &winSize.x, &winSize.y);
+    glfwGetFramebufferSize(glfwGetCurrentContext(), &fbSize.x, &fbSize.y);
+    return glm::vec2(fbSize) / glm::vec2(winSize);
+  }
+
   static ImU32 ApplyAlpha(ImU32 col, float alpha) {
     ImVec4 c = ImGui::ColorConvertU32ToFloat4(col);
     c.w *= alpha;
