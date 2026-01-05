@@ -5,6 +5,8 @@
 #include <glm/glm.hpp>
 #include <imgui.h>
 
+#include <ctime>
+
 void Effect::Init(int width, int height) {
   scrollShader.CreateCompute("assets/shaders/scroll_move.comp.glsl");
   fillShader.CreateCompute("assets/shaders/scroll_fill.comp.glsl");
@@ -19,6 +21,8 @@ void Effect::Init(int width, int height) {
   prevDepthTex.Create(width, height, GL_DEPTH_COMPONENT24, GL_LINEAR);
 
   ClearBuffers();
+
+  std::srand((unsigned)std::time(nullptr));
 }
 
 void Effect::Destroy() {
@@ -102,7 +106,7 @@ void Effect::FillPass() {
   fillShader.SetImage("uPrevNoiseTex", prevNoiseTex, 1, GL_WRITE_ONLY);
   fillShader.SetImage("uCurrAccTex", currAccTex, 2, GL_WRITE_ONLY);
   fillShader.SetImage("uPrevAccTex", prevAccTex, 3, GL_READ_WRITE);
-  fillShader.SetUint("uSeed", (uint32_t)rand());
+  fillShader.SetUint("uSeed", (unsigned)std::rand());
 
   fillShader.DispatchCompute(currNoiseTex.width, currNoiseTex.height, 16);
 }
