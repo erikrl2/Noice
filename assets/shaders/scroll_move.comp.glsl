@@ -31,7 +31,6 @@ void main() {
   vec2 prevUV = (vec2(prevPx) + 0.5) / vec2(size);
     
   vec2 currUV;
-  ivec2 currPx;
   vec3 currNDC;
 
   if (uReproject) {
@@ -58,10 +57,8 @@ void main() {
     if (abs(currNDC.x) > 1.0 || abs(currNDC.y) > 1.0 || abs(currNDC.z) > 1.0) return;
 
     currUV = currNDC.xy * 0.5 + 0.5;
-    currPx = ivec2(currUV * vec2(size));
   } else {
     currUV = prevUV;
-    currPx = prevPx;
   }
 
 
@@ -69,14 +66,15 @@ void main() {
   vec2 prevAcc = imageLoad(uPrevAccTex, prevPx).xy;
 
   vec2 flow = flowDir * uScrollSpeed;
+  vec2 reprojDelta = (currUV - prevUV) * vec2(size);
 
-  vec2 totalMove = prevAcc + flow;
+  vec2 totalMove = prevAcc + reprojDelta + flow;
   vec2 intStep = trunc(totalMove); // or floor(totalMove + 0.5 * sign(totalMove));
 
   vec2 nextAcc = totalMove - intStep;
   imageStore(uPrevAccTex, prevPx, vec4(nextAcc, 0, 0));
 
-  ivec2 targetPx = currPx + ivec2(intStep);
+  ivec2 targetPx = prevPx + ivec2(intStep);
   vec2 targetUV = (vec2(targetPx) + 0.5) / vec2(size);
 
 
