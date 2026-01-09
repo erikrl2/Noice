@@ -4,8 +4,8 @@ layout(local_size_x = 16, local_size_y = 16) in;
 
 layout(rg8, binding = 0) uniform writeonly image2D uCurrNoiseTex;
 layout(rg8, binding = 1) uniform readonly image2D uPrevNoiseTex;
-layout(rg16f, binding = 2) uniform writeonly image2D uCurrAccTex;
-layout(rg16f, binding = 3) uniform image2D uPrevAccTex;
+layout(rg32f, binding = 2) uniform writeonly image2D uCurrAccTex;
+layout(rg32f, binding = 3) uniform image2D uPrevAccTex;
 
 uniform sampler2D uFlowTex;
 uniform sampler2D uCurrDepthTex;
@@ -23,6 +23,7 @@ uniform bool uReproject;
 void main() {
   ivec2 prevPx = ivec2(gl_GlobalInvocationID.xy);
   ivec2 size = imageSize(uPrevNoiseTex);
+  ivec2 fullRes = textureSize(uPrevDepthTex, 0);
   if (prevPx.x >= size.x || prevPx.y >= size.y) return;
 
   vec2 prevNoise = imageLoad(uPrevNoiseTex, prevPx).rg;
@@ -34,7 +35,7 @@ void main() {
   vec3 currNDC;
 
   if (uReproject) {
-    float prevDepth = texture(uPrevDepthTex, prevUV).r;
+    float prevDepth = texelFetch(uPrevDepthTex, ivec2(prevUV * vec2(fullRes)), 0).r;
     if (prevDepth >= 1.0) {
       imageStore(uCurrNoiseTex, prevPx, vec4(prevNoise.r, 1, 0, 0));
       return;
@@ -62,14 +63,14 @@ void main() {
   }
 
 
-  vec2 flowDir = texture(uFlowTex, currUV).xy;
+  vec2 flowDir = texelFetch(uFlowTex, ivec2(currUV * vec2(fullRes)), 0).xy;
   vec2 prevAcc = imageLoad(uPrevAccTex, prevPx).xy;
 
   vec2 flow = flowDir * uScrollSpeed;
   vec2 reprojDelta = (currUV - prevUV) * vec2(size);
 
   vec2 totalMove = prevAcc + reprojDelta + flow;
-  vec2 intStep = trunc(totalMove); // or floor(totalMove + 0.5 * sign(totalMove));
+  vec2 intStep = trunc(totalMove);
 
   vec2 nextAcc = totalMove - intStep;
   imageStore(uPrevAccTex, prevPx, vec4(nextAcc, 0, 0));
@@ -81,8 +82,11 @@ void main() {
   if (targetPx.x < 0 || targetPx.x >= size.x || targetPx.y < 0 || targetPx.y >= size.y) return;
 
   if (uReproject) {
-    float targetDepth = texture(uCurrDepthTex, targetUV).r;
-    if (targetDepth >= 1.0) return;
+    float targetDepth = texelFetch(uCurrDepthTex, ivec2(targetUV * vec2(fullRes)), 0).r;
+    if (targetDepth >= 1.0) {
+      imageStore(uCurrNoiseTex, prevPx, vec4(prevNoise.r, 1, 0, 0));
+      return;
+    }
 
     float depthDiff = abs(currNDC.z - (targetDepth * 2.0 - 1.0));
     if (depthDiff > 0.05) return;

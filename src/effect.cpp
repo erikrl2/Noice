@@ -15,8 +15,8 @@ void Effect::Init(int width, int height) {
   int scaledHeight = height / downscaleFactor;
   currNoiseTex.Create(scaledWidth, scaledHeight, GL_RG8, GL_NEAREST);
   prevNoiseTex.Create(scaledWidth, scaledHeight, GL_RG8, GL_NEAREST);
-  currAccTex.Create(scaledWidth, scaledHeight, GL_RG16F, GL_NEAREST);
-  prevAccTex.Create(scaledWidth, scaledHeight, GL_RG16F, GL_NEAREST);
+  currAccTex.Create(scaledWidth, scaledHeight, GL_RG32F, GL_NEAREST);
+  prevAccTex.Create(scaledWidth, scaledHeight, GL_RG32F, GL_NEAREST);
 
   prevDepthTex.Create(width, height, GL_DEPTH_COMPONENT24, GL_LINEAR);
 

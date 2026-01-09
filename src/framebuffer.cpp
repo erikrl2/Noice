@@ -93,6 +93,7 @@ namespace {
     case GL_R16F: return {GL_RED, GL_HALF_FLOAT};
     case GL_RG16F: return {GL_RG, GL_HALF_FLOAT};
     case GL_RGBA16F: return {GL_RGBA, GL_HALF_FLOAT};
+    case GL_RG32F: return {GL_RG, GL_FLOAT};
     case GL_RG8: return {GL_RG, GL_UNSIGNED_BYTE};
     case GL_R8: return {GL_RED, GL_UNSIGNED_BYTE};
     case GL_DEPTH_COMPONENT24: return {GL_DEPTH_COMPONENT, GL_UNSIGNED_INT};
@@ -141,9 +142,11 @@ void Texture::Resize(int w, int h) {
 
 void Texture::Clear() const {
   GLenum format = GetFormatInfo(internalFormat).format;
+  GLenum type = GetFormatInfo(internalFormat).type;
   float clearValue[4] = {0, 0, 0, 0};
   if (format == GL_DEPTH_COMPONENT) clearValue[0] = 1.0f;
-  glClearTexImage(id, 0, format, GL_FLOAT, clearValue);
+  //glClearTexImage(id, 0, format, GL_FLOAT, clearValue);
+  glClearTexImage(id, 0, format, type, clearValue);
 }
 
 void Texture::Bind() const {
