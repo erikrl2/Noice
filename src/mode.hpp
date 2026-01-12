@@ -1,5 +1,6 @@
 #pragma once
-#include "framebuffer.hpp"
+
+struct EffectInputData;
 
 class Mode {
 public:
@@ -13,5 +14,5 @@ public:
   virtual void OnKeyPressed(int key, int action) {}
   virtual void OnFileDrop(const std::string& path) {}
 
-  virtual Framebuffer& GetResultFB() = 0;
+  virtual EffectInputData GetEffectInputData() = 0;
 };

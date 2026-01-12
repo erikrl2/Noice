@@ -7,7 +7,7 @@ endif()
 
 project(Noice C CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 add_subdirectory(external/glfw)
 add_subdirectory(external/glad)

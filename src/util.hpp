@@ -1,11 +1,18 @@
 #pragma once
 #include <glm/glm.hpp>
 
+#include <glad/glad.h>
+
 #include <mutex>
 #include <optional>
 #include <queue>
 #include <string>
 #include <vector>
+
+struct FormatInfo {
+  GLenum format;
+  GLenum type;
+};
 
 namespace util {
 
@@ -20,6 +27,7 @@ namespace util {
   bool ImGuiDirection2D(const char* label, glm::vec2& dir, float radius = 32.0f);
 
   void EnableOpenGLDebugOutput();
+  FormatInfo GetFormatInfo(GLenum internalFormat);
 
 } // namespace util
 

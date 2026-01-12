@@ -1,12 +1,12 @@
 #version 430 core
 
-out vec2 oDir;
+layout(location = 0) out vec2 oDir;
+
+layout(binding = 0) uniform sampler2D uCanvas;
 
 uniform vec2 uCenter;
 uniform float uRadius;
 uniform vec2 uDir;
-
-uniform sampler2D uCanvas;
 
 void main() {
   vec2 size = vec2(textureSize(uCanvas, 0));

@@ -24,23 +24,23 @@ public:
   void Destroy();
 
   void UpdateImGui();
-  void Update(const Texture& source);
+  void Update(int width, int height, Texture source);
 
   void OnMouseClicked(int button, int action);
   void OnKeyPressed(int key, int action);
 
   bool IsCapturing() const { return capturing; }
   bool IsActive() const { return hasResult || capturing; }
-  const Texture& GetResultTex() const { return outTex; }
+  Texture GetResult() const { return outImg; }
 
 private:
   void Begin();
   void Reset();
 
-  void Accumulate(const Texture& source);
+  void Accumulate(Texture source);
   void Finalize();
   void ClearBuffers();
-  void ResizeBuffers(int w, int h);
+  void ResizeBuffers(int width, int height);
 
   void SavePNG();
 
@@ -56,7 +56,7 @@ private:
   Shader accumShader;
   Shader finalizeShader;
 
-  Texture accumTex;
-  Texture prevTex;
-  Texture outTex;
+  Image accumImg;
+  Image prevImg;
+  Image outImg;
 };

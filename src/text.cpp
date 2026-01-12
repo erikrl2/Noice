@@ -1,5 +1,6 @@
 #include "text.hpp"
 
+#include "effect.hpp"
 #include "util.hpp"
 
 #define STB_TRUETYPE_IMPLEMENTATION
@@ -11,8 +12,13 @@
 static const char* fontPath = "assets/fonts/courier-mon.ttf";
 
 void TextMode::Init(int width, int height) {
-  textFB.Create(width, height, GL_RG16F, GL_LINEAR);
-  textShader.Create("assets/shaders/text.vert.glsl", "assets/shaders/text.frag.glsl");
+  textFB.CreateOrResize(width, height);
+  textFB.AttachColorTexture(GL_RG16F, GL_LINEAR); // 0: flow
+  textFB.AttachColorTexture(GL_R8I, GL_NEAREST); // 1: id
+  textFB.SetClearColor({-1, 0, 0, 0}, 1);
+  textFB.Finalize();
+
+  textShader.CreateVertFrag("assets/shaders/text.vert.glsl", "assets/shaders/text.frag.glsl");
 
   LoadFontAtlas();
 }
@@ -57,12 +63,13 @@ void TextMode::Update(float dt) {
 
   if (dirtyMesh) RebuildTextMesh();
 
-  textFB.Clear(glm::vec4(bgDir.x, bgDir.y, 0.0f, 0.0f));
+  textFB.SetClearColor({bgDir.x, bgDir.y, 0, 0}, 0);
+  textFB.Clear();
 
   textShader.Use();
-  textShader.SetVec2("uScreenSize", {textFB.tex.width, textFB.tex.height});
+  textShader.SetVec2("uScreenSize", {textFB.GetWidth(), textFB.GetHeight()});
   textShader.SetVec2("uDir", direction);
-  textShader.SetTexture("uFontAtlas", fontAtlasTex);
+  fontAtlasImg.GetTexture().Bind(0);
 
   textMesh.Draw();
 }
@@ -81,17 +88,17 @@ void TextMode::LoadFontAtlas() {
 
   if (res <= 0) return;
 
-  if (fontAtlasTex.id == 0) {
-    fontAtlasTex.Create(atlasW, atlasH, GL_R8, GL_LINEAR, GL_CLAMP_TO_EDGE);
+  if (!fontAtlasImg) {
+    fontAtlasImg.Create(atlasW, atlasH, GL_R8, GL_LINEAR); // TODO: CLAMP_TO_EDGE
   }
 
-  fontAtlasTex.Upload(atlasPixels.data());
+  fontAtlasImg.Upload(atlasPixels.data());
 
   dirtyMesh = true;
 }
 
 void TextMode::DestroyFontAtlas() {
-  fontAtlasTex.Destroy();
+  fontAtlasImg.Destroy();
   atlasPixels.clear();
   ttfBuffer.clear();
 }
@@ -126,8 +133,8 @@ void TextMode::RebuildTextMesh() {
   verts.reserve(text.size() * 4);
   indices.reserve(text.size() * 6);
 
-  float screenW = (float)textFB.tex.width;
-  float screenH = (float)textFB.tex.height;
+  float screenW = (float)textFB.GetWidth();
+  float screenH = (float)textFB.GetHeight();
   float wrapWidth = (screenW * wrapWidthFrac) / scale;
 
   // Pass 1: layout text with word-based wrapping and compute bounds
@@ -266,7 +273,7 @@ static inline void AddQuad(
 }
 
 void TextMode::OnResize(int width, int height) {
-  textFB.Resize(width, height);
+  textFB.CreateOrResize(width, height);
   dirtyMesh = true;
 }
 
@@ -275,4 +282,11 @@ void TextMode::OnKeyPressed(int key, int action) {
     center = !center;
     dirtyMesh = true;
   }
+}
+
+EffectInputData TextMode::GetEffectInputData() {
+  EffectInputData data;
+  data.currFlowTex = textFB.GetColorTexture(0);
+  data.currIdTex = textFB.GetColorTexture(1);
+  return data;
 }

@@ -1,6 +1,4 @@
-
 /.vs
-/build
-TODO.md
+/build*
 /.cache/
 /compile_commands.json

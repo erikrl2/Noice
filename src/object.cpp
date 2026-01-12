@@ -3,14 +3,13 @@
 #include "flowfield/flowfield.hpp"
 #include "mesh.hpp"
 
-#include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <imgui.h>
 
 #include <thread>
 
-static std::string meshFilePaths[(size_t)ObjectMode::Model::Count] = {
+static std::string meshFilePaths[] = {
     "assets/models/debug.obj",
     "assets/models/car.obj",
     "assets/models/interior.obj",
@@ -20,20 +19,35 @@ static std::string meshFilePaths[(size_t)ObjectMode::Model::Count] = {
 };
 
 void ObjectMode::Init(int width, int height) {
+  this->width = width;
+  this->height = height;
+
   SetInitialFlowfieldSettings();
   SetInitialObjectTransforms();
 
   meshLoaderThread = std::thread(MeshLoaderThreadFunc, std::ref(meshJobQueue), std::ref(uploadQueue));
   for (int type = 0; type < (int)Model::Count; type++) LoadMeshAsync((Model)type);
 
-  objectShader.Create("assets/shaders/object.vert.glsl", "assets/shaders/object.frag.glsl");
+  objectShader.CreateVertFrag("assets/shaders/object.vert.glsl", "assets/shaders/object.frag.glsl");
 
-  objectFB.Create(width, height, GL_RG16F, GL_LINEAR, GL_CLAMP_TO_BORDER, true);
+  for (auto& fb : objectFBs) {
+    fb.CreateOrResize(width, height);
+    fb.AttachColorTexture(GL_RG16F, GL_NEAREST); // 0: flow
+    fb.AttachColorTexture(GL_RGB32F, GL_NEAREST); // 1: localPos
+    fb.AttachColorTexture(GL_R8I, GL_NEAREST); // 2: id
+    fb.SetClearColor({-1, 0, 0, 0}, 2);
+    fb.AttachDepthTexture();
+    fb.Finalize();
+  }
+
+  UpdateViewProjMatrix();
+  UpdateModelMatrices();
 }
 
 void ObjectMode::Destroy() {
   objectShader.Destroy();
-  objectFB.Destroy();
+
+  for (auto& fb : objectFBs) fb.Destroy();
 
   uploadQueue.Close();
   meshJobQueue.Close();
@@ -47,13 +61,11 @@ void ObjectMode::UpdateImGui() {
   static const char* objects[] = {"Custom", "Car", "Interior", "Dragon", "Alien", "Head"};
   int o = (int)objectSelect;
 
+  ImGui::SeparatorText("Transform");
   if (ImGui::Combo("Object", &o, objects, (int)Model::Count)) {
     objectSelect = (Model)o;
     meshChanged = true;
-    hasValidPrevMvp = false;
   }
-
-  ImGui::SeparatorText("Transform");
   ImGui::DragFloat3("Translation", (float*)&transforms[(int)objectSelect].translation.x, 0.1f, 0, 0, "%.1f");
   ImGui::DragFloat3("Rotation", (float*)&transforms[(int)objectSelect].rotation.x, 0.5f, 0, 0, "%.1f");
   ImGui::DragFloat("Scale", &transforms[(int)objectSelect].scale, 0.02f, 0, 0, "%.2f");
@@ -83,57 +95,64 @@ void ObjectMode::UpdateImGui() {
 }
 
 void ObjectMode::Update(float dt) {
-  while (auto d = uploadQueue.TryPop()) meshes[d->slot].UploadFlowfieldMesh(*d);
+  while (auto d = uploadQueue.TryPop()) meshes[d->id].CreateFromFlowfieldData(*d);
+
+  std::swap(curr, prev);
 
   camera.Update(dt);
-  UpdateTransformMatrices(dt);
-  RenderObject();
+
+  UpdateViewProjMatrix();
+  UpdateModelMatrices();
+
+  RenderObjects();
 }
 
-void ObjectMode::RenderObject() {
-  objectFB.Clear();
-
-  objectShader.Use();
-  objectShader.SetMat4("uModel", mvpState.currModel);
-  objectShader.SetMat4("uViewproj", mvpState.currProj * mvpState.currView);
-  objectShader.SetVec2("uViewportSize", {objectFB.tex.width, objectFB.tex.height});
-
-  meshes[(int)objectSelect].Draw(RenderFlag::DepthTest);
-}
-
-void ObjectMode::UpdateTransformMatrices(float dt) {
-  float width = (float)objectFB.tex.width, height = (float)objectFB.tex.height;
-  float aspect = (height > 0) ? width / height : 1.0f;
+void ObjectMode::UpdateViewProjMatrix() {
+  float aspect = (height > 0) ? (float)width / (float)height : 1.0f;
   glm::mat4 proj = camera.GetProjection(aspect);
   glm::mat4 view = camera.GetView();
+  viewProj[curr] = proj * view;
+}
 
-  Transform& t = transforms[(int)objectSelect];
+void ObjectMode::UpdateModelMatrices() {
+  for (int id = 0; id < (int)Model::Count; id++) {
+    Transform& t = transforms[id];
 
-  glm::mat4 m = glm::mat4(1.0f);
-  m = glm::translate(m, t.translation);
-  m = glm::rotate(m, glm::radians(t.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
-  m = glm::rotate(m, glm::radians(t.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-  m = glm::rotate(m, glm::radians(t.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-  m = glm::scale(m, glm::vec3(t.scale));
+    glm::mat4 m = glm::mat4(1.0f);
+    m = glm::translate(m, t.translation);
+    m = glm::rotate(m, glm::radians(t.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+    m = glm::rotate(m, glm::radians(t.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+    m = glm::rotate(m, glm::radians(t.rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+    m = glm::scale(m, glm::vec3(t.scale));
 
-  if (hasValidPrevMvp) {
-    mvpState.prevProj = mvpState.currProj;
-    mvpState.prevView = mvpState.currView;
-    mvpState.prevModel = mvpState.currModel;
-  } else {
-    mvpState.prevProj = proj;
-    mvpState.prevView = view;
-    mvpState.prevModel = m;
-    hasValidPrevMvp = true;
+    modelMats[id][curr] = m;
   }
-  mvpState.currProj = proj;
-  mvpState.currView = view;
-  mvpState.currModel = m;
+}
+
+void ObjectMode::RenderObjects() {
+  objectFBs[curr].Clear();
+
+  objectShader.Use();
+  objectShader.SetVec2("uViewportSize", {width, height});
+  objectShader.SetMat4("uViewproj", viewProj[curr]);
+
+  for (int id = 0; id < (int)Model::Count; id++) {
+    if (meshes[id]) {
+      objectShader.SetMat4("uModel", modelMats[id][curr]);
+      objectShader.SetInt("uObjectId", id);
+
+      meshes[id].Draw(RenderFlag::DepthTest);
+    }
+  }
 }
 
 void ObjectMode::OnResize(int width, int height) {
-  hasValidPrevMvp = false;
-  objectFB.Resize(width, height);
+  this->width = width;
+  this->height = height;
+  for (auto& fb : objectFBs) fb.CreateOrResize(width, height);
+
+  //curr = 0, prev = 1;
+  UpdateViewProjMatrix();
 }
 
 void ObjectMode::OnMouseClicked(int button, int action) {
@@ -158,31 +177,44 @@ void ObjectMode::OnFileDrop(const std::string& path) {
 }
 
 void ObjectMode::SetInitialObjectTransforms() {
+  transforms[(int)Model::Custom].translation.x = 10.0f;
+  transforms[(int)Model::Custom].translation.y = -10.0f;
+  transforms[(int)Model::Custom].scale = 2.0f;
+
+#if 0
+  transforms[(int)Model::Car].translation.x = 30.0f;
   transforms[(int)Model::Car].rotation.y = 45.0f;
   transforms[(int)Model::Car].scale = 10.0f;
 
+  transforms[(int)Model::Interior].translation.x = 20.0f;
   transforms[(int)Model::Interior].rotation.y = 0.0f;
   transforms[(int)Model::Interior].scale = 20.0f;
 
+  transforms[(int)Model::Dragon].translation.x = 40.0f;
   transforms[(int)Model::Dragon].rotation.y = 20.0f;
   transforms[(int)Model::Dragon].scale = 0.7f;
 
+  transforms[(int)Model::Alien].translation.x = 60.0f;
   transforms[(int)Model::Alien].rotation.y = 60.0f;
   transforms[(int)Model::Alien].scale = 1.2f;
 
+  transforms[(int)Model::Head].translation.x = 80.0f;
   transforms[(int)Model::Head].translation.y = -5.0f;
   transforms[(int)Model::Head].rotation.x = -90.0f;
   transforms[(int)Model::Head].rotation.y = -135.0f;
   transforms[(int)Model::Head].scale = 2.0f;
+#endif
 }
 
 void ObjectMode::SetInitialFlowfieldSettings() {
   flowSettings[(int)Model::Custom] = {'U', 0};
+#if 0
   flowSettings[(int)Model::Car] = {'A', 12};
   flowSettings[(int)Model::Interior] = {'A', 80};
   flowSettings[(int)Model::Dragon] = {'A', 15};
   flowSettings[(int)Model::Alien] = {'A', 45};
   flowSettings[(int)Model::Head] = {'A', 0};
+#endif
 }
 
 void ObjectMode::LoadMeshAsync(Model type) {
@@ -199,4 +231,19 @@ void ObjectMode::MeshLoaderThreadFunc(Queue<ModelLoadJob>& meshJobQueue, Queue<M
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
+}
+
+EffectInputData ObjectMode::GetEffectInputData() {
+  EffectInputData data;
+  data.reproject = true;
+
+  data.currFlowTex = objectFBs[curr].GetColorTexture(0);
+  data.prevLocalPosTex = objectFBs[prev].GetColorTexture(1);
+  data.prevIdTex = objectFBs[prev].GetColorTexture(2);
+  data.currIdTex = objectFBs[curr].GetColorTexture(2);
+
+  data.prevCurrViewProj = viewProj;
+  data.modelMats = std::span<glm::mat4[2]>(modelMats, (int)Model::Count);
+  data.currInd = curr;
+  return data;
 }

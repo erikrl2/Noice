@@ -12,7 +12,8 @@
 
 class ObjectMode: public Mode {
 public:
-  enum class Model { Custom, Car, Interior, Dragon, Alien, Head, Count };
+  //enum class Model { Custom, Car, Interior, Dragon, Alien, Head, Count };
+  enum class Model { Custom, Count };
 
   struct Transform {
     glm::vec3 translation = {0.0f, 0.0f, 0.0f};
@@ -39,32 +40,35 @@ public:
   void OnKeyPressed(int key, int action) override;
   void OnFileDrop(const std::string& path) override;
 
-  Framebuffer& GetResultFB() override { return objectFB; }
-  const MvpState* GetMvpState() { return &mvpState; }
+  EffectInputData GetEffectInputData() override;
 
 private:
-  void UpdateTransformMatrices(float dt);
-  void RenderObject();
+  void UpdateViewProjMatrix();
+  void UpdateModelMatrices();
+  void RenderObjects();
 
   void SetInitialObjectTransforms();
   void SetInitialFlowfieldSettings();
 
 private:
-  Model objectSelect = Model::Car;
+  int width = 0, height = 0;
+  int curr = 0, prev = 1;
 
-  Transform transforms[(size_t)Model::Count];
-  FlowfieldSettings flowSettings[(size_t)Model::Count];
+  Model objectSelect = Model::Custom;
 
-  Mesh meshes[(size_t)Model::Count];
+  Transform transforms[(int)Model::Count];
+  FlowfieldSettings flowSettings[(int)Model::Count];
+
+  Mesh meshes[(int)Model::Count];
 
   Shader objectShader;
-  Framebuffer objectFB;
+
+  Framebuffer objectFBs[2];
 
   Camera camera;
-  MvpState mvpState;
-  bool hasValidPrevMvp = false;
+  glm::mat4 viewProj[2]{};
+  glm::mat4 modelMats[(int)Model::Count][2]{};
 
-private:
   std::thread meshLoaderThread;
 
   Queue<ModelLoadJob> meshJobQueue;

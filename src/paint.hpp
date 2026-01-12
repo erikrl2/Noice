@@ -17,7 +17,7 @@ public:
   void OnMouseMoved(double xpos, double ypos) override;
   void OnMouseScrolled(float offset) override;
 
-  Framebuffer& GetResultFB() override { return resultFB; }
+  EffectInputData GetEffectInputData() override;
 
 private:
   void PaintSegment(const glm::vec2& from, const glm::vec2& to);

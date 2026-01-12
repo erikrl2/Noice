@@ -210,4 +210,83 @@ namespace util {
     glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, nullptr, GL_FALSE);
   }
 
+  FormatInfo GetFormatInfo(GLenum internalFormat) {
+    switch (internalFormat) {
+
+    // ======================
+    // Floating-Point Formate
+    // ======================
+    case GL_R16F: return {GL_RED, GL_HALF_FLOAT};
+    case GL_RG16F: return {GL_RG, GL_HALF_FLOAT};
+    case GL_RGB16F: return {GL_RGB, GL_HALF_FLOAT};
+    case GL_RGBA16F: return {GL_RGBA, GL_HALF_FLOAT};
+
+    case GL_R32F: return {GL_RED, GL_FLOAT};
+    case GL_RG32F: return {GL_RG, GL_FLOAT};
+    case GL_RGB32F: return {GL_RGB, GL_FLOAT};
+    case GL_RGBA32F: return {GL_RGBA, GL_FLOAT};
+
+    // ======================
+    // Normalisierte Unsigned Formate
+    // ======================
+    case GL_R8: return {GL_RED, GL_UNSIGNED_BYTE};
+    case GL_RG8: return {GL_RG, GL_UNSIGNED_BYTE};
+    case GL_RGB8: return {GL_RGB, GL_UNSIGNED_BYTE};
+    case GL_RGBA8: return {GL_RGBA, GL_UNSIGNED_BYTE};
+
+    case GL_R16: return {GL_RED, GL_UNSIGNED_SHORT};
+    case GL_RG16: return {GL_RG, GL_UNSIGNED_SHORT};
+    case GL_RGB16: return {GL_RGB, GL_UNSIGNED_SHORT};
+    case GL_RGBA16: return {GL_RGBA, GL_UNSIGNED_SHORT};
+
+    // ======================
+    // Signed Integer Formate
+    // ======================
+    case GL_R8I: return {GL_RED_INTEGER, GL_BYTE};
+    case GL_RG8I: return {GL_RG_INTEGER, GL_BYTE};
+    case GL_RGB8I: return {GL_RGB_INTEGER, GL_BYTE};
+    case GL_RGBA8I: return {GL_RGBA_INTEGER, GL_BYTE};
+
+    case GL_R16I: return {GL_RED_INTEGER, GL_SHORT};
+    case GL_RG16I: return {GL_RG_INTEGER, GL_SHORT};
+    case GL_RGB16I: return {GL_RGB_INTEGER, GL_SHORT};
+    case GL_RGBA16I: return {GL_RGBA_INTEGER, GL_SHORT};
+
+    case GL_R32I: return {GL_RED_INTEGER, GL_INT};
+    case GL_RG32I: return {GL_RG_INTEGER, GL_INT};
+    case GL_RGB32I: return {GL_RGB_INTEGER, GL_INT};
+    case GL_RGBA32I: return {GL_RGBA_INTEGER, GL_INT};
+
+    // ======================
+    // Unsigned Integer Formate
+    // ======================
+    case GL_R8UI: return {GL_RED_INTEGER, GL_UNSIGNED_BYTE};
+    case GL_RG8UI: return {GL_RG_INTEGER, GL_UNSIGNED_BYTE};
+    case GL_RGB8UI: return {GL_RGB_INTEGER, GL_UNSIGNED_BYTE};
+    case GL_RGBA8UI: return {GL_RGBA_INTEGER, GL_UNSIGNED_BYTE};
+
+    case GL_R16UI: return {GL_RED_INTEGER, GL_UNSIGNED_SHORT};
+    case GL_RG16UI: return {GL_RG_INTEGER, GL_UNSIGNED_SHORT};
+    case GL_RGB16UI: return {GL_RGB_INTEGER, GL_UNSIGNED_SHORT};
+    case GL_RGBA16UI: return {GL_RGBA_INTEGER, GL_UNSIGNED_SHORT};
+
+    case GL_R32UI: return {GL_RED_INTEGER, GL_UNSIGNED_INT};
+    case GL_RG32UI: return {GL_RG_INTEGER, GL_UNSIGNED_INT};
+    case GL_RGB32UI: return {GL_RGB_INTEGER, GL_UNSIGNED_INT};
+    case GL_RGBA32UI: return {GL_RGBA_INTEGER, GL_UNSIGNED_INT};
+
+    // ======================
+    // Depth / Stencil
+    // ======================
+    case GL_DEPTH_COMPONENT16: return {GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT};
+    case GL_DEPTH_COMPONENT24: return {GL_DEPTH_COMPONENT, GL_UNSIGNED_INT};
+    case GL_DEPTH_COMPONENT32F: return {GL_DEPTH_COMPONENT, GL_FLOAT};
+
+    case GL_DEPTH24_STENCIL8: return {GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8};
+    case GL_STENCIL_INDEX8: return {GL_STENCIL_INDEX, GL_UNSIGNED_BYTE};
+
+    default: assert(false); return {GL_RGBA, GL_UNSIGNED_BYTE}; // Fallback
+    }
+  }
+
 } // namespace util

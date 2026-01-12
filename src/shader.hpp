@@ -1,21 +1,15 @@
 #pragma once
-#include "framebuffer.hpp"
-
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 
+#include <span>
 #include <string>
+#include <unordered_map>
 
-struct Shader {
-  unsigned int id = 0;
-
-  Shader() = default;
-  ~Shader() { Destroy(); }
-  Shader(const Shader&) = delete;
-  Shader& operator=(const Shader&) = delete;
-
-  void Create(const char* v, const char* f);
-  void CreateCompute(const char* c);
+class Shader {
+public:
+  void CreateVertFrag(const char* vertFilepath, const char* FragFilepath);
+  void CreateCompute(const char* compFilepath);
   void Destroy();
 
   void Use() const;
@@ -26,9 +20,46 @@ struct Shader {
   void SetVec2(const std::string& name, const glm::vec2& v) const;
   void SetVec3(const std::string& name, const glm::vec3& v) const;
   void SetMat4(const std::string& name, const glm::mat4& m) const;
-
-  void SetTexture(const std::string& name, const Texture& texture, unsigned unit = 0) const;
+  void SetMat4v(const std::string& name, GLsizei count, const glm::mat4* m) const;
 
   void DispatchCompute(int width, int height, int groupSize, bool barrier = true) const;
-  void SetImage(const std::string& name, const Texture& texture, unsigned unit, GLenum access = GL_READ_WRITE) const;
+
+  operator bool() const { return program != 0; }
+
+  Shader() = default;
+  Shader(const Shader&) = delete;
+  ~Shader() { assert(!*this); }
+
+private:
+  GLint GetUniformLocation(const std::string& name) const;
+
+  GLuint program = 0;
+  mutable std::unordered_map<std::string, GLint> uniformLocationCache;
+};
+
+class StorageBuffer {
+public:
+  void Create(GLsizeiptr sizeBytes, const void* initialData = nullptr, GLenum usage = GL_DYNAMIC_DRAW);
+  void Destroy();
+
+  void Bind(GLuint binding) const;
+
+  template<typename T>
+  void Upload(std::span<T> data) {
+    Upload((GLsizeiptr)(sizeof(T) * data.size()), data.data());
+  }
+
+  operator bool() const { return id != 0; }
+
+  StorageBuffer() = default;
+  StorageBuffer(const StorageBuffer&) = delete;
+  ~StorageBuffer() { assert(!*this); }
+
+private:
+  void Upload(GLsizeiptr sizeBytes, const void* data);
+
+private:
+  GLuint id = 0;
+  GLsizeiptr sizeBytes = 0;
+  GLenum usage = GL_DYNAMIC_DRAW;
 };

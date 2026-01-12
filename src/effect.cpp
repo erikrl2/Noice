@@ -11,14 +11,15 @@ void Effect::Init(int width, int height) {
   scrollShader.CreateCompute("assets/shaders/scroll_move.comp.glsl");
   fillShader.CreateCompute("assets/shaders/scroll_fill.comp.glsl");
 
-  int scaledWidth = width / downscaleFactor;
-  int scaledHeight = height / downscaleFactor;
-  currNoiseTex.Create(scaledWidth, scaledHeight, GL_RG8, GL_NEAREST);
-  prevNoiseTex.Create(scaledWidth, scaledHeight, GL_RG8, GL_NEAREST);
-  currAccTex.Create(scaledWidth, scaledHeight, GL_RG32F, GL_NEAREST);
-  prevAccTex.Create(scaledWidth, scaledHeight, GL_RG32F, GL_NEAREST);
+  modelSSB.Create(sizeof(glm::mat4[2]) * 6, nullptr, GL_DYNAMIC_DRAW); // or GL_STREAM_DRAW ?
 
-  prevDepthTex.Create(width, height, GL_DEPTH_COMPONENT24, GL_LINEAR);
+  scaledWidth = width / downscaleFactor;
+  scaledHeight = height / downscaleFactor;
+
+  for (auto& img : effectImgs) {
+    img.noise.Create(scaledWidth, scaledHeight, GL_RG8, GL_NEAREST);
+    img.acc.Create(scaledWidth, scaledHeight, GL_RG32F, GL_NEAREST);
+  }
 
   ClearBuffers();
 
@@ -26,114 +27,114 @@ void Effect::Init(int width, int height) {
 }
 
 void Effect::Destroy() {
+  modelSSB.Destroy();
   scrollShader.Destroy();
   fillShader.Destroy();
 
-  currNoiseTex.Destroy();
-  prevNoiseTex.Destroy();
-  currAccTex.Destroy();
-  prevAccTex.Destroy();
-
-  prevDepthTex.Destroy();
+  for (auto& img : effectImgs) {
+    img.noise.Destroy();
+    img.acc.Destroy();
+  }
 }
 
 void Effect::UpdateImGui() {
+  int fullWidth = scaledWidth * downscaleFactor;
+  int fullHeight = scaledHeight * downscaleFactor;
+
   ImGui::DragFloat("Speed", &scrollSpeed, 0.1f, 0.0f, 0.0f, "%.1f");
   ImGui::DragInt("Sync rate", &accResetInterval, 0.1f, 0, 1000, "%d", ImGuiSliderFlags_ClampOnInput);
+
   if (ImGui::SliderInt("Downscale", &downscaleFactor, 1, 8, "%d", ImGuiSliderFlags_NoInput))
-    OnResize(prevDepthTex.width, prevDepthTex.height);
+    OnResize(fullWidth, fullHeight);
+
   ImGui::Checkbox("Disable", &disabled);
   ImGui::SameLine();
   ImGui::Checkbox("Pause", &paused);
 }
 
-void Effect::ApplyAttached(Framebuffer& in, float dt, const MvpState* mats) {
-  assert(mats && in.hasDepth);
-  ScatterPass(in, dt, mats);
-  FillPass();
-  SwapBuffers(in);
-}
+Texture Effect::Apply(const EffectInputData& in, float dt) {
+  std::swap(curr, prev);
 
-void Effect::Apply(Framebuffer& in, float dt) {
   ScatterPass(in, dt);
   FillPass();
-  SwapBuffers(in);
+
+#if 0 // NORMAL
+  return !disabled ? effectImgs[curr].noise : in.currFlowTex;
+#else // DEBUG
+  return !disabled ? effectImgs[curr].noise : effectImgs[curr].acc;
+#endif
 }
 
-void Effect::ScatterPass(Framebuffer& in, float dt, const MvpState* mats) {
-  assert(in.tex.internalFormat == GL_RG16F);
-
+void Effect::ScatterPass(const EffectInputData& in, float dt) {
   if (accResetInterval > 0) {
     static unsigned frameCount = 0;
-    if (++frameCount % accResetInterval == 0) prevAccTex.Clear();
+    if (++frameCount % accResetInterval == 0) effectImgs[prev].acc.Clear();
   }
 
-  bool attachedEffect = (mats != nullptr);
   float speed = scrollSpeed * dt / downscaleFactor * (int)!paused;
 
   scrollShader.Use();
 
-  scrollShader.SetImage("uCurrNoiseTex", currNoiseTex, 0, GL_WRITE_ONLY);
-  scrollShader.SetImage("uPrevNoiseTex", prevNoiseTex, 1, GL_READ_ONLY);
-  scrollShader.SetImage("uCurrAccTex", currAccTex, 2, GL_WRITE_ONLY);
-  scrollShader.SetImage("uPrevAccTex", prevAccTex, 3, GL_READ_WRITE);
-  scrollShader.SetTexture("uFlowTex", in.tex, 0);
+  effectImgs[curr].noise.Bind(0, GL_WRITE_ONLY);
+  effectImgs[prev].noise.Bind(1, GL_READ_ONLY);
+  effectImgs[curr].acc.Bind(2, GL_WRITE_ONLY);
+  effectImgs[prev].acc.Bind(3, GL_READ_WRITE);
 
-  scrollShader.SetInt("uReproject", attachedEffect);
-  if (attachedEffect) {
-    scrollShader.SetTexture("uCurrDepthTex", in.depthTex, 1);
-    scrollShader.SetTexture("uPrevDepthTex", prevDepthTex, 2);
+  in.currFlowTex.Bind(0);
+  in.currIdTex.Bind(1);
 
-    scrollShader.SetMat4("uInvPrevProj", glm::inverse(mats->prevProj));
-    scrollShader.SetMat4("uInvPrevView", glm::inverse(mats->prevView));
-    scrollShader.SetMat4("uInvPrevModel", glm::inverse(mats->prevModel));
-    scrollShader.SetMat4("uCurrModel", mats->currModel);
-    scrollShader.SetMat4("uCurrViewProj", mats->currProj * mats->currView);
+  if (in.reproject) {
+    in.prevIdTex.Bind(2);
+    in.prevLocalPosTex.Bind(3);
 
+    modelSSB.Upload(in.modelMats);
+    modelSSB.Bind(0);
+
+    scrollShader.SetMat4v("uViewProj", 2, in.prevCurrViewProj);
+
+    scrollShader.SetInt("uCurrInd", in.currInd);
     scrollShader.SetFloat("uScrollSpeed", speed);
   } else {
+    in.currIdTex.Bind(2);
+
     // speed adjustment: scrollspeed unit here is [pixels per second] and not [pixels per worldspace-unit per second]
     scrollShader.SetFloat("uScrollSpeed", speed * 20.0f);
   }
+  scrollShader.SetInt("uReproject", in.reproject);
 
-  scrollShader.DispatchCompute(currNoiseTex.width, currNoiseTex.height, 16);
+  scrollShader.DispatchCompute(scaledWidth, scaledHeight, 16);
 }
 
 void Effect::FillPass() {
   fillShader.Use();
 
-  fillShader.SetImage("uCurrNoiseTex", currNoiseTex, 0, GL_READ_WRITE);
-  fillShader.SetImage("uPrevNoiseTex", prevNoiseTex, 1, GL_WRITE_ONLY);
-  fillShader.SetImage("uCurrAccTex", currAccTex, 2, GL_WRITE_ONLY);
-  fillShader.SetImage("uPrevAccTex", prevAccTex, 3, GL_READ_WRITE);
+  effectImgs[curr].noise.Bind(0, GL_READ_WRITE);
+  effectImgs[prev].noise.Bind(1, GL_WRITE_ONLY);
+  effectImgs[curr].acc.Bind(2, GL_WRITE_ONLY);
+  effectImgs[prev].acc.Bind(3, GL_READ_WRITE);
+
   fillShader.SetUint("uSeed", (unsigned)std::rand());
 
-  fillShader.DispatchCompute(currNoiseTex.width, currNoiseTex.height, 16);
-}
-
-void Effect::SwapBuffers(Framebuffer& in) {
-  currNoiseTex.Swap(prevNoiseTex);
-  currAccTex.Swap(prevAccTex);
-  if (in.hasDepth) in.SwapDepthTex(prevDepthTex);
+  fillShader.DispatchCompute(scaledWidth, scaledHeight, 16);
 }
 
 void Effect::ClearBuffers() {
-  currNoiseTex.Clear();
-  prevNoiseTex.Clear();
-  currAccTex.Clear();
-  prevAccTex.Clear();
+  for (auto& img : effectImgs) {
+    img.noise.Clear();
+    img.acc.Clear();
+  }
 }
 
 void Effect::OnResize(int width, int height) {
-  int scaledWidth = width / downscaleFactor;
-  int scaledHeight = height / downscaleFactor;
-  currNoiseTex.Resize(scaledWidth, scaledHeight);
-  prevNoiseTex.Resize(scaledWidth, scaledHeight);
-  currAccTex.Resize(scaledWidth, scaledHeight);
-  prevAccTex.Resize(scaledWidth, scaledHeight);
+  scaledWidth = width / downscaleFactor;
+  scaledHeight = height / downscaleFactor;
 
-  prevDepthTex.Resize(width, height);
+  for (auto& img : effectImgs) {
+    img.noise.Resize(scaledWidth, scaledHeight);
+    img.acc.Resize(scaledWidth, scaledHeight);
+  }
 
+  //curr = 0, prev = 1;
   ClearBuffers();
 }
 

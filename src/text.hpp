@@ -21,7 +21,7 @@ public:
   void OnResize(int width, int height) override;
   void OnKeyPressed(int key, int action) override;
 
-  Framebuffer& GetResultFB() override { return textFB; }
+  EffectInputData GetEffectInputData() override;
 
 private:
   void LoadFontAtlas();
@@ -33,7 +33,7 @@ private:
   Shader textShader;
   Framebuffer textFB;
 
-  Texture fontAtlasTex;
+  Image fontAtlasImg;
   const int atlasW = 2048;
   const int atlasH = 2048;
 

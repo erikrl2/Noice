@@ -25,7 +25,7 @@ private:
   void UpdateImGui();
   void Update(float dt);
 
-  void RenderToScreen();
+  void RenderToScreen(Texture src);
 
   static void OnFramebufferResized(GLFWwindow* window, int w, int h);
   static void OnMouseMoved(GLFWwindow* window, double xpos, double ypos);

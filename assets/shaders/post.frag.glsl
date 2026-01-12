@@ -2,7 +2,8 @@
 
 layout(location = 0) out vec4 oColor;
 
-uniform sampler2D uScreenTex;
+layout(binding = 0) uniform sampler2D uScreenTex;
+
 uniform vec2 uResolution;
 uniform bool uShowVectors;
 
@@ -12,7 +13,9 @@ void main() {
   if (!uShowVectors) {
     oColor = vec4(v.r, v.r, v.r, 1);
   } else {
+#if 0 // disable to render acc
     if (v != vec2(0)) v = normalize(v);
+#endif
     oColor = vec4(v * 0.5 + 0.5, 0, 1);
   }
 }

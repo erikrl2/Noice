@@ -23,7 +23,7 @@ void Camera::Update(float dt) {
   if (util::IsKeyPressed(GLFW_KEY_D)) moveDir += right;
   if (util::IsKeyPressed(GLFW_KEY_SPACE)) moveDir += worldUp;
   if (util::IsKeyPressed(GLFW_KEY_LEFT_CONTROL)) moveDir -= worldUp;
-  if (util::IsKeyPressed(GLFW_KEY_LEFT_SHIFT)) camSpeed *= 0.5f;
+  if (util::IsKeyPressed(GLFW_KEY_LEFT_SHIFT)) camSpeed *= 5.0f;
 
   if (glm::length(moveDir) > 0.001f) {
     moveDir = glm::normalize(moveDir);
@@ -80,7 +80,12 @@ glm::mat4 Camera::GetView() const {
 }
 
 glm::mat4 Camera::GetProjection(float aspect) const {
+#if 1
   return glm::perspective(glm::radians(fov), aspect, 0.1f, 1000.0f);
+#else
+  float halfHeight = 25.0f;
+  return glm::ortho(-halfHeight * aspect, halfHeight * aspect, -halfHeight, halfHeight, 0.1f, 1000.0f);
+#endif
 }
 
 glm::vec3 Camera::GetFront() const {

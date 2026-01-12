@@ -1,5 +1,6 @@
 #include "paint.hpp"
 
+#include "effect.hpp"
 #include "util.hpp"
 
 #include <GLFW/glfw3.h>
@@ -8,14 +9,21 @@
 #include <algorithm>
 #include <cmath>
 
-void PaintMode::Init(int w, int h) {
-  quad = Mesh::CreateFullscreenQuad();
+void PaintMode::Init(int width, int height) {
+  quad.CreateFullscreenQuad();
 
-  canvasFB.Create(w, h, GL_RG16F);
-  resultFB.Create(w, h, GL_RG16F);
+  canvasFB.CreateOrResize(width, height);
+  canvasFB.AttachColorTexture(GL_RG16F, GL_NEAREST); // 0: flow
+  canvasFB.Finalize();
 
-  stampShader.Create("assets/shaders/post.vert.glsl", "assets/shaders/paint_stamp.frag.glsl");
-  resolveShader.Create("assets/shaders/post.vert.glsl", "assets/shaders/paint_resolve.frag.glsl");
+  resultFB.CreateOrResize(width, height);
+  resultFB.AttachColorTexture(GL_RG16F, GL_NEAREST); // 0: flow
+  resultFB.AttachColorTexture(GL_R8I, GL_NEAREST); // 1: id
+  resultFB.SetClearColor({-1, 0, 0, 0}, 1);
+  resultFB.Finalize();
+
+  stampShader.CreateVertFrag("assets/shaders/post.vert.glsl", "assets/shaders/paint_stamp.frag.glsl");
+  resolveShader.CreateVertFrag("assets/shaders/post.vert.glsl", "assets/shaders/paint_resolve.frag.glsl");
 
   canvasFB.Clear();
 }
@@ -68,24 +76,27 @@ void PaintMode::StampAt(const glm::vec2& center, const glm::vec2& dir) {
   canvasFB.Bind();
   stampShader.Use();
 
+  canvasFB.GetColorTexture().Bind(0);
+
   stampShader.SetVec2("uCenter", center);
   stampShader.SetFloat("uRadius", brushRadius);
   stampShader.SetVec2("uDir", dir);
-  stampShader.SetTexture("uCanvas", canvasFB.tex);
 
   quad.Draw();
 }
 
 void PaintMode::Resolve() {
-  resultFB.Bind();
+  resultFB.Clear();
   resolveShader.Use();
-  resolveShader.SetTexture("uCanvas", canvasFB.tex);
+
+  canvasFB.GetColorTexture().Bind(0);
+
   quad.Draw();
 }
 
-void PaintMode::OnResize(int w, int h) {
-  canvasFB.Resize(w, h);
-  resultFB.Resize(w, h);
+void PaintMode::OnResize(int width, int height) {
+  canvasFB.CreateOrResize(width, height);
+  resultFB.CreateOrResize(width, height);
 }
 
 void PaintMode::OnMouseMoved(double xpos, double ypos) {
@@ -114,4 +125,11 @@ void PaintMode::OnMouseClicked(int button, int action) {
   if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
     canvasFB.Clear();
   }
+}
+
+EffectInputData PaintMode::GetEffectInputData() {
+  EffectInputData data;
+  data.currFlowTex = resultFB.GetColorTexture(0);
+  data.currIdTex = resultFB.GetColorTexture(1);
+  return data;
 }

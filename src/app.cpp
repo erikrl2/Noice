@@ -98,9 +98,9 @@ void App::InitImGui() {
 }
 
 void App::SetupResources() {
-  quadMesh = Mesh::CreateFullscreenQuad();
+  quadMesh.CreateFullscreenQuad();
 
-  postShader.Create("assets/shaders/post.vert.glsl", "assets/shaders/post.frag.glsl");
+  postShader.CreateVertFrag("assets/shaders/post.vert.glsl", "assets/shaders/post.frag.glsl");
 
   effect.Init(width, height);
 
@@ -161,34 +161,25 @@ void App::Update(float dt) {
     modePtr->Update(!screenshot.IsActive() ? dt : 0.0f);
   }
 
-  if (modeSelect == ModeType::Object) {
-    effect.ApplyAttached(modePtr->GetResultFB(), dt, objectMode.GetMvpState());
-  } else {
-    effect.Apply(modePtr->GetResultFB(), dt);
-  }
+  Texture effectTex = effect.Apply(modePtr->GetEffectInputData(), dt);
 
-  screenshot.Update(effect.GetResultTex());
+  if (screenshot.IsCapturing()) screenshot.Update(width, height, effectTex); // TODO: test
 
-  RenderToScreen();
+  RenderToScreen(effectTex);
 }
 
-void App::RenderToScreen() {
-  const Texture* src = nullptr;
-
+void App::RenderToScreen(Texture src) {
   if (screenshot.IsActive()) {
-    src = &screenshot.GetResultTex();
-  } else if (effect.IsDisabled()) {
-    src = &modePtr->GetResultFB().tex;
-  } else {
-    src = &effect.GetResultTex();
+    src = screenshot.GetResult();
   }
 
-  postShader.Use();
-  postShader.SetTexture("uScreenTex", *src);
-  postShader.SetVec2("uResolution", {width, height});
-  postShader.SetInt("uShowVectors", effect.IsDisabled() && !screenshot.IsActive());
-
   Framebuffer::BindDefault(width, height);
+  postShader.Use();
+
+  src.Bind(0);
+
+  postShader.SetVec2("uResolution", {width, height});
+  postShader.SetInt("uShowVectors", effect.disabled && !screenshot.IsActive());
 
   quadMesh.Draw();
 }
