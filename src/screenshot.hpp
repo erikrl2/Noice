@@ -9,7 +9,7 @@ public:
   enum class Method { Average = 0, AbsDiffSum = 1, Count };
 
   struct Options {
-    Method method = Method::Average;
+    Method method = Method::AbsDiffSum;
     int targetFrames = 30;
     float gain = 1.0f;
     float gamma = 1.0f;

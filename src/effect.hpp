@@ -5,7 +5,7 @@
 #include <span>
 
 struct EffectInputData {
-  Texture currFlowTex, currIdTex;
+  Texture prevFlowTex, currIdTex;
   bool reproject = false;
   Texture prevLocalPosTex, prevIdTex;
   glm::mat4* prevCurrViewProj;

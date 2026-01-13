@@ -11,7 +11,7 @@ static bool mouseDown = false;
 void Camera::Update(float dt) {
   if (ImGui::GetIO().WantCaptureKeyboard) return;
 
-  float camSpeed = 50.0f * dt;
+  float camSpeed = 20.0f * dt;
   glm::vec3 front = GetFront();
   glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f);
   glm::vec3 right = glm::normalize(glm::cross(front, worldUp));
@@ -23,7 +23,7 @@ void Camera::Update(float dt) {
   if (util::IsKeyPressed(GLFW_KEY_D)) moveDir += right;
   if (util::IsKeyPressed(GLFW_KEY_SPACE)) moveDir += worldUp;
   if (util::IsKeyPressed(GLFW_KEY_LEFT_CONTROL)) moveDir -= worldUp;
-  if (util::IsKeyPressed(GLFW_KEY_LEFT_SHIFT)) camSpeed *= 5.0f;
+  if (util::IsKeyPressed(GLFW_KEY_LEFT_SHIFT)) camSpeed *= 2.0f;
 
   if (glm::length(moveDir) > 0.001f) {
     moveDir = glm::normalize(moveDir);
@@ -79,13 +79,13 @@ glm::mat4 Camera::GetView() const {
   return glm::lookAt(position, position + front, glm::vec3(0, 1, 0));
 }
 
-glm::mat4 Camera::GetProjection(float aspect) const {
-#if 1
-  return glm::perspective(glm::radians(fov), aspect, 0.1f, 1000.0f);
-#else
-  float halfHeight = 25.0f;
-  return glm::ortho(-halfHeight * aspect, halfHeight * aspect, -halfHeight, halfHeight, 0.1f, 1000.0f);
-#endif
+glm::mat4 Camera::GetProjection(float aspect, bool ortho) const {
+  if (!ortho) {
+    return glm::perspective(glm::radians(fov), aspect, 0.1f, 1000.0f);
+  } else {
+    float halfHeight = 25.0f;
+    return glm::ortho(-halfHeight * aspect, halfHeight * aspect, -halfHeight, halfHeight, 0.1f, 1000.0f);
+  }
 }
 
 glm::vec3 Camera::GetFront() const {

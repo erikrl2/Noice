@@ -15,7 +15,6 @@ void TextMode::Init(int width, int height) {
   textFB.CreateOrResize(width, height);
   textFB.AttachColorTexture(GL_RG16F, GL_LINEAR); // 0: flow
   textFB.AttachColorTexture(GL_R8I, GL_NEAREST); // 1: id
-  textFB.SetClearColor({-1, 0, 0, 0}, 1);
   textFB.Finalize();
 
   textShader.CreateVertFrag("assets/shaders/text.vert.glsl", "assets/shaders/text.frag.glsl");
@@ -278,15 +277,15 @@ void TextMode::OnResize(int width, int height) {
 }
 
 void TextMode::OnKeyPressed(int key, int action) {
-  if (key == GLFW_KEY_R && action == GLFW_PRESS) {
-    center = !center;
-    dirtyMesh = true;
-  }
+  //if (key == GLFW_KEY_R && action == GLFW_PRESS) {
+  //  center = !center;
+  //  dirtyMesh = true;
+  //}
 }
 
 EffectInputData TextMode::GetEffectInputData() {
   EffectInputData data;
-  data.currFlowTex = textFB.GetColorTexture(0);
+  data.prevFlowTex = textFB.GetColorTexture(0);
   data.currIdTex = textFB.GetColorTexture(1);
   return data;
 }

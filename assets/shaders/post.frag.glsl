@@ -2,20 +2,17 @@
 
 layout(location = 0) out vec4 oColor;
 
-layout(binding = 0) uniform sampler2D uScreenTex;
+layout(binding = 0) uniform sampler2D uSrcTex;
 
-uniform vec2 uResolution;
+uniform vec2 uFullResolution;
 uniform bool uShowVectors;
 
 void main() {
-  vec2 v = texture(uScreenTex, gl_FragCoord.xy / uResolution).rg;
+  vec3 v = texture(uSrcTex, gl_FragCoord.xy / uFullResolution).rgb;
 
   if (!uShowVectors) {
     oColor = vec4(v.r, v.r, v.r, 1);
   } else {
-#if 0 // disable to render acc
-    if (v != vec2(0)) v = normalize(v);
-#endif
-    oColor = vec4(v * 0.5 + 0.5, 0, 1);
+    oColor = vec4(v * 0.5 + 0.5, 1);
   }
 }

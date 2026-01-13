@@ -3,6 +3,9 @@
 
 #include "flowfield_detail.hpp"
 
+#include <fstream>
+#include <iomanip>
+
 bool ComputeUvFlowfieldFromOBJ(
     const std::string& objPath,
     std::vector<float>& outVert,
@@ -46,6 +49,46 @@ bool ComputeUvFlowfieldFromOBJ(
 
   packInterleavedVertices(split.outPos, outFlow, outVert);
   packTriangleIndices(split.polyOutCorner, outInd);
+
+#if 0
+  // Debug dump result
+  // Writes positions as `v` and flow vectors as `vn`.
+  {
+    const std::string outPath = objPath + ".flow.obj";
+    std::ofstream f(outPath, std::ios::out | std::ios::trunc);
+    if (f) {
+      f << "# source: " << objPath << "\n";
+      f << "\n";
+
+      const size_t stride = 6; // px,py,pz, tx,ty,tz
+      const size_t nV = outVert.size() / stride;
+
+      for (size_t i = 0; i < nV; ++i) {
+        const float* v = &outVert[i * stride];
+        f << std::setprecision(std::numeric_limits<float>::max_digits10);
+        f << "v " << v[0] << " " << v[1] << " " << v[2] << "\n";
+      }
+      f << "\n";
+      for (size_t i = 0; i < nV; ++i) {
+        const float* v = &outVert[i * stride];
+        f << std::setprecision(std::numeric_limits<float>::max_digits10);
+        f << "vn " << v[3] << " " << v[4] << " " << v[5] << "\n";
+      }
+      f << "\n";
+
+      for (size_t i = 0; i + 2 < outInd.size(); i += 3) {
+        // map each vertex to its corresponding normal index
+        const unsigned int a = outInd[i + 0] + 1;
+        const unsigned int b = outInd[i + 1] + 1;
+        const unsigned int c = outInd[i + 2] + 1;
+        f << "f "
+          << a << "//" << a << " "
+          << b << "//" << b << " "
+          << c << "//" << c << "\n";
+      }
+    }
+  }
+#endif
 
   return true;
 }

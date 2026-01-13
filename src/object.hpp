@@ -12,8 +12,11 @@
 
 class ObjectMode: public Mode {
 public:
-  //enum class Model { Custom, Car, Interior, Dragon, Alien, Head, Count };
-  enum class Model { Custom, Count };
+#ifdef NDEBUG
+  enum class Model { Custom, Car, Interior, Dragon, Alien, Head, Count };
+#else
+  enum class Model { Custom, Car, Count };
+#endif
 
   struct Transform {
     glm::vec3 translation = {0.0f, 0.0f, 0.0f};
@@ -66,6 +69,7 @@ private:
   Framebuffer objectFBs[2];
 
   Camera camera;
+  bool isOrtho = false;
   glm::mat4 viewProj[2]{};
   glm::mat4 modelMats[(int)Model::Count][2]{};
 

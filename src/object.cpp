@@ -32,7 +32,7 @@ void ObjectMode::Init(int width, int height) {
 
   for (auto& fb : objectFBs) {
     fb.CreateOrResize(width, height);
-    fb.AttachColorTexture(GL_RG16F, GL_NEAREST); // 0: flow
+    fb.AttachColorTexture(GL_RGB32F, GL_NEAREST); // 0: flow
     fb.AttachColorTexture(GL_RGB32F, GL_NEAREST); // 1: localPos
     fb.AttachColorTexture(GL_R8I, GL_NEAREST); // 2: id
     fb.SetClearColor({-1, 0, 0, 0}, 2);
@@ -66,13 +66,17 @@ void ObjectMode::UpdateImGui() {
     objectSelect = (Model)o;
     meshChanged = true;
   }
-  ImGui::DragFloat3("Translation", (float*)&transforms[(int)objectSelect].translation.x, 0.1f, 0, 0, "%.1f");
-  ImGui::DragFloat3("Rotation", (float*)&transforms[(int)objectSelect].rotation.x, 0.5f, 0, 0, "%.1f");
-  ImGui::DragFloat("Scale", &transforms[(int)objectSelect].scale, 0.02f, 0, 0, "%.2f");
+  int flags = ImGuiSliderFlags_NoRoundToFormat;
+  ImGui::DragFloat3("Translation", (float*)&transforms[(int)objectSelect].translation.x, 0.1f, 0, 0, "%.1f", flags);
+  ImGui::DragFloat3("Rotation", (float*)&transforms[(int)objectSelect].rotation.x, 0.5f, 0, 0, "%.1f", flags);
+  ImGui::DragFloat("Scale", &transforms[(int)objectSelect].scale, 0.02f, 0, 0, "%.2f", flags);
 
   FlowfieldSettings& stored = flowSettings[(int)objectSelect];
   static FlowfieldSettings edit = stored;
   if (meshChanged) edit = stored;
+
+  ImGui::SeparatorText("Camera");
+  ImGui::Checkbox("Orthographic", &isOrtho);
 
   ImGui::SeparatorText("Flow Settings");
   if (ImGui::RadioButton("U", edit.axis == 'U')) edit.axis = 'U';
@@ -109,7 +113,7 @@ void ObjectMode::Update(float dt) {
 
 void ObjectMode::UpdateViewProjMatrix() {
   float aspect = (height > 0) ? (float)width / (float)height : 1.0f;
-  glm::mat4 proj = camera.GetProjection(aspect);
+  glm::mat4 proj = camera.GetProjection(aspect, isOrtho);
   glm::mat4 view = camera.GetView();
   viewProj[curr] = proj * view;
 }
@@ -133,12 +137,10 @@ void ObjectMode::RenderObjects() {
   objectFBs[curr].Clear();
 
   objectShader.Use();
-  objectShader.SetVec2("uViewportSize", {width, height});
-  objectShader.SetMat4("uViewproj", viewProj[curr]);
 
   for (int id = 0; id < (int)Model::Count; id++) {
     if (meshes[id]) {
-      objectShader.SetMat4("uModel", modelMats[id][curr]);
+      objectShader.SetMat4("uMvp", viewProj[curr] * modelMats[id][curr]);
       objectShader.SetInt("uObjectId", id);
 
       meshes[id].Draw(RenderFlag::DepthTest);
@@ -151,7 +153,7 @@ void ObjectMode::OnResize(int width, int height) {
   this->height = height;
   for (auto& fb : objectFBs) fb.CreateOrResize(width, height);
 
-  //curr = 0, prev = 1;
+  // curr = 0, prev = 1;
   UpdateViewProjMatrix();
 }
 
@@ -177,39 +179,33 @@ void ObjectMode::OnFileDrop(const std::string& path) {
 }
 
 void ObjectMode::SetInitialObjectTransforms() {
-  transforms[(int)Model::Custom].translation.x = 10.0f;
-  transforms[(int)Model::Custom].translation.y = -10.0f;
-  transforms[(int)Model::Custom].scale = 2.0f;
-
-#if 0
-  transforms[(int)Model::Car].translation.x = 30.0f;
-  transforms[(int)Model::Car].rotation.y = 45.0f;
-  transforms[(int)Model::Car].scale = 10.0f;
-
-  transforms[(int)Model::Interior].translation.x = 20.0f;
+  transforms[(int)Model::Custom].translation.x = -80.0f;
+  transforms[(int)Model::Custom].rotation.y = 90.0f;
+  transforms[(int)Model::Custom].scale = 0.5f;
+  transforms[(int)Model::Car].translation = {-11.3f, 0.0f, -35.9f};
+  transforms[(int)Model::Car].rotation.y = 27.5f;
+  transforms[(int)Model::Car].scale = 7.92f;
+#ifdef NDEBUG
+  transforms[(int)Model::Interior].translation = {-30.6f, 5.4f, -8.5f};
   transforms[(int)Model::Interior].rotation.y = 0.0f;
-  transforms[(int)Model::Interior].scale = 20.0f;
-
-  transforms[(int)Model::Dragon].translation.x = 40.0f;
-  transforms[(int)Model::Dragon].rotation.y = 20.0f;
-  transforms[(int)Model::Dragon].scale = 0.7f;
-
-  transforms[(int)Model::Alien].translation.x = 60.0f;
-  transforms[(int)Model::Alien].rotation.y = 60.0f;
-  transforms[(int)Model::Alien].scale = 1.2f;
-
-  transforms[(int)Model::Head].translation.x = 80.0f;
-  transforms[(int)Model::Head].translation.y = -5.0f;
+  transforms[(int)Model::Interior].scale = 4.46f;
+  transforms[(int)Model::Dragon].translation = {1.9f, 0.2f, 43.2f};
+  transforms[(int)Model::Dragon].rotation.y = -195.0f;
+  transforms[(int)Model::Dragon].scale = 0.62f;
+  transforms[(int)Model::Alien].translation = {23.1f, 0.0f, -26.6f};
+  transforms[(int)Model::Alien].rotation.y = -85.5f;
+  transforms[(int)Model::Alien].scale = 1.0f;
+  transforms[(int)Model::Head].translation = {45.8f, -5.0f, 9.8f};
   transforms[(int)Model::Head].rotation.x = -90.0f;
-  transforms[(int)Model::Head].rotation.y = -135.0f;
-  transforms[(int)Model::Head].scale = 2.0f;
+  transforms[(int)Model::Head].rotation.y = 111.5f;
+  transforms[(int)Model::Head].scale = 1.82f;
 #endif
 }
 
 void ObjectMode::SetInitialFlowfieldSettings() {
   flowSettings[(int)Model::Custom] = {'U', 0};
-#if 0
   flowSettings[(int)Model::Car] = {'A', 12};
+#ifdef NDEBUG
   flowSettings[(int)Model::Interior] = {'A', 80};
   flowSettings[(int)Model::Dragon] = {'A', 15};
   flowSettings[(int)Model::Alien] = {'A', 45};
@@ -237,7 +233,7 @@ EffectInputData ObjectMode::GetEffectInputData() {
   EffectInputData data;
   data.reproject = true;
 
-  data.currFlowTex = objectFBs[curr].GetColorTexture(0);
+  data.prevFlowTex = objectFBs[prev].GetColorTexture(0);
   data.prevLocalPosTex = objectFBs[prev].GetColorTexture(1);
   data.prevIdTex = objectFBs[prev].GetColorTexture(2);
   data.currIdTex = objectFBs[curr].GetColorTexture(2);

@@ -32,7 +32,7 @@ void Screenshot::Destroy() {
 }
 
 void Screenshot::UpdateImGui() {
-  const char* methods[] = {"Average", "Average of changes"};
+  const char* methods[] = {"AVG", "SAD"};
   int m = (int)options.method;
 
   ImGui::BeginDisabled(capturing);

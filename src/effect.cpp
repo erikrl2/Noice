@@ -1,11 +1,11 @@
 #include "effect.hpp"
 
+#include "util.hpp"
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <imgui.h>
-
-#include <ctime>
 
 void Effect::Init(int width, int height) {
   scrollShader.CreateCompute("assets/shaders/scroll_move.comp.glsl");
@@ -23,7 +23,7 @@ void Effect::Init(int width, int height) {
 
   ClearBuffers();
 
-  std::srand((unsigned)std::time(nullptr));
+  //std::srand((unsigned)std::time(nullptr));
 }
 
 void Effect::Destroy() {
@@ -58,9 +58,9 @@ Texture Effect::Apply(const EffectInputData& in, float dt) {
   ScatterPass(in, dt);
   FillPass();
 
-#if 0 // NORMAL
-  return !disabled ? effectImgs[curr].noise : in.currFlowTex;
-#else // DEBUG
+#ifdef NDEBUG // FLOW
+  return !disabled ? effectImgs[curr].noise : in.prevFlowTex;
+#else // ACC
   return !disabled ? effectImgs[curr].noise : effectImgs[curr].acc;
 #endif
 }
@@ -71,6 +71,7 @@ void Effect::ScatterPass(const EffectInputData& in, float dt) {
     if (++frameCount % accResetInterval == 0) effectImgs[prev].acc.Clear();
   }
 
+  // dt = 1.0f / 144.0f; // DEBUG
   float speed = scrollSpeed * dt / downscaleFactor * (int)!paused;
 
   scrollShader.Use();
@@ -80,7 +81,7 @@ void Effect::ScatterPass(const EffectInputData& in, float dt) {
   effectImgs[curr].acc.Bind(2, GL_WRITE_ONLY);
   effectImgs[prev].acc.Bind(3, GL_READ_WRITE);
 
-  in.currFlowTex.Bind(0);
+  in.prevFlowTex.Bind(0);
   in.currIdTex.Bind(1);
 
   if (in.reproject) {
@@ -113,7 +114,7 @@ void Effect::FillPass() {
   effectImgs[curr].acc.Bind(2, GL_WRITE_ONLY);
   effectImgs[prev].acc.Bind(3, GL_READ_WRITE);
 
-  fillShader.SetUint("uSeed", (unsigned)std::rand());
+  fillShader.SetUint("uSeed", util::RandomInt());
 
   fillShader.DispatchCompute(scaledWidth, scaledHeight, 16);
 }
@@ -152,6 +153,9 @@ void Effect::OnKeyPressed(int key, int action) {
   switch (key) {
   case GLFW_KEY_F:
     if (action == GLFW_PRESS) paused = !paused;
+    break;
+  case GLFW_KEY_R:
+    if (action != GLFW_REPEAT) accResetInterval ^= 8;
     break;
   case GLFW_KEY_TAB:
     if (action == GLFW_PRESS) disabled = !disabled;

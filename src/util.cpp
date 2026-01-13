@@ -8,8 +8,15 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <random>
 
 namespace util {
+
+  int RandomInt() {
+    static std::mt19937 engine{std::random_device{}()};
+    static std::uniform_int_distribution<int> dist;
+    return dist(engine);
+  }
 
   bool ReadFileBytes(const char* path, std::vector<unsigned char>& out) {
     std::ifstream file(path, std::ios::binary | std::ios::ate);

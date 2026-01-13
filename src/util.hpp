@@ -16,6 +16,8 @@ struct FormatInfo {
 
 namespace util {
 
+  int RandomInt();
+
   bool ReadFileBytes(const char* path, std::vector<unsigned char>& out);
   std::string ReadFileString(const char* path);
 

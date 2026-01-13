@@ -159,11 +159,13 @@ void App::UpdateImGui() {
 void App::Update(float dt) {
   if (!screenshot.IsCapturing()) {
     modePtr->Update(!screenshot.IsActive() ? dt : 0.0f);
+  } else {
+    effect.disabled = false;
   }
 
   Texture effectTex = effect.Apply(modePtr->GetEffectInputData(), dt);
 
-  if (screenshot.IsCapturing()) screenshot.Update(width, height, effectTex); // TODO: test
+  if (screenshot.IsCapturing()) screenshot.Update(width, height, effectTex);
 
   RenderToScreen(effectTex);
 }
@@ -178,7 +180,7 @@ void App::RenderToScreen(Texture src) {
 
   src.Bind(0);
 
-  postShader.SetVec2("uResolution", {width, height});
+  postShader.SetVec2("uFullResolution", {width, height});
   postShader.SetInt("uShowVectors", effect.disabled && !screenshot.IsActive());
 
   quadMesh.Draw();

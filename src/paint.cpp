@@ -129,7 +129,7 @@ void PaintMode::OnMouseClicked(int button, int action) {
 
 EffectInputData PaintMode::GetEffectInputData() {
   EffectInputData data;
-  data.currFlowTex = resultFB.GetColorTexture(0);
+  data.prevFlowTex = resultFB.GetColorTexture(0);
   data.currIdTex = resultFB.GetColorTexture(1);
   return data;
 }

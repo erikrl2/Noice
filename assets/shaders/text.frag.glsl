@@ -15,5 +15,5 @@ void main() {
   if (a < 0.5) discard;
 
   oDir = uDir;
-  oId = 0;
+  oId = 1;
 }
