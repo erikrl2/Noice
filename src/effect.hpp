@@ -16,7 +16,7 @@ struct EffectInputData {
 class Effect {
 public:
   float scrollSpeed = 7.0f;
-  int accResetInterval = 10;
+  int accResetInterval = 0;
   int downscaleFactor = 1;
   bool paused = false;
   bool disabled = false;
@@ -36,9 +36,12 @@ public:
   void OnMouseScrolled(float offset);
   void OnKeyPressed(int key, int action);
 
+  int GetWidth() const { return scaledWidth; }
+  int GetHeight() const { return scaledHeight; }
+
 private:
   void ScatterPass(const EffectInputData& in, float dt);
-  void FillPass();
+  void FillPass(const EffectInputData& in);
 
 private:
   // scaled size

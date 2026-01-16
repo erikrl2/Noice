@@ -61,11 +61,11 @@ void ObjectMode::UpdateImGui() {
   static const char* objects[] = {"Custom", "Car", "Interior", "Dragon", "Alien", "Head"};
   int o = (int)objectSelect;
 
-  ImGui::SeparatorText("Transform");
   if (ImGui::Combo("Object", &o, objects, (int)Model::Count)) {
     objectSelect = (Model)o;
     meshChanged = true;
   }
+  ImGui::SeparatorText("Transform");
   int flags = ImGuiSliderFlags_NoRoundToFormat;
   ImGui::DragFloat3("Translation", (float*)&transforms[(int)objectSelect].translation.x, 0.1f, 0, 0, "%.1f", flags);
   ImGui::DragFloat3("Rotation", (float*)&transforms[(int)objectSelect].rotation.x, 0.5f, 0, 0, "%.1f", flags);
@@ -74,9 +74,7 @@ void ObjectMode::UpdateImGui() {
   FlowfieldSettings& stored = flowSettings[(int)objectSelect];
   static FlowfieldSettings edit = stored;
   if (meshChanged) edit = stored;
-
-  ImGui::SeparatorText("Camera");
-  ImGui::Checkbox("Orthographic", &isOrtho);
+  meshChanged = false;
 
   ImGui::SeparatorText("Flow Settings");
   if (ImGui::RadioButton("U", edit.axis == 'U')) edit.axis = 'U';
@@ -95,7 +93,8 @@ void ObjectMode::UpdateImGui() {
   }
   ImGui::EndDisabled();
 
-  meshChanged = false;
+  ImGui::SeparatorText("Camera");
+  if (ImGui::Checkbox("Orthographic", &isOrtho)) UpdateViewProjMatrix();
 }
 
 void ObjectMode::Update(float dt) {
@@ -179,13 +178,13 @@ void ObjectMode::OnFileDrop(const std::string& path) {
 }
 
 void ObjectMode::SetInitialObjectTransforms() {
+#ifdef NDEBUG
   transforms[(int)Model::Custom].translation.x = -80.0f;
   transforms[(int)Model::Custom].rotation.y = 90.0f;
   transforms[(int)Model::Custom].scale = 0.5f;
   transforms[(int)Model::Car].translation = {-11.3f, 0.0f, -35.9f};
   transforms[(int)Model::Car].rotation.y = 27.5f;
   transforms[(int)Model::Car].scale = 7.92f;
-#ifdef NDEBUG
   transforms[(int)Model::Interior].translation = {-30.6f, 5.4f, -8.5f};
   transforms[(int)Model::Interior].rotation.y = 0.0f;
   transforms[(int)Model::Interior].scale = 4.46f;
@@ -199,13 +198,15 @@ void ObjectMode::SetInitialObjectTransforms() {
   transforms[(int)Model::Head].rotation.x = -90.0f;
   transforms[(int)Model::Head].rotation.y = 111.5f;
   transforms[(int)Model::Head].scale = 1.82f;
+#else
+  transforms[(int)Model::Custom].translation.z = -20.0f;
 #endif
 }
 
 void ObjectMode::SetInitialFlowfieldSettings() {
   flowSettings[(int)Model::Custom] = {'U', 0};
-  flowSettings[(int)Model::Car] = {'A', 12};
 #ifdef NDEBUG
+  flowSettings[(int)Model::Car] = {'A', 12};
   flowSettings[(int)Model::Interior] = {'A', 80};
   flowSettings[(int)Model::Dragon] = {'A', 15};
   flowSettings[(int)Model::Alien] = {'A', 45};

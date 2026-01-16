@@ -22,12 +22,6 @@ uniform float uScrollSpeed;
 uniform bool uReproject;
 uniform int uCurrInd;
 
-vec2 snapZero(vec2 v, float epsPx) {
-  v.x = (abs(v.x) < epsPx) ? 0.0 : v.x;
-  v.y = (abs(v.y) < epsPx) ? 0.0 : v.y;
-  return v;
-}
-
 vec2 quantizePx(vec2 v, float q) {
   return round(v * q) / q;
 }
@@ -57,28 +51,18 @@ vec2 flowPixelsPerWorldUnitFromLocal(vec3 localPos, vec3 localDir, int objID, ve
   if (dirLen < 1e-20) return vec2(0);
   worldDir /= dirLen;
 
-  // TODO: dont hardcode this
   float eps = 1.0;
 
   vec2 uv0 = uvFromWorld(worldPos, prevInd);
-  //if (uv0.x < 0.0) return vec2(0);
 
   vec2 uv1;
-  //uv1 = uvFromWorld(worldPos + worldDir * eps, prevInd);
+  uv1 = uvFromWorld(worldPos + worldDir * eps, prevInd);
 
-  for (int k = 0; k < 6; k++) {
+  for (int k = 0; k < 8; k++) {
     uv1 = uvFromWorld(worldPos + worldDir * eps, prevInd);
     if (uv1.x > 0) break;
-    eps *= 0.5; // TODO: make it go below 1
+    eps *= 0.5;
   }
-
-  //float targetPx = 0.25; // aim for ~0.25 pixel delta for the finite difference
-  //float dpx1 = length((uv1 - uv0) * viewportPx);
-  //if (dpx1 > 1e-8) {
-    //eps *= clamp(targetPx / dpx1, 0.1, 10.0);
-  //}
-  //uv1 = uvFromWorld(worldPos + worldDir * eps, prevInd);
-  //if (uv1.x < 0.0) return vec2(0);
 
   vec2 dPx = (uv1 - uv0) * viewportPx;
 
@@ -117,6 +101,7 @@ void main() {
     if (currUV.x < 0.0 || prevUV.x < 0.0) return;
 
     reprojDelta = (currUV - prevUV) * vec2(noiseRes);
+    //reprojDelta = trunc(reprojDelta);
 
     flowDir = flowPixelsPerWorldUnitFromLocal(localPos, flowLocal, prevId, vec2(noiseRes));
   }
@@ -125,19 +110,16 @@ void main() {
 
   vec2 flow = flowDir * uScrollSpeed;
 
-  const float Q = 64.0; // 1024.0, 64.0
-  const float EPS0 = 1.0 / 2048.0;
-
-  flow = snapZero(quantizePx(flow, Q), EPS0);
-  reprojDelta = snapZero(quantizePx(reprojDelta, Q), EPS0);
+  flow = quantizePx(flow, 32.0);
+  reprojDelta = quantizePx(reprojDelta, 128.0);
 
   vec2 totalMove = prevAcc + reprojDelta + flow;
-  totalMove = quantizePx(totalMove, Q);
+  //totalMove = quantizePx(totalMove, 128.0);
 
   vec2 intStep = trunc(totalMove);
   vec2 nextAcc = totalMove - intStep;
 
-  imageStore(uPrevAccTex, prevPx, vec4(nextAcc, 0, 0));
+  //imageStore(uPrevAccTex, prevPx, vec4(nextAcc, 0, 0)); // old
 
   ivec2 targetPx = prevPx + ivec2(intStep);
   vec2 targetUV = (vec2(targetPx) + 0.5) / vec2(noiseRes);
@@ -146,8 +128,11 @@ void main() {
 
   int targetId = texelFetch(uCurrIdTex, ivec2(targetUV * vec2(fullRes)), 0).r;
   if (targetId != prevId) {
-    imageStore(uCurrNoiseTex, prevPx, vec4(prevNoise.r, 1, 0, 0));
+    //imageStore(uCurrNoiseTex, prevPx, vec4(prevNoise.r, 1, 0, 0)); // this caused flickering on leading edge at high speed
     //imageStore(uCurrAccTex, prevPx, vec4(prevAcc, 0, 0));
+
+    //imageStore(uPrevAccTex, prevPx, vec4(nextAcc, 0, 0));
+    //imageStore(uPrevAccTex, targetPx, vec4(nextAcc, 0, 0));
     return;
   }
 
@@ -156,8 +141,12 @@ void main() {
   if (asdf != prevId) {
     //imageStore(uCurrNoiseTex, targetPx, vec4(prevNoise.r, 1, 0, 0));
     //imageStore(uCurrAccTex, targetPx, vec4(nextAcc, 0, 0));
+
+    //imageStore(uPrevAccTex, prevPx, vec4(nextAcc, 0, 0));
+    //imageStore(uPrevAccTex, targetPx, vec4(nextAcc, 0, 0));
     return;
   }
+  imageStore(uPrevAccTex, prevPx, vec4(nextAcc, 0, 0));
 
   imageStore(uCurrNoiseTex, targetPx, vec4(prevNoise.r, 1, 0, 0));
   imageStore(uCurrAccTex, targetPx, vec4(nextAcc, 0, 0));

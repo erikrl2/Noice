@@ -15,7 +15,7 @@ public:
 #ifdef NDEBUG
   enum class Model { Custom, Car, Interior, Dragon, Alien, Head, Count };
 #else
-  enum class Model { Custom, Car, Count };
+  enum class Model { Custom, Count };
 #endif
 
   struct Transform {

@@ -37,13 +37,18 @@ target_link_libraries(Noice PRIVATE flowfield glfw glad imgui glm::glm stb compi
 
 
 file(GLOB_RECURSE ASSETS CONFIGURE_DEPENDS "assets/*")
+set(ASSET_DST "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/assets")
+set(ASSET_STAMP "${ASSET_DST}/.assets_copied")
 add_custom_command(
-  OUTPUT "${CMAKE_BINARY_DIR}/assets/.assets_copied"
-  COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/assets" "${CMAKE_BINARY_DIR}/assets"
-  COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_BINARY_DIR}/assets/.assets_copied"
+  OUTPUT "${ASSET_STAMP}"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${ASSET_DST}"
+  COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/assets" "${ASSET_DST}"
+  COMMAND ${CMAKE_COMMAND} -E touch "${ASSET_STAMP}"
   DEPENDS ${ASSETS}
+  VERBATIM
 )
-add_custom_target(copy_assets ALL DEPENDS "${CMAKE_BINARY_DIR}/assets/.assets_copied")
+
+add_custom_target(copy_assets ALL DEPENDS "${ASSET_STAMP}")
 add_dependencies(Noice copy_assets)
 
 

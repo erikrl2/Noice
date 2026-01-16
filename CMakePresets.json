@@ -2,22 +2,41 @@
   "version": 3,
   "configurePresets": [
     {
-      "name": "debug",
-      "displayName": "Debug (Ninja)",
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/debug",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+      "name": "vs",
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/build/vs",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
       }
     },
     {
-      "name": "release",
-      "displayName": "Release (Ninja)",
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/release",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
-      }
+      "name": "ninja-mc",
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/build/ninja"
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug-vs",
+      "configurePreset": "vs",
+      "configuration": "Debug"
+    },
+    {
+      "name": "release-vs",
+      "configurePreset": "vs",
+      "configuration": "Release"
+    },
+    {
+      "name": "debug-ninja",
+      "configurePreset": "ninja-mc",
+      "configuration": "Debug"
+    },
+    {
+      "name": "release-ninja",
+      "configurePreset": "ninja-mc",
+      "configuration": "Release"
     }
   ]
 }
