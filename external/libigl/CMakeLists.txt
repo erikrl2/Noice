@@ -14,3 +14,6 @@ set(LIBIGL_WITH_PNG OFF CACHE BOOL "" FORCE)
 set(LIBIGL_WITH_IMGUI OFF CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(libigl)
+
+get_property(libiglTargets DIRECTORY "${libigl_SOURCE_DIR}" PROPERTY BUILDSYSTEM_TARGETS)
+set_property(TARGET ${libiglTargets} PROPERTY FOLDER "Dependencies")

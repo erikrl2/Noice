@@ -9,6 +9,10 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(imgui)
 
+file(REMOVE_RECURSE
+  ${imgui_SOURCE_DIR}/examples
+)
+
 set(IMGUI_SOURCES
     ${imgui_SOURCE_DIR}/imgui.cpp
     ${imgui_SOURCE_DIR}/imgui_draw.cpp
@@ -26,3 +30,5 @@ target_include_directories(imgui PUBLIC
     ${imgui_SOURCE_DIR}/backends
     $<TARGET_PROPERTY:glfw,INTERFACE_INCLUDE_DIRECTORIES>
 )
+
+set_property(TARGET imgui PROPERTY FOLDER "Dependencies")

@@ -277,10 +277,10 @@ void TextMode::OnResize(int width, int height) {
 }
 
 void TextMode::OnKeyPressed(int key, int action) {
-  //if (key == GLFW_KEY_R && action == GLFW_PRESS) {
-  //  center = !center;
-  //  dirtyMesh = true;
-  //}
+  // if (key == GLFW_KEY_R && action == GLFW_PRESS) {
+  //   center = !center;
+  //   dirtyMesh = true;
+  // }
 }
 
 EffectInputData TextMode::GetEffectInputData() {

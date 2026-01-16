@@ -9,6 +9,8 @@ project(Noice C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
 add_subdirectory(external/glfw)
 add_subdirectory(external/glad)
 add_subdirectory(external/imgui)
@@ -19,7 +21,6 @@ add_subdirectory(external/eigen)
 add_subdirectory(external/libigl)
 add_subdirectory(external/tinyobjloader)
 
-
 add_library(compile_options INTERFACE)
 target_compile_options(compile_options INTERFACE
   $<$<AND:$<CONFIG:Release>,$<CXX_COMPILER_ID:GNU>>:-march=native>
@@ -27,30 +28,44 @@ target_compile_options(compile_options INTERFACE
   $<$<AND:$<CONFIG:Release>,$<CXX_COMPILER_ID:MSVC>>:/arch:AVX2>
 )
 
+file(GLOB CMAKE_FILES "external/*/CMakeLists.txt")
+file(GLOB NOICE_SOURCES "src/*.cpp" "src/*.hpp")
+file(GLOB SHADER_FILES "assets/shaders/*.glsl")
 file(GLOB FLOWFIELD_SOURCES "src/flowfield/*.cpp" "src/flowfield/*.hpp")
+
 add_library(flowfield STATIC ${FLOWFIELD_SOURCES})
 target_link_libraries(flowfield PRIVATE igl::core Eigen3::Eigen tinyobjloader compile_options)
 
-file(GLOB NOICE_SOURCES "src/*.cpp" "src/*.hpp")
+add_library(CMakeFiles INTERFACE)
+target_sources(CMakeFiles INTERFACE ${CMAKE_FILES})
+add_library(Shaders INTERFACE)
+target_sources(Shaders INTERFACE ${SHADER_FILES})
+
 add_executable(Noice ${NOICE_SOURCES})
-target_link_libraries(Noice PRIVATE flowfield glfw glad imgui glm::glm stb compile_options)
+target_link_libraries(Noice PRIVATE glfw glad imgui glm::glm stb flowfield compile_options Shaders CMakeFiles)
 
-
+# Utility targets
 file(GLOB_RECURSE ASSETS CONFIGURE_DEPENDS "assets/*")
 set(ASSET_DST "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/assets")
 set(ASSET_STAMP "${ASSET_DST}/.assets_copied")
-add_custom_command(
-  OUTPUT "${ASSET_STAMP}"
-  COMMAND ${CMAKE_COMMAND} -E make_directory "${ASSET_DST}"
+add_custom_command(OUTPUT "${ASSET_STAMP}" COMMAND ${CMAKE_COMMAND} -E make_directory "${ASSET_DST}"
   COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/assets" "${ASSET_DST}"
-  COMMAND ${CMAKE_COMMAND} -E touch "${ASSET_STAMP}"
-  DEPENDS ${ASSETS}
-  VERBATIM
+  COMMAND ${CMAKE_COMMAND} -E touch "${ASSET_STAMP}" DEPENDS ${ASSETS} VERBATIM
 )
-
 add_custom_target(copy_assets ALL DEPENDS "${ASSET_STAMP}")
 add_dependencies(Noice copy_assets)
 
-
 find_program(CLANG_FORMAT clang-format)
 add_custom_target(format COMMAND ${CLANG_FORMAT} -i ${NOICE_SOURCES} ${FLOWFIELD_SOURCES})
+
+# Visual Studio specific settings
+set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT Noice)
+set_target_properties(Noice PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:Noice>")
+
+source_group(TREE "${CMAKE_SOURCE_DIR}/src" PREFIX "Source" FILES ${NOICE_SOURCES})
+source_group(TREE "${CMAKE_SOURCE_DIR}/src/flowfield" PREFIX "Source" FILES ${FLOWFIELD_SOURCES})
+source_group(TREE "${CMAKE_SOURCE_DIR}/assets/shaders" PREFIX "Shaders" FILES ${SHADER_FILES})
+source_group(TREE "${CMAKE_SOURCE_DIR}/external" PREFIX "CMakeFiles" FILES ${CMAKE_FILES})
+
+set_property(TARGET Noice flowfield PROPERTY FOLDER "App")
+set_property(TARGET copy_assets format PROPERTY FOLDER "Tools")

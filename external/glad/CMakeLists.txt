@@ -6,3 +6,5 @@ set_target_properties(glad PROPERTIES
   C_STANDARD 99
   C_STANDARD_REQUIRED ON
 )
+
+set_property(TARGET glad PROPERTY FOLDER "Dependencies")

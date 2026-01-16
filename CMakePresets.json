@@ -12,30 +12,15 @@
       }
     },
     {
-      "name": "ninja-mc",
+      "name": "ninja",
       "generator": "Ninja Multi-Config",
       "binaryDir": "${sourceDir}/build/ninja"
     }
   ],
   "buildPresets": [
     {
-      "name": "debug-vs",
-      "configurePreset": "vs",
-      "configuration": "Debug"
-    },
-    {
-      "name": "release-vs",
-      "configurePreset": "vs",
-      "configuration": "Release"
-    },
-    {
-      "name": "debug-ninja",
-      "configurePreset": "ninja-mc",
-      "configuration": "Debug"
-    },
-    {
-      "name": "release-ninja",
-      "configurePreset": "ninja-mc",
+      "name": "ninja",
+      "configurePreset": "ninja",
       "configuration": "Release"
     }
   ]
