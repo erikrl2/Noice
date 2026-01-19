@@ -22,8 +22,8 @@ void PaintMode::Init(int width, int height) {
   resultFB.SetClearColor({-1, 0, 0, 0}, 1);
   resultFB.Finalize();
 
-  stampShader.CreateVertFrag("assets/shaders/post.vert.glsl", "assets/shaders/paint_stamp.frag.glsl");
-  resolveShader.CreateVertFrag("assets/shaders/post.vert.glsl", "assets/shaders/paint_resolve.frag.glsl");
+  stampShader.CreateVertFrag("assets/shaders/post.vert.glsl", "assets/shaders/paint/paint_stamp.frag.glsl");
+  resolveShader.CreateVertFrag("assets/shaders/post.vert.glsl", "assets/shaders/paint/paint_resolve.frag.glsl");
 
   canvasFB.Clear();
 }

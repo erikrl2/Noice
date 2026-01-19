@@ -5,12 +5,16 @@
 #include <span>
 
 struct EffectInputData {
-  Texture prevFlowTex, currIdTex;
-  bool reproject = false;
-  Texture prevLocalPosTex, prevIdTex;
-  glm::mat4* prevCurrViewProj;
+  Texture currFlowTex, prevFlowTex;
+  Texture currMotionTex, prevMotionTex;
+  Texture currIdTex, prevIdTex;
+  Texture currLocalPosTex, prevLocalPosTex;
+
+  glm::mat4* prevCurrViewProj = nullptr;
   std::span<glm::mat4[2]> modelMats;
+
   int currInd = 0;
+  bool reproject = false;
 };
 
 class Effect {
@@ -18,7 +22,7 @@ public:
   float scrollSpeed = 7.0f;
   int accResetInterval = 0;
   int downscaleFactor = 1;
-  bool paused = false;
+  bool paused = true;
   bool disabled = false;
 
 public:
@@ -40,8 +44,9 @@ public:
   int GetHeight() const { return scaledHeight; }
 
 private:
-  void ScatterPass(const EffectInputData& in, float dt);
-  void FillPass(const EffectInputData& in);
+  void AccGather(const EffectInputData& in, float dt);
+  void NoiseScatter(const EffectInputData& in, float dt);
+  void NoiseFill(const EffectInputData& in);
 
 private:
   // scaled size
@@ -55,8 +60,11 @@ private:
   EffectImage effectImgs[2];
   int curr = 0, prev = 1;
 
-  Shader scrollShader;
-  Shader fillShader;
+  Image moveStepImg;
+
+  Shader accGather;
+  Shader noiseScatter;
+  Shader noiseFill;
 
   StorageBuffer modelSSB;
 };

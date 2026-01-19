@@ -28,17 +28,24 @@ void ObjectMode::Init(int width, int height) {
   meshLoaderThread = std::thread(MeshLoaderThreadFunc, std::ref(meshJobQueue), std::ref(uploadQueue));
   for (int type = 0; type < (int)Model::Count; type++) LoadMeshAsync((Model)type);
 
-  objectShader.CreateVertFrag("assets/shaders/object.vert.glsl", "assets/shaders/object.frag.glsl");
+  objectShader.CreateVertFrag("assets/shaders/object/object.vert.glsl", "assets/shaders/object/object.frag.glsl");
 
   for (auto& fb : objectFBs) {
     fb.CreateOrResize(width, height);
-    fb.AttachColorTexture(GL_RGB32F, GL_NEAREST); // 0: flow
-    fb.AttachColorTexture(GL_RGB32F, GL_NEAREST); // 1: localPos
-    fb.AttachColorTexture(GL_R8I, GL_NEAREST); // 2: id
-    fb.SetClearColor({-1, 0, 0, 0}, 2);
+    fb.AttachColorTexture(GL_RG32F, GL_NEAREST); // 0: motion
+    fb.AttachColorTexture(GL_RG32F, GL_NEAREST); // 1: flow (FlowPxPerWorldUnit)
+    fb.AttachColorTexture(GL_RGB32F, GL_NEAREST); // 2: localPos
+    fb.AttachColorTexture(GL_R16I, GL_NEAREST); // 3: id
+    fb.SetClearColor({-1, 0, 0, 0}, 3);
+    fb.AttachColorTexture(GL_RG32F, GL_NEAREST); // 4: uv
     fb.AttachDepthTexture();
     fb.Finalize();
   }
+
+  prevMotionFB.CreateOrResize(width, height);
+  prevMotionFB.AttachColorTexture(GL_RG32F, GL_NEAREST);
+  prevMotionFB.AttachDepthTexture();
+  prevMotionFB.Finalize();
 
   UpdateViewProjMatrix();
   UpdateModelMatrices();
@@ -48,6 +55,7 @@ void ObjectMode::Destroy() {
   objectShader.Destroy();
 
   for (auto& fb : objectFBs) fb.Destroy();
+  prevMotionFB.Destroy();
 
   uploadQueue.Close();
   meshJobQueue.Close();
@@ -133,24 +141,33 @@ void ObjectMode::UpdateModelMatrices() {
 }
 
 void ObjectMode::RenderObjects() {
-  objectFBs[curr].Clear();
-
   objectShader.Use();
 
-  for (int id = 0; id < (int)Model::Count; id++) {
-    if (meshes[id]) {
-      objectShader.SetMat4("uMvp", viewProj[curr] * modelMats[id][curr]);
-      objectShader.SetInt("uObjectId", id);
+  objectShader.SetVec2("uViewportPx", {width, height});
+  objectShader.SetMat4("uViewProjCurr", viewProj[curr]);
+  objectShader.SetMat4("uViewProjPrev", viewProj[prev]);
 
-      meshes[id].Draw(RenderFlag::DepthTest);
+  auto draw = [&](const auto& fb, int mode) {
+    fb.Clear();
+    objectShader.SetInt("uMotionMode", mode);
+    for (int id = 0; id < (int)Model::Count; id++) {
+      if (meshes[id]) {
+        objectShader.SetInt("uObjectId", id);
+        objectShader.SetMat4("uModelCurr", modelMats[id][curr]);
+        objectShader.SetMat4("uModelPrev", modelMats[id][prev]);
+        meshes[id].Draw(RenderFlag::DepthTest);
+      }
     }
-  }
+  };
+  draw(objectFBs[curr], 0);
+  draw(prevMotionFB, 1);
 }
 
 void ObjectMode::OnResize(int width, int height) {
   this->width = width;
   this->height = height;
   for (auto& fb : objectFBs) fb.CreateOrResize(width, height);
+  prevMotionFB.CreateOrResize(width, height);
 
   // curr = 0, prev = 1;
   UpdateViewProjMatrix();
@@ -234,10 +251,14 @@ EffectInputData ObjectMode::GetEffectInputData() {
   EffectInputData data;
   data.reproject = true;
 
-  data.prevFlowTex = objectFBs[prev].GetColorTexture(0);
-  data.prevLocalPosTex = objectFBs[prev].GetColorTexture(1);
-  data.prevIdTex = objectFBs[prev].GetColorTexture(2);
-  data.currIdTex = objectFBs[curr].GetColorTexture(2);
+  data.currMotionTex = objectFBs[curr].GetColorTexture(0);
+  data.prevMotionTex = prevMotionFB.GetColorTexture(0);
+  data.currFlowTex = objectFBs[curr].GetColorTexture(1);
+  data.prevFlowTex = objectFBs[prev].GetColorTexture(1);
+  data.currLocalPosTex = objectFBs[curr].GetColorTexture(2);
+  data.prevLocalPosTex = objectFBs[prev].GetColorTexture(2);
+  data.prevIdTex = objectFBs[prev].GetColorTexture(3);
+  data.currIdTex = objectFBs[curr].GetColorTexture(3);
 
   data.prevCurrViewProj = viewProj;
   data.modelMats = std::span<glm::mat4[2]>(modelMats, (int)Model::Count);

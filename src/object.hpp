@@ -67,6 +67,7 @@ private:
   Shader objectShader;
 
   Framebuffer objectFBs[2];
+  Framebuffer prevMotionFB;
 
   Camera camera;
   bool isOrtho = false;

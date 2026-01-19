@@ -54,7 +54,7 @@ private:
   int width = 0;
   int height = 0;
 
-  static const int maxAttachments = 3;
+  static const int maxAttachments = 5;
   int attachmentCount = 0;
 
   Texture colorTex[maxAttachments];
