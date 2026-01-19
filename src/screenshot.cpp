@@ -11,8 +11,8 @@
 #include <iostream>
 
 void Screenshot::Init(int width, int height) {
-  accumShader.CreateCompute("assets/shaders/screenshot_accum.comp.glsl");
-  finalizeShader.CreateCompute("assets/shaders/screenshot_finalize.comp.glsl");
+  accumShader.CreateCompute("assets/shaders/screenshot/screenshot_accum.comp.glsl");
+  finalizeShader.CreateCompute("assets/shaders/screenshot/screenshot_finalize.comp.glsl");
 
   accumImg.Create(width, height, GL_R16F, GL_NEAREST);
   prevImg.Create(width, height, GL_R8, GL_NEAREST);

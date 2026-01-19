@@ -5,11 +5,14 @@
 #include <span>
 
 struct EffectInputData {
-  Texture prevFlowTex, currIdTex;
-  bool reproject = false;
-  Texture prevLocalPosTex, prevIdTex;
+  Texture currIdTex, prevIdTex;
+  Texture prevLocalPosTex;
+  Texture prevFlowTex;
+
   glm::mat4* prevCurrViewProj;
   std::span<glm::mat4[2]> modelMats;
+
+  bool reproject = false;
   int currInd = 0;
 };
 
@@ -20,8 +23,11 @@ public:
   int downscaleFactor = 1;
   bool paused = false;
   bool disabled = false;
+  bool showAcc = false;
 
 public:
+  Effect() { self = this; }
+
   void Init(int width, int height);
   void Destroy();
 
@@ -30,6 +36,7 @@ public:
   Texture Apply(const EffectInputData& in, float dt);
 
   void ClearBuffers();
+  void ClearAcc();
 
   void OnResize(int width, int height);
   void OnMouseClicked(int button, int action);
@@ -39,12 +46,13 @@ public:
   int GetWidth() const { return scaledWidth; }
   int GetHeight() const { return scaledHeight; }
 
+  static Effect* Get() { return self; }
+
 private:
   void ScatterPass(const EffectInputData& in, float dt);
   void FillPass(const EffectInputData& in);
 
 private:
-  // scaled size
   int scaledWidth = 0, scaledHeight = 0;
 
   struct EffectImage {
@@ -55,8 +63,13 @@ private:
   EffectImage effectImgs[2];
   int curr = 0, prev = 1;
 
+  Image claimImg;
+
   Shader scrollShader;
   Shader fillShader;
 
   StorageBuffer modelSSB;
+
+private:
+  inline static Effect* self = nullptr;
 };

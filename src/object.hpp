@@ -1,6 +1,5 @@
 #pragma once
 #include "camera.hpp"
-#include "effect.hpp"
 #include "flowfield/flowfield.hpp"
 #include "framebuffer.hpp"
 #include "mesh.hpp"

@@ -182,6 +182,7 @@ void App::RenderToScreen(Texture src) {
 
   postShader.SetVec2("uFullResolution", {width, height});
   postShader.SetInt("uShowVectors", effect.disabled && !screenshot.IsActive());
+  postShader.SetInt("uNormalizeVectors", !effect.showAcc);
 
   quadMesh.Draw();
 }

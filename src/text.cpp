@@ -17,7 +17,7 @@ void TextMode::Init(int width, int height) {
   textFB.AttachColorTexture(GL_R8I, GL_NEAREST); // 1: id
   textFB.Finalize();
 
-  textShader.CreateVertFrag("assets/shaders/text.vert.glsl", "assets/shaders/text.frag.glsl");
+  textShader.CreateVertFrag("assets/shaders/text/text.vert.glsl", "assets/shaders/text/text.frag.glsl");
 
   LoadFontAtlas();
 }
@@ -60,7 +60,10 @@ void TextMode::Update(float dt) {
     }
   }
 
-  if (dirtyMesh) RebuildTextMesh();
+  if (dirtyMesh) {
+    RebuildTextMesh();
+    Effect::Get()->ClearAcc();
+  }
 
   textFB.SetClearColor({bgDir.x, bgDir.y, 0, 0}, 0);
   textFB.Clear();

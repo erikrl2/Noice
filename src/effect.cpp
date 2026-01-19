@@ -8,10 +8,10 @@
 #include <imgui.h>
 
 void Effect::Init(int width, int height) {
-  scrollShader.CreateCompute("assets/shaders/scroll_move.comp.glsl");
-  fillShader.CreateCompute("assets/shaders/scroll_fill.comp.glsl");
+  scrollShader.CreateCompute("assets/shaders/effect/scroll_move.comp.glsl");
+  fillShader.CreateCompute("assets/shaders/effect/scroll_fill.comp.glsl");
 
-  modelSSB.Create(sizeof(glm::mat4[2]) * 6, nullptr, GL_DYNAMIC_DRAW); // or GL_STREAM_DRAW ?
+  modelSSB.Create(sizeof(glm::mat4[2]) * 8, nullptr, GL_DYNAMIC_DRAW); // or GL_STREAM_DRAW ?
 
   scaledWidth = width / downscaleFactor;
   scaledHeight = height / downscaleFactor;
@@ -21,9 +21,9 @@ void Effect::Init(int width, int height) {
     img.acc.Create(scaledWidth, scaledHeight, GL_RG32F, GL_NEAREST);
   }
 
-  ClearBuffers();
+  claimImg.Create(scaledWidth, scaledHeight, GL_R32UI, GL_NEAREST);
 
-  // std::srand((unsigned)std::time(nullptr));
+  ClearBuffers();
 }
 
 void Effect::Destroy() {
@@ -35,6 +35,7 @@ void Effect::Destroy() {
     img.noise.Destroy();
     img.acc.Destroy();
   }
+  claimImg.Destroy();
 }
 
 void Effect::UpdateImGui() {
@@ -44,10 +45,14 @@ void Effect::UpdateImGui() {
   ImGui::Checkbox("Disable", &disabled);
   ImGui::SameLine();
   ImGui::Checkbox("Pause", &paused);
+  if (disabled) {
+    ImGui::SameLine();
+    ImGui::Checkbox("Show Acc", &showAcc);
+  }
 
   ImGui::DragFloat("Speed", &scrollSpeed, 0.1f, 0.0f, 0.0f, "%.1f", ImGuiSliderFlags_NoRoundToFormat);
-  ImGui::DragInt("Sync rate", &accResetInterval, 0.1f, 0, 1000, "%d", ImGuiSliderFlags_ClampOnInput);
-  if (ImGui::Button("Clear Accumulation")) effectImgs[curr].acc.Clear();
+  ImGui::DragInt("Acc Reset Rate", &accResetInterval, 0.1f, 0, 1000, "%d", ImGuiSliderFlags_ClampOnInput);
+  if (ImGui::Button("Clear Acc")) ClearAcc();
 
   // if (ImGui::SliderInt("Downscale", &downscaleFactor, 1, 8, "%d", ImGuiSliderFlags_NoInput))
   // OnResize(fullWidth, fullHeight);
@@ -59,11 +64,8 @@ Texture Effect::Apply(const EffectInputData& in, float dt) {
   ScatterPass(in, dt);
   FillPass(in);
 
-#ifdef NDEBUG // FLOW
-  return !disabled ? effectImgs[curr].noise : in.prevFlowTex;
-#else // ACC
-  return !disabled ? effectImgs[curr].noise : effectImgs[curr].acc;
-#endif
+  if (disabled) return showAcc ? effectImgs[curr].acc : in.prevFlowTex;
+  return effectImgs[curr].noise;
 }
 
 void Effect::ScatterPass(const EffectInputData& in, float dt) {
@@ -75,19 +77,22 @@ void Effect::ScatterPass(const EffectInputData& in, float dt) {
   // dt = 1.0f / 144.0f; // DEBUG
   float speed = scrollSpeed * dt / downscaleFactor * (int)!paused;
 
+  claimImg.Clear({-1, 0, 0, 0});
+
   scrollShader.Use();
 
   effectImgs[curr].noise.Bind(0, GL_WRITE_ONLY);
   effectImgs[prev].noise.Bind(1, GL_READ_ONLY);
   effectImgs[curr].acc.Bind(2, GL_WRITE_ONLY);
   effectImgs[prev].acc.Bind(3, GL_READ_WRITE);
+  claimImg.Bind(4, GL_READ_WRITE);
 
-  in.prevFlowTex.Bind(0);
-  in.currIdTex.Bind(1);
+  in.currIdTex.Bind(0);
+  in.prevFlowTex.Bind(3);
 
   if (in.reproject) {
-    in.prevIdTex.Bind(2);
-    in.prevLocalPosTex.Bind(3);
+    in.prevIdTex.Bind(1);
+    in.prevLocalPosTex.Bind(2);
 
     modelSSB.Upload(in.modelMats);
     modelSSB.Bind(0);
@@ -97,7 +102,7 @@ void Effect::ScatterPass(const EffectInputData& in, float dt) {
     scrollShader.SetInt("uCurrInd", in.currInd);
     scrollShader.SetFloat("uScrollSpeed", speed);
   } else {
-    in.currIdTex.Bind(2);
+    in.currIdTex.Bind(1);
 
     // speed adjustment: scrollspeed unit here is [pixels per second] and not [pixels per worldspace-unit per second]
     scrollShader.SetFloat("uScrollSpeed", speed * 20.0f);
@@ -116,6 +121,7 @@ void Effect::FillPass(const EffectInputData& in) {
   effectImgs[prev].acc.Bind(3, GL_READ_WRITE);
 
   in.currIdTex.Bind(0);
+  in.prevIdTex.Bind(1);
 
   fillShader.SetUint("uSeed", util::RandomInt());
 
@@ -129,6 +135,10 @@ void Effect::ClearBuffers() {
   }
 }
 
+void Effect::ClearAcc() {
+  effectImgs[curr].acc.Clear();
+}
+
 void Effect::OnResize(int width, int height) {
   scaledWidth = width / downscaleFactor;
   scaledHeight = height / downscaleFactor;
@@ -137,8 +147,8 @@ void Effect::OnResize(int width, int height) {
     img.noise.Resize(scaledWidth, scaledHeight);
     img.acc.Resize(scaledWidth, scaledHeight);
   }
+  claimImg.Resize(scaledWidth, scaledHeight);
 
-  // curr = 0, prev = 1;
   ClearBuffers();
 }
 
@@ -161,7 +171,7 @@ void Effect::OnKeyPressed(int key, int action) {
     if (action == GLFW_PRESS) disabled = !disabled;
     break;
   case GLFW_KEY_R:
-    if (action == GLFW_PRESS) effectImgs[curr].acc.Clear();
+    if (action == GLFW_PRESS) ClearAcc();
     break;
   }
 }

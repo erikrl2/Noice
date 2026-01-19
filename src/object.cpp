@@ -1,5 +1,6 @@
 #include "object.hpp"
 
+#include "effect.hpp"
 #include "flowfield/flowfield.hpp"
 #include "mesh.hpp"
 
@@ -28,7 +29,7 @@ void ObjectMode::Init(int width, int height) {
   meshLoaderThread = std::thread(MeshLoaderThreadFunc, std::ref(meshJobQueue), std::ref(uploadQueue));
   for (int type = 0; type < (int)Model::Count; type++) LoadMeshAsync((Model)type);
 
-  objectShader.CreateVertFrag("assets/shaders/object.vert.glsl", "assets/shaders/object.frag.glsl");
+  objectShader.CreateVertFrag("assets/shaders/object/object.vert.glsl", "assets/shaders/object/object.frag.glsl");
 
   for (auto& fb : objectFBs) {
     fb.CreateOrResize(width, height);
@@ -236,8 +237,8 @@ EffectInputData ObjectMode::GetEffectInputData() {
 
   data.prevFlowTex = objectFBs[prev].GetColorTexture(0);
   data.prevLocalPosTex = objectFBs[prev].GetColorTexture(1);
-  data.prevIdTex = objectFBs[prev].GetColorTexture(2);
   data.currIdTex = objectFBs[curr].GetColorTexture(2);
+  data.prevIdTex = objectFBs[prev].GetColorTexture(2);
 
   data.prevCurrViewProj = viewProj;
   data.modelMats = std::span<glm::mat4[2]>(modelMats, (int)Model::Count);

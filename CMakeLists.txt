@@ -30,7 +30,7 @@ target_compile_options(compile_options INTERFACE
 
 file(GLOB CMAKE_FILES "external/*/CMakeLists.txt")
 file(GLOB NOICE_SOURCES "src/*.cpp" "src/*.hpp")
-file(GLOB SHADER_FILES "assets/shaders/*.glsl")
+file(GLOB_RECURSE SHADER_FILES "assets/shaders/*.glsl")
 file(GLOB FLOWFIELD_SOURCES "src/flowfield/*.cpp" "src/flowfield/*.hpp")
 
 add_library(flowfield STATIC ${FLOWFIELD_SOURCES})
