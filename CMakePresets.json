@@ -16,12 +16,5 @@
       "generator": "Ninja Multi-Config",
       "binaryDir": "${sourceDir}/build/ninja"
     }
-  ],
-  "buildPresets": [
-    {
-      "name": "ninja",
-      "configurePreset": "ninja",
-      "configuration": "Release"
-    }
   ]
 }

@@ -1,5 +1,6 @@
 #include "effect.hpp"
 
+#include "glm/fwd.hpp"
 #include "util.hpp"
 
 #include <glad/glad.h>
@@ -23,6 +24,7 @@ void Effect::Init(int width, int height) {
   }
 
   moveStepImg.Create(scaledWidth, scaledHeight, GL_RG16I, GL_NEAREST);
+  claimImg.Create(scaledWidth, scaledHeight, GL_R32UI, GL_NEAREST);
 
   ClearBuffers();
 }
@@ -38,6 +40,7 @@ void Effect::Destroy() {
     img.acc.Destroy();
   }
   moveStepImg.Destroy();
+  claimImg.Destroy();
 }
 
 void Effect::UpdateImGui() {
@@ -59,7 +62,8 @@ void Effect::UpdateImGui() {
 Texture Effect::Apply(const EffectInputData& in, float dt) {
   std::swap(curr, prev);
 
-  // modelSSB.Upload(in.modelMats);
+  effectImgs[curr].noise.Clear();
+  claimImg.Clear({-1, 0, 0, 0});
 
   AccGather(in, dt);
   NoiseScatter(in, dt);
@@ -74,38 +78,42 @@ Texture Effect::Apply(const EffectInputData& in, float dt) {
 
 void Effect::AccGather(const EffectInputData& in, float dt) {
   effectImgs[curr].acc.Bind(0, GL_WRITE_ONLY);
-  effectImgs[prev].acc.Bind(1, GL_READ_ONLY);
+  moveStepImg.Bind(1, GL_WRITE_ONLY);
+  effectImgs[prev].acc.Bind(2, GL_READ_ONLY);
 
   in.currIdTex.Bind(0);
-  in.currMotionTex.Bind(1);
+  in.currLocalPosTex.Bind(1);
   in.currFlowTex.Bind(2);
 
+  modelSSB.Upload(in.modelMats);
+  modelSSB.Bind(0);
+
   accGather.Use();
-  accGather.SetFloat("uScrollSpeed", scrollSpeed);
+  accGather.SetMat4v("uViewProj", 2, in.prevCurrViewProj);
+  accGather.SetInt("uCurrInd", in.currInd);
+  accGather.SetFloat("uScrollSpeed", scrollSpeed * !paused);
   accGather.SetFloat("uDt", dt);
   accGather.SetFloat("uDownscaleFactor", (float)downscaleFactor);
-  accGather.SetInt("uUseFlow", !paused);
   accGather.DispatchCompute(scaledWidth, scaledHeight, 16);
 }
 
 void Effect::NoiseScatter(const EffectInputData& in, float dt) {
   effectImgs[curr].noise.Bind(0, GL_WRITE_ONLY);
   effectImgs[prev].noise.Bind(1, GL_READ_ONLY);
+  claimImg.Bind(2, GL_READ_WRITE);
+  moveStepImg.Bind(3, GL_READ_ONLY);
 
   in.prevIdTex.Bind(0);
   in.currIdTex.Bind(1);
   in.prevMotionTex.Bind(2);
 
-  //modelSSB.Bind(0);
-
   noiseScatter.Use();
-  // noiseScatter.SetFloat("uScrollSpeed", scrollSpeed * dt / downscaleFactor * (int)!paused);
+  noiseScatter.SetUint("uFrameSalt", 0); // TODO: random
   noiseScatter.DispatchCompute(scaledWidth, scaledHeight, 16);
 }
 
 void Effect::NoiseFill(const EffectInputData& in) {
   effectImgs[curr].noise.Bind(0, GL_READ_WRITE);
-  effectImgs[prev].noise.Bind(1, GL_WRITE_ONLY);
 
   noiseFill.Use();
   noiseFill.SetUint("uSeed", util::RandomInt());
@@ -129,6 +137,7 @@ void Effect::OnResize(int width, int height) {
     img.acc.Resize(scaledWidth, scaledHeight);
   }
   moveStepImg.Resize(scaledWidth, scaledHeight);
+  claimImg.Resize(scaledWidth, scaledHeight);
 
   ClearBuffers();
 }

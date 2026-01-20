@@ -61,6 +61,7 @@ private:
   int curr = 0, prev = 1;
 
   Image moveStepImg;
+  Image claimImg;
 
   Shader accGather;
   Shader noiseScatter;

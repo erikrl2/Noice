@@ -188,16 +188,14 @@ void Image::Clear(const glm::vec4& color) const {
       || info.format == GL_RGBA_INTEGER;
 
   if (!isInteger) {
-    // Float oder normalized fixed-point: immer float clearen
     glm::vec4 v = color;
     glClearTexImage(tex.id, 0, info.format, GL_FLOAT, &v[0]);
   } else {
-    // Integer: signed vs unsigned
     switch (info.type) {
     case GL_UNSIGNED_BYTE:
     case GL_UNSIGNED_SHORT:
     case GL_UNSIGNED_INT: {
-      glm::uvec4 v = glm::uvec4(color); // Achtung: Cast-Regeln!
+      glm::uvec4 v = glm::ivec4(color);
       glClearTexImage(tex.id, 0, info.format, GL_UNSIGNED_INT, &v[0]);
       break;
     }

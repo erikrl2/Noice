@@ -2,7 +2,6 @@
 layout(local_size_x = 16, local_size_y = 16) in;
 
 layout(rg8, binding = 0) uniform image2D uCurrNoiseTex;
-layout(rg8, binding = 1) uniform writeonly image2D uPrevNoiseTex; // clear for next frame
 
 uniform uint uSeed;
 
@@ -23,7 +22,4 @@ void main() {
     float noiseVal = step(0.5, rng(uvec2(px)));
     imageStore(uCurrNoiseTex, px, vec4(noiseVal, 1, 0, 0));
   }
-
-  // clear prev noise for next frame (keep your existing ping-pong protocol)
-  imageStore(uPrevNoiseTex, px, vec4(0));
 }
