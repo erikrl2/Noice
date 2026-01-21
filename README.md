@@ -45,7 +45,7 @@ Uses Ninja build system by default.
 ```
 git clone https://github.com/erikrl2/Noice.git
 cd Noice
-cmake --preset release
-cmake --build build/release
-build/release/Noice
+cmake --preset ninja
+cmake --build build/ninja --config Release
+build/ninja/Release/Noice
 ```
