@@ -25,7 +25,6 @@ uniform int uCurrInd;
 uniform bool uFlow;
 uniform float uScrollSpeed;
 
-// TODO: quantisize to angles
 vec2 quantizePx(vec2 v, float q) {
   return round(v * q) / q;
 }
@@ -33,9 +32,7 @@ vec2 quantizePx(vec2 v, float q) {
 vec2 uvFromWorld(vec3 worldPos, int i) {
   vec4 clip = uProjMat[i] * uViewMat[i] * vec4(worldPos, 1);
   if (clip.w <= 0.0) return vec2(-1);
-
   vec3 ndc = clip.xyz / clip.w;
-
   return ndc.xy * 0.5 + 0.5;
 }
 
@@ -52,7 +49,7 @@ void main() {
   if (prevPx.x >= noiseRes.x || prevPx.y >= noiseRes.y) return;
 
   vec2 prevNoise = imageLoad(uPrevNoiseTex, prevPx).rg;
-  if (prevNoise.g < 0.1) return; // not yet initialized
+  if (prevNoise.g < 0.1) return; // first frame only
 
   vec2 prevUV = (vec2(prevPx) + 0.5) / vec2(noiseRes);
   ivec2 prevFullPx = ivec2(round(prevUV * vec2(fullRes) - 0.5));
@@ -97,6 +94,8 @@ void main() {
   vec2 intStep = trunc(totalMove);
   vec2 nextAcc = totalMove - intStep;
 
+  imageStore(uPrevAccTex, prevPx, vec4(nextAcc, 0, 0));
+
   ivec2 targetPx = prevPx + ivec2(intStep);
   vec2 targetUV = (vec2(targetPx) + 0.5) / vec2(noiseRes);
   ivec2 targetFullPx = ivec2(round(targetUV * vec2(fullRes) - 0.5));
@@ -109,12 +108,10 @@ void main() {
   //int asdf = texelFetch(uPrevIdTex, targetFullPx, 0).r;
   //if (asdf != prevId) {}
 
-  //uint myKey = hash(uvec2(prevPx));
   uint myKey = uint(prevPx.x) + (uint(prevPx.y) << 16);
   uint oldKey = imageAtomicMin(uClaimTex, targetPx, myKey);
   if (myKey <= oldKey) {
     imageStore(uCurrNoiseTex, targetPx, vec4(prevNoise.r, 1, 0, 0));
     imageStore(uCurrAccTex, targetPx, vec4(nextAcc, 0, 0));
-    imageStore(uPrevAccTex, prevPx, vec4(nextAcc, 0, 0));
   }
 }
