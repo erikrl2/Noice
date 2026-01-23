@@ -69,7 +69,8 @@ private:
 
   Camera camera;
   bool isOrtho = false;
-  glm::mat4 viewProj[2]{};
+  glm::mat4 projMat[2]{};
+  glm::mat4 viewMat[2]{};
   glm::mat4 modelMats[(int)Model::Count][2]{};
 
   std::thread meshLoaderThread;

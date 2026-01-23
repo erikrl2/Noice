@@ -46,7 +46,7 @@ void Framebuffer::CreateOrResize(int width, int height) {
   }
 
   if (attachDepth) {
-    AttachDepthTexture(depthFilter);
+    AttachDepthTexture(depthInternalFormat, depthFilter);
   }
 
   if (attachmentCount > 0 || attachDepth) {
@@ -82,13 +82,15 @@ void Framebuffer::AttachColorTexture(GLint internalFormat, GLint filter) {
   attachmentCount++;
 }
 
-void Framebuffer::AttachDepthTexture(GLint filter) {
+void Framebuffer::AttachDepthTexture(GLint internalFormat, GLint filter) {
   if (depthTex.id) {
     std::cerr << "Depth attachment already exists\n";
     return;
   }
   // glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-  depthTex.CreateOrResize(width, height, GL_DEPTH_COMPONENT24, filter);
+  depthTex.CreateOrResize(width, height, internalFormat, filter);
+
+  depthInternalFormat = internalFormat;
   depthFilter = filter;
 
   glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depthTex.id, 0);

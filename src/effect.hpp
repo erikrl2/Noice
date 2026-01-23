@@ -5,15 +5,18 @@
 #include <span>
 
 struct EffectInputData {
-  Texture currIdTex, prevIdTex;
-  Texture prevLocalPosTex;
-  Texture prevFlowTex;
-
-  glm::mat4* prevCurrViewProj;
-  std::span<glm::mat4[2]> modelMats;
+  Texture currIdTex;
 
   bool reproject = false;
+  Texture prevIdTex;
+  Texture prevDepthTex;
+  glm::mat4* prevCurrProj = nullptr;
+  glm::mat4* prevCurrView = nullptr;
+  std::span<glm::mat4[2]> modelMats;
   int currInd = 0;
+
+  bool flow = true;
+  Texture prevFlowTex;
 };
 
 class Effect {

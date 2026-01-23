@@ -28,7 +28,7 @@ public:
   void Destroy();
 
   void AttachColorTexture(GLint internalFormat, GLint filter);
-  void AttachDepthTexture(GLint filter = GL_NEAREST);
+  void AttachDepthTexture(GLint internalFormat, GLint filter);
   void Finalize();
 
   void SetClearColor(const glm::vec4& color, int attachment = -1);
@@ -65,6 +65,7 @@ private:
 
   Texture depthTex;
 
+  GLint depthInternalFormat = GL_DEPTH_COMPONENT24;
   GLint depthFilter = GL_NEAREST;
 };
 

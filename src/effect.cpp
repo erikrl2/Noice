@@ -88,26 +88,27 @@ void Effect::ScatterPass(const EffectInputData& in, float dt) {
   claimImg.Bind(4, GL_READ_WRITE);
 
   in.currIdTex.Bind(0);
-  in.prevFlowTex.Bind(3);
+
+  (in.reproject ? in.prevIdTex : in.currIdTex).Bind(1);
 
   if (in.reproject) {
-    in.prevIdTex.Bind(1);
-    in.prevLocalPosTex.Bind(2);
+    in.prevDepthTex.Bind(2);
 
     modelSSB.Upload(in.modelMats);
     modelSSB.Bind(0);
 
-    scrollShader.SetMat4v("uViewProj", 2, in.prevCurrViewProj);
-
+    scrollShader.SetMat4v("uViewMat", 2, in.prevCurrView);
+    scrollShader.SetMat4v("uProjMat", 2, in.prevCurrProj);
     scrollShader.SetInt("uCurrInd", in.currInd);
-    scrollShader.SetFloat("uScrollSpeed", speed);
-  } else {
-    in.currIdTex.Bind(1);
-
-    // speed adjustment: scrollspeed unit here is [pixels per second] and not [pixels per worldspace-unit per second]
-    scrollShader.SetFloat("uScrollSpeed", speed * 20.0f);
   }
+
+  if (in.flow) {
+    in.prevFlowTex.Bind(3);
+    scrollShader.SetFloat("uScrollSpeed", speed * (in.reproject ? 1 : 20));
+  }
+
   scrollShader.SetInt("uReproject", in.reproject);
+  scrollShader.SetInt("uFlow", in.flow);
 
   scrollShader.DispatchCompute(scaledWidth, scaledHeight, 16);
 }

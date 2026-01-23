@@ -33,11 +33,10 @@ void ObjectMode::Init(int width, int height) {
 
   for (auto& fb : objectFBs) {
     fb.CreateOrResize(width, height);
-    fb.AttachColorTexture(GL_RGB32F, GL_NEAREST); // 0: flow
-    fb.AttachColorTexture(GL_RGB32F, GL_NEAREST); // 1: localPos
-    fb.AttachColorTexture(GL_R8I, GL_NEAREST); // 2: id
-    fb.SetClearColor({-1, 0, 0, 0}, 2);
-    fb.AttachDepthTexture();
+    fb.AttachColorTexture(GL_RG32F, GL_NEAREST); // 0: flow
+    fb.AttachColorTexture(GL_R8I, GL_NEAREST); // 1: id
+    fb.SetClearColor({-1, 0, 0, 0}, 1);
+    fb.AttachDepthTexture(GL_DEPTH_COMPONENT32F, GL_NEAREST);
     fb.Finalize();
   }
 
@@ -113,9 +112,8 @@ void ObjectMode::Update(float dt) {
 
 void ObjectMode::UpdateViewProjMatrix() {
   float aspect = (height > 0) ? (float)width / (float)height : 1.0f;
-  glm::mat4 proj = camera.GetProjection(aspect, isOrtho);
-  glm::mat4 view = camera.GetView();
-  viewProj[curr] = proj * view;
+  projMat[curr] = camera.GetProjection(aspect, isOrtho);
+  viewMat[curr] = camera.GetView();
 }
 
 void ObjectMode::UpdateModelMatrices() {
@@ -137,10 +135,12 @@ void ObjectMode::RenderObjects() {
   objectFBs[curr].Clear();
 
   objectShader.Use();
+  objectShader.SetVec2("uViewportSize", {width, height});
+  objectShader.SetMat4("uViewProj", projMat[curr] * viewMat[curr]);
 
   for (int id = 0; id < (int)Model::Count; id++) {
     if (meshes[id]) {
-      objectShader.SetMat4("uMvp", viewProj[curr] * modelMats[id][curr]);
+      objectShader.SetMat4("uModel", modelMats[id][curr]);
       objectShader.SetInt("uObjectId", id);
 
       meshes[id].Draw(RenderFlag::DepthTest);
@@ -234,13 +234,15 @@ void ObjectMode::MeshLoaderThreadFunc(Queue<ModelLoadJob>& meshJobQueue, Queue<M
 EffectInputData ObjectMode::GetEffectInputData() {
   EffectInputData data;
   data.reproject = true;
+  data.flow = true;
 
   data.prevFlowTex = objectFBs[prev].GetColorTexture(0);
-  data.prevLocalPosTex = objectFBs[prev].GetColorTexture(1);
-  data.currIdTex = objectFBs[curr].GetColorTexture(2);
-  data.prevIdTex = objectFBs[prev].GetColorTexture(2);
+  data.currIdTex = objectFBs[curr].GetColorTexture(1);
+  data.prevIdTex = objectFBs[prev].GetColorTexture(1);
+  data.prevDepthTex = objectFBs[prev].GetDepthTexture();
 
-  data.prevCurrViewProj = viewProj;
+  data.prevCurrProj = projMat;
+  data.prevCurrView = viewMat;
   data.modelMats = std::span<glm::mat4[2]>(modelMats, (int)Model::Count);
   data.currInd = curr;
   return data;
