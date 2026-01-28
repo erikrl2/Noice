@@ -167,6 +167,6 @@ void Screenshot::SavePNG() {
   if (!ok) {
     std::cerr << "Screenshot: failed to write png: " << filename << "\n";
   } else {
-    std::cout << "Screenshot: saved " << filename << " (" << outImg.GetHeight() << "x" << outImg.GetHeight() << ")\n";
+    std::cout << "Screenshot: saved " << filename << " (" << outImg.GetWidth() << "x" << outImg.GetHeight() << ")\n";
   }
 }

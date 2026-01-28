@@ -39,7 +39,7 @@ private:
 
 class StorageBuffer {
 public:
-  void Create(GLsizeiptr sizeBytes, const void* initialData = nullptr, GLenum usage = GL_DYNAMIC_DRAW);
+  void Create(GLsizeiptr sizeBytes, const void* initialData, GLenum usage);
   void Destroy();
 
   void Bind(GLuint binding) const;
@@ -61,5 +61,5 @@ private:
 private:
   GLuint id = 0;
   GLsizeiptr sizeBytes = 0;
-  GLenum usage = GL_DYNAMIC_DRAW;
+  GLenum usage = GL_STREAM_DRAW;
 };

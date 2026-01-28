@@ -29,7 +29,7 @@ void App::Run() {
     }
     float dt = ImGui::GetIO().DeltaTime;
 
-    static float hz = glfwGetVideoMode(glfwGetPrimaryMonitor())->refreshRate;
+    static float hz = (float)glfwGetVideoMode(glfwGetPrimaryMonitor())->refreshRate;
     dt = std::min(dt, 1.0f / hz + 0.0005f);
 
     ImGui_ImplOpenGL3_NewFrame();

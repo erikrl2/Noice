@@ -132,7 +132,6 @@ void StorageBuffer::Destroy() {
 void StorageBuffer::Upload(GLsizeiptr newSizeBytes, const void* data) {
   if (!id) {
     Create(newSizeBytes, data, usage);
-    return;
   }
   if (newSizeBytes > sizeBytes) {
     GLsizeiptr newCapacity = sizeBytes > 0 ? sizeBytes : 256;

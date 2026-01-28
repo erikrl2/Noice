@@ -11,8 +11,6 @@ void Effect::Init(int width, int height) {
   scrollShader.CreateCompute("assets/shaders/effect/scroll_move.comp.glsl");
   fillShader.CreateCompute("assets/shaders/effect/scroll_fill.comp.glsl");
 
-  modelSSB.Create(sizeof(glm::mat4[2]) * 8, nullptr, GL_DYNAMIC_DRAW); // or GL_STREAM_DRAW ?
-
   scaledWidth = width / downscaleFactor;
   scaledHeight = height / downscaleFactor;
 
