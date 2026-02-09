@@ -154,6 +154,13 @@ void Framebuffer::Clear() const {
   }
 }
 
+void Framebuffer::ReadPixel(int attachment, int x, int y, void* outPixel) const {
+  glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
+  glReadBuffer(GL_COLOR_ATTACHMENT0 + attachment);
+  auto info = util::GetFormatInfo(colorInternalFormats[attachment]);
+  glReadPixels(x, y, 1, 1, info.format, info.type, outPixel);
+}
+
 void Framebuffer::BindDefault(int width, int height) {
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glViewport(0, 0, width, height);

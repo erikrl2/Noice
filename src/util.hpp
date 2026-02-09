@@ -15,13 +15,14 @@ struct FormatInfo {
 
 namespace util {
 
-  int RandomInt();
+  unsigned int RandomInt();
 
   bool ReadFileBytes(const char* path, std::vector<unsigned char>& out);
   std::string ReadFileString(const char* path);
 
   bool IsMouseButtonPressed(int button);
   bool IsKeyPressed(int key);
+  glm::vec2 GetMousePosition();
   void SetCursorDisabled(bool hide);
   glm::vec2 GetDpiScaleFactor();
 

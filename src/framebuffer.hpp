@@ -41,6 +41,8 @@ public:
   void Bind() const;
   void Clear() const;
 
+  void ReadPixel(int attachmentIndex, int x, int y, void* outPixel) const;
+
   static void BindDefault(int w, int h);
 
   operator bool() const { return fbo != 0; }

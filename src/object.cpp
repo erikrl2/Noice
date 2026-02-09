@@ -4,6 +4,7 @@
 #include "flowfield/flowfield.hpp"
 #include "mesh.hpp"
 
+#include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <imgui.h>
@@ -159,6 +160,24 @@ void ObjectMode::OnResize(int width, int height) {
 
 void ObjectMode::OnMouseClicked(int button, int action) {
   camera.OnMouseClicked(button, action);
+
+  if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
+    glm::vec2 pos = util::GetMousePosition();
+
+    glm::vec2 dpi = util::GetDpiScaleFactor();
+    int px = (int)(pos.x * dpi.x);
+    int py = height - 1 - (int)(pos.y * dpi.y);
+
+    if (px >= 0 && px < width && py >= 0 && py < height) {
+      GLbyte id = -1;
+      objectFBs[curr].ReadPixel(1, px, py, &id);
+
+      if (id >= 0 && id < (int)Model::Count) {
+        objectSelect = (Model)id;
+        meshChanged = true;
+      }
+    }
+  }
 }
 
 void ObjectMode::OnMouseMoved(double xpos, double ypos) {

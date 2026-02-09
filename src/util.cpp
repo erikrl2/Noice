@@ -12,9 +12,9 @@
 
 namespace util {
 
-  int RandomInt() {
+  unsigned int RandomInt() {
     static std::mt19937 engine{std::random_device{}()};
-    static std::uniform_int_distribution<int> dist;
+    static std::uniform_int_distribution<unsigned int> dist(0u, 0xFFFFFFFFu);
     return dist(engine);
   }
 
@@ -44,6 +44,12 @@ namespace util {
 
   bool IsKeyPressed(int key) {
     return glfwGetKey(glfwGetCurrentContext(), key) == GLFW_PRESS;
+  }
+
+  glm::vec2 GetMousePosition() {
+    double x, y;
+    glfwGetCursorPos(glfwGetCurrentContext(), &x, &y);
+    return glm::vec2(x, y);
   }
 
   void SetCursorDisabled(bool disable) {
