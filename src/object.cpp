@@ -12,12 +12,17 @@
 #include <thread>
 
 static std::string meshFilePaths[] = {
+#ifdef NDEBUG
     "assets/models/debug.obj",
     "assets/models/car.obj",
     "assets/models/interior.obj",
     "assets/models/dragon.obj",
     "assets/models/alien.obj",
     "assets/models/head.obj"
+#else
+    "assets/models/debug.obj",
+    "assets/models/debug.obj",
+#endif
 };
 
 void ObjectMode::Init(int width, int height) {
@@ -107,6 +112,8 @@ void ObjectMode::Update(float dt) {
 
   UpdateViewProjMatrix();
   UpdateModelMatrices();
+
+  // TODO: Call Effect::Get()->ClearAcc(); once mvp stopped changing
 
   RenderObjects();
 }
@@ -220,6 +227,9 @@ void ObjectMode::SetInitialObjectTransforms() {
   transforms[(int)Model::Head].scale = 1.82f;
 #else
   transforms[(int)Model::Custom].translation.z = -20.0f;
+  transforms[(int)Model::Custom].scale = 0.75f;
+  transforms[(int)Model::Quad].translation = {0.0f, 4.0f, -19.0f};
+  transforms[(int)Model::Quad].scale = 0.3f;
 #endif
 }
 
