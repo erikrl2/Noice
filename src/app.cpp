@@ -168,7 +168,7 @@ void App::Update(float dt) {
 
   Texture effectTex = effect.Apply(modePtr->GetEffectInputData(), dt);
 
-  if (screenshot.IsCapturing()) screenshot.Update(effect.GetWidth(), effect.GetHeight(), effectTex);
+  if (screenshot.IsCapturing()) screenshot.Update(width, height, effectTex);
 
   RenderToScreen(effectTex);
 }

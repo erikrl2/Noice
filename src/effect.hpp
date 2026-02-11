@@ -23,7 +23,6 @@ class Effect {
 public:
   float scrollSpeed = 3.0f;
   int accResetInterval = 0;
-  int downscaleFactor = 1; // TODO: Remove
   bool paused = false;
   bool disabled = false;
   bool showAcc = false;
@@ -46,9 +45,6 @@ public:
   void OnMouseScrolled(float offset);
   void OnKeyPressed(int key, int action);
 
-  int GetWidth() const { return scaledWidth; }
-  int GetHeight() const { return scaledHeight; }
-
   static Effect* Get() { return self; }
 
 private:
@@ -58,7 +54,7 @@ private:
   void BuildAccSeedMap(const EffectInputData& in);
 
 private:
-  int scaledWidth = 0, scaledHeight = 0;
+  int width = 0, height = 0;
 
   struct EffectImage {
     Image noise;

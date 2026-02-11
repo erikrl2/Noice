@@ -113,8 +113,6 @@ void ObjectMode::Update(float dt) {
   UpdateViewProjMatrix();
   UpdateModelMatrices();
 
-  // TODO: Call Effect::Get()->ClearAcc(); once mvp stopped changing
-
   RenderObjects();
 }
 

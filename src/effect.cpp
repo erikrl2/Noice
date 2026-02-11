@@ -14,17 +14,17 @@ void Effect::Init(int width, int height) {
   seedInitShader.CreateCompute("assets/shaders/effect/acc_seed_init.comp.glsl");
   jfaStepShader.CreateCompute("assets/shaders/effect/acc_seed_jfa_step.comp.glsl");
 
-  scaledWidth = width / downscaleFactor;
-  scaledHeight = height / downscaleFactor;
+  this->width = width;
+  this->height = height;
 
   for (auto& img : effectImgs) {
-    img.noise.Create(scaledWidth, scaledHeight, GL_RG8, GL_NEAREST);
-    img.acc.Create(scaledWidth, scaledHeight, GL_RG32F, GL_NEAREST);
+    img.noise.Create(width, height, GL_RG8, GL_NEAREST);
+    img.acc.Create(width, height, GL_RG32F, GL_NEAREST);
   }
 
-  claimImg.Create(scaledWidth, scaledHeight, GL_R32UI, GL_NEAREST);
+  claimImg.Create(width, height, GL_R32UI, GL_NEAREST);
 
-  for (auto& s : seed) s.Create(scaledWidth, scaledHeight, GL_RGBA16I, GL_NEAREST);
+  for (auto& s : seed) s.Create(width, height, GL_RGBA16I, GL_NEAREST);
 
   ClearBuffers();
 }
@@ -46,9 +46,6 @@ void Effect::Destroy() {
 }
 
 void Effect::UpdateImGui() {
-  int fullWidth = scaledWidth * downscaleFactor;
-  int fullHeight = scaledHeight * downscaleFactor;
-
   ImGui::Checkbox("Disable", &disabled);
   ImGui::SameLine();
   ImGui::Checkbox("Pause", &paused);
@@ -60,9 +57,6 @@ void Effect::UpdateImGui() {
   ImGui::DragFloat("Speed", &scrollSpeed, 0.1f, 0.0f, 0.0f, "%.1f", ImGuiSliderFlags_NoRoundToFormat);
   ImGui::DragInt("Acc Reset Rate", &accResetInterval, 0.1f, 0, 1000, "%d", ImGuiSliderFlags_ClampOnInput);
   if (ImGui::Button("Clear Acc")) ClearAcc();
-
-  // if (ImGui::SliderInt("Downscale", &downscaleFactor, 1, 8, "%d", ImGuiSliderFlags_NoInput))
-  // OnResize(fullWidth, fullHeight);
 }
 
 Texture Effect::Apply(const EffectInputData& in, float dt) {
@@ -82,7 +76,7 @@ void Effect::ScatterPass(const EffectInputData& in, float dt) {
   }
 
   // dt = 1.0f / 144.0f; // DEBUG
-  float speed = scrollSpeed * dt / downscaleFactor * (int)!paused;
+  float speed = scrollSpeed * dt * (int)!paused;
 
   claimImg.Clear({-1, 0, 0, 0});
 
@@ -117,7 +111,7 @@ void Effect::ScatterPass(const EffectInputData& in, float dt) {
   scrollShader.SetInt("uReproject", in.reproject);
   scrollShader.SetInt("uFlow", in.flow);
 
-  scrollShader.DispatchCompute(scaledWidth, scaledHeight, 16);
+  scrollShader.DispatchCompute(width, height, 16);
 }
 
 void Effect::FillPass(const EffectInputData& in) {
@@ -135,7 +129,7 @@ void Effect::FillPass(const EffectInputData& in) {
   in.prevIdTex.Bind(1);
 
   fillShader.SetUint("uSeed", util::RandomInt());
-  fillShader.DispatchCompute(scaledWidth, scaledHeight, 16);
+  fillShader.DispatchCompute(width, height, 16);
 }
 
 void Effect::BuildAccSeedMap(const EffectInputData& in) {
@@ -143,9 +137,9 @@ void Effect::BuildAccSeedMap(const EffectInputData& in) {
   seed[0].Bind(0, GL_WRITE_ONLY);
   effectImgs[curr].noise.Bind(1, GL_READ_ONLY);
   in.currIdTex.Bind(0);
-  seedInitShader.DispatchCompute(scaledWidth, scaledHeight, 16);
+  seedInitShader.DispatchCompute(width, height, 16);
 
-  int maxDim = std::max(scaledWidth, scaledHeight);
+  int maxDim = std::max(width, height);
   int step = 1;
   while (step < maxDim) step <<= 1;
 
@@ -156,7 +150,7 @@ void Effect::BuildAccSeedMap(const EffectInputData& in) {
     seed[src].Bind(0, GL_READ_ONLY);
     seed[1 - src].Bind(1, GL_WRITE_ONLY);
     in.currIdTex.Bind(0);
-    jfaStepShader.DispatchCompute(scaledWidth, scaledHeight, 16);
+    jfaStepShader.DispatchCompute(width, height, 16);
     src = 1 - src;
   }
 
@@ -175,15 +169,15 @@ void Effect::ClearAcc() {
 }
 
 void Effect::OnResize(int width, int height) {
-  scaledWidth = width / downscaleFactor;
-  scaledHeight = height / downscaleFactor;
+  this->width = width;
+  this->height = height;
 
   for (auto& img : effectImgs) {
-    img.noise.Resize(scaledWidth, scaledHeight);
-    img.acc.Resize(scaledWidth, scaledHeight);
+    img.noise.Resize(width, height);
+    img.acc.Resize(width, height);
   }
-  claimImg.Resize(scaledWidth, scaledHeight);
-  for (auto& s : seed) s.Resize(scaledWidth, scaledHeight);
+  claimImg.Resize(width, height);
+  for (auto& s : seed) s.Resize(width, height);
 
   ClearBuffers();
 }

@@ -65,9 +65,8 @@ void Camera::OnMouseMoved(double xpos, double ypos) {
   lastX = xpos;
   lastY = ypos;
 
-  float mouseSensitivity = 0.12f;
+  float mouseSensitivity = 0.08f;
 
-  // ProcessMouseDelta
   yaw += (float)dx * mouseSensitivity;
   pitch += (float)dy * mouseSensitivity;
   if (pitch > 89.0f) pitch = 89.0f;

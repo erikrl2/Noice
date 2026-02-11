@@ -42,21 +42,17 @@ vec2 uvFromLocal(vec3 localPos, int objID, int i) {
 }
 
 void main() {
-  ivec2 fullRes  = textureSize(uCurrIdTex, 0);
-  ivec2 noiseRes = imageSize(uPrevNoiseTex);
+  ivec2 res = imageSize(uPrevNoiseTex);
 
   ivec2 prevPx = ivec2(gl_GlobalInvocationID.xy);
-  if (prevPx.x >= noiseRes.x || prevPx.y >= noiseRes.y) return;
+  if (prevPx.x >= res.x || prevPx.y >= res.y) return;
 
   vec2 prevNoise = imageLoad(uPrevNoiseTex, prevPx).rg;
   if (prevNoise.g < 0.1) return; // first frame only
 
-  vec2 prevUV = (vec2(prevPx) + 0.5) / vec2(noiseRes);
-  ivec2 prevFullPx = ivec2(round(prevUV * vec2(fullRes) - 0.5));
-
-  int prevId = texelFetch(uPrevIdTex, prevFullPx, 0).r;
+  int prevId = texelFetch(uPrevIdTex, prevPx, 0).r;
   if (prevId < 0) {
-    if (texelFetch(uCurrIdTex, prevFullPx, 0).r < 0) {
+    if (texelFetch(uCurrIdTex, prevPx, 0).r < 0) {
       imageStore(uCurrNoiseTex, prevPx, vec4(prevNoise.r, 1, 0, 0));
     }
     return;
@@ -64,7 +60,8 @@ void main() {
 
   vec2 reprojDelta = vec2(0);
   if (uReproject) {
-    float prevDepth = texelFetch(uPrevDepthTex, prevFullPx, 0).x;
+    vec2 prevUV = (vec2(prevPx) + 0.5) / vec2(res);
+    float prevDepth = texelFetch(uPrevDepthTex, prevPx, 0).x;
     int prevInd = 1 - uCurrInd;
 
     vec4 prevClipPos = vec4(vec3(prevUV, prevDepth) * 2.0 - 1.0, 1);
@@ -75,7 +72,7 @@ void main() {
     vec2 currUV = uvFromLocal(localPos.xyz, prevId, uCurrInd);
     prevUV = uvFromLocal(localPos.xyz, prevId, prevInd);
 
-    reprojDelta = (currUV - prevUV) * vec2(noiseRes);
+    reprojDelta = (currUV - prevUV) * vec2(res);
     reprojDelta = quantizePx(reprojDelta, 128.0);
   }
 
@@ -83,7 +80,7 @@ void main() {
 
   vec2 flow = vec2(0);
   if (uFlow) {
-    vec2 flowDir = texelFetch(uPrevFlowTex, prevFullPx, 0).xy;
+    vec2 flowDir = texelFetch(uPrevFlowTex, prevPx, 0).xy;
 
     flow = flowDir * uScrollSpeed;
     flow = quantizePx(flow, 32.0);
@@ -97,12 +94,10 @@ void main() {
   imageStore(uPrevAccTex, prevPx, vec4(nextAcc, 0, 0));
 
   ivec2 targetPx = prevPx + ivec2(intStep);
-  vec2 targetUV = (vec2(targetPx) + 0.5) / vec2(noiseRes);
-  ivec2 targetFullPx = ivec2(round(targetUV * vec2(fullRes) - 0.5));
 
-  if (targetPx.x < 0 || targetPx.x >= noiseRes.x || targetPx.y < 0 || targetPx.y >= noiseRes.y) return;
+  if (targetPx.x < 0 || targetPx.x >= res.x || targetPx.y < 0 || targetPx.y >= res.y) return;
 
-  int targetId = texelFetch(uCurrIdTex, targetFullPx, 0).r;
+  int targetId = texelFetch(uCurrIdTex, targetPx, 0).r;
   if (targetId != prevId) return;
 
   uint myKey = uint(prevPx.x) + (uint(prevPx.y) << 16);
