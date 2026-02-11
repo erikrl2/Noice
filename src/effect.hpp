@@ -66,10 +66,14 @@ private:
 
   Image claimImg;
 
-  Shader scrollShader;
+  Shader scatterShader;
   Shader fillShader;
 
-  Shader seedInitShader;
+  Shader fillJfaShader;
+  Image needsJfaFlag;
+  Image needsJfaMask;
+
+  Shader jfaInitShader;
   Shader jfaStepShader;
   Image seed[2];
   int lastSeed = 0;

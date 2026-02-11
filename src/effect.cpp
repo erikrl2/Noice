@@ -8,11 +8,12 @@
 #include <imgui.h>
 
 void Effect::Init(int width, int height) {
-  scrollShader.CreateCompute("assets/shaders/effect/scroll_move.comp.glsl");
-  fillShader.CreateCompute("assets/shaders/effect/scroll_fill.comp.glsl");
+  scatterShader.CreateCompute("assets/shaders/effect/effect_scatter.comp.glsl");
+  fillShader.CreateCompute("assets/shaders/effect/effect_fill.comp.glsl");
+  fillJfaShader.CreateCompute("assets/shaders/effect/effect_fill_jfa.comp.glsl");
 
-  seedInitShader.CreateCompute("assets/shaders/effect/acc_seed_init.comp.glsl");
-  jfaStepShader.CreateCompute("assets/shaders/effect/acc_seed_jfa_step.comp.glsl");
+  jfaInitShader.CreateCompute("assets/shaders/effect/effect_jfa_init.comp.glsl");
+  jfaStepShader.CreateCompute("assets/shaders/effect/effect_jfa_step.comp.glsl");
 
   this->width = width;
   this->height = height;
@@ -26,13 +27,18 @@ void Effect::Init(int width, int height) {
 
   for (auto& s : seed) s.Create(width, height, GL_RGBA16I, GL_NEAREST);
 
+  needsJfaFlag.Create(1, 1, GL_R32UI, GL_NEAREST);
+  needsJfaMask.Create(width, height, GL_R8UI, GL_NEAREST);
+
   ClearBuffers();
 }
 
 void Effect::Destroy() {
   modelSSB.Destroy();
-  scrollShader.Destroy();
+
+  scatterShader.Destroy();
   fillShader.Destroy();
+  fillJfaShader.Destroy();
 
   for (auto& img : effectImgs) {
     img.noise.Destroy();
@@ -40,9 +46,12 @@ void Effect::Destroy() {
   }
   claimImg.Destroy();
 
-  seedInitShader.Destroy();
+  jfaInitShader.Destroy();
   jfaStepShader.Destroy();
   for (auto& s : seed) s.Destroy();
+
+  needsJfaFlag.Destroy();
+  needsJfaMask.Destroy();
 }
 
 void Effect::UpdateImGui() {
@@ -75,12 +84,11 @@ void Effect::ScatterPass(const EffectInputData& in, float dt) {
     if (++frameCount % accResetInterval == 0) effectImgs[prev].acc.Clear();
   }
 
-  // dt = 1.0f / 144.0f; // DEBUG
   float speed = scrollSpeed * dt * (int)!paused;
 
   claimImg.Clear({-1, 0, 0, 0});
 
-  scrollShader.Use();
+  scatterShader.Use();
 
   effectImgs[curr].noise.Bind(0, GL_WRITE_ONLY);
   effectImgs[prev].noise.Bind(1, GL_READ_ONLY);
@@ -89,7 +97,6 @@ void Effect::ScatterPass(const EffectInputData& in, float dt) {
   claimImg.Bind(4, GL_READ_WRITE);
 
   in.currIdTex.Bind(0);
-
   (in.reproject ? in.prevIdTex : in.currIdTex).Bind(1);
 
   if (in.reproject) {
@@ -98,24 +105,25 @@ void Effect::ScatterPass(const EffectInputData& in, float dt) {
     modelSSB.Upload(in.modelMats);
     modelSSB.Bind(0);
 
-    scrollShader.SetMat4v("uViewMat", 2, in.prevCurrView);
-    scrollShader.SetMat4v("uProjMat", 2, in.prevCurrProj);
-    scrollShader.SetInt("uCurrInd", in.currInd);
+    scatterShader.SetMat4v("uViewMat", 2, in.prevCurrView);
+    scatterShader.SetMat4v("uProjMat", 2, in.prevCurrProj);
+    scatterShader.SetInt("uCurrInd", in.currInd);
   }
 
   if (in.flow) {
     in.prevFlowTex.Bind(3);
-    scrollShader.SetFloat("uScrollSpeed", speed * (in.reproject ? 1 : 20));
+    scatterShader.SetFloat("uScrollSpeed", speed * (in.reproject ? 1 : 20));
   }
 
-  scrollShader.SetInt("uReproject", in.reproject);
-  scrollShader.SetInt("uFlow", in.flow);
+  scatterShader.SetInt("uReproject", in.reproject);
+  scatterShader.SetInt("uFlow", in.flow);
 
-  scrollShader.DispatchCompute(width, height, 16);
+  scatterShader.DispatchCompute(width, height, 16);
 }
 
 void Effect::FillPass(const EffectInputData& in) {
-  BuildAccSeedMap(in);
+  needsJfaFlag.Clear();
+  needsJfaMask.Clear();
 
   fillShader.Use();
 
@@ -123,21 +131,40 @@ void Effect::FillPass(const EffectInputData& in) {
   effectImgs[prev].noise.Bind(1, GL_WRITE_ONLY);
   effectImgs[curr].acc.Bind(2, GL_READ_WRITE);
   effectImgs[prev].acc.Bind(3, GL_READ_WRITE);
-  seed[lastSeed].Bind(4, GL_READ_ONLY);
+
+  needsJfaFlag.Bind(5, GL_READ_WRITE);
+  needsJfaMask.Bind(6, GL_WRITE_ONLY);
 
   in.currIdTex.Bind(0);
   in.prevIdTex.Bind(1);
 
   fillShader.SetUint("uSeed", util::RandomInt());
+
   fillShader.DispatchCompute(width, height, 16);
+
+  if (accResetInterval > 0) return;
+
+  BuildAccSeedMap(in);
+
+  fillJfaShader.Use();
+
+  effectImgs[curr].acc.Bind(2, GL_READ_WRITE);
+  seed[lastSeed].Bind(4, GL_READ_ONLY);
+  needsJfaFlag.Bind(5, GL_READ_ONLY);
+  needsJfaMask.Bind(6, GL_READ_ONLY);
+
+  in.currIdTex.Bind(0);
+
+  fillJfaShader.DispatchCompute(width, height, 16);
 }
 
 void Effect::BuildAccSeedMap(const EffectInputData& in) {
-  seedInitShader.Use();
+  jfaInitShader.Use();
   seed[0].Bind(0, GL_WRITE_ONLY);
   effectImgs[curr].noise.Bind(1, GL_READ_ONLY);
+  needsJfaFlag.Bind(5, GL_READ_ONLY);
   in.currIdTex.Bind(0);
-  seedInitShader.DispatchCompute(width, height, 16);
+  jfaInitShader.DispatchCompute(width, height, 16);
 
   int maxDim = std::max(width, height);
   int step = 1;
@@ -146,10 +173,11 @@ void Effect::BuildAccSeedMap(const EffectInputData& in) {
   int src = 0;
   for (step >>= 1; step >= 1; step >>= 1) {
     jfaStepShader.Use();
-    jfaStepShader.SetInt("uStep", step);
     seed[src].Bind(0, GL_READ_ONLY);
     seed[1 - src].Bind(1, GL_WRITE_ONLY);
+    needsJfaFlag.Bind(5, GL_READ_ONLY);
     in.currIdTex.Bind(0);
+    jfaStepShader.SetInt("uStep", step);
     jfaStepShader.DispatchCompute(width, height, 16);
     src = 1 - src;
   }
@@ -178,6 +206,8 @@ void Effect::OnResize(int width, int height) {
   }
   claimImg.Resize(width, height);
   for (auto& s : seed) s.Resize(width, height);
+
+  needsJfaMask.Resize(width, height);
 
   ClearBuffers();
 }

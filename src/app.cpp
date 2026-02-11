@@ -130,6 +130,14 @@ void App::UpdateImGui() {
   if (!showSettings) return;
   bool open = ImGui::Begin("Settings", &showSettings, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav);
   if (open) {
+#if 0
+    ImGui::Text("FPS: %.1f (%.2f ms)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate);
+    if (ImGui::Checkbox("VSync", &vsync)) {
+      glfwSwapInterval(vsync ? 1 : 0);
+    }
+    ImGui::Separator();
+#endif
+
     if (ImGui::CollapsingHeader("Effect", ImGuiTreeNodeFlags_DefaultOpen)) {
       ImGui::BeginDisabled(screenshot.IsCapturing());
       effect.UpdateImGui();

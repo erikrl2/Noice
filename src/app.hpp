@@ -44,6 +44,7 @@ private:
   int width = 1280;
   int height = 720;
   bool minimized = false;
+  bool vsync = true;
 
   Mesh quadMesh;
   Shader postShader;
