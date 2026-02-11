@@ -21,9 +21,9 @@ struct EffectInputData {
 
 class Effect {
 public:
-  float scrollSpeed = 7.0f;
+  float scrollSpeed = 3.0f;
   int accResetInterval = 0;
-  int downscaleFactor = 1;
+  int downscaleFactor = 1; // TODO: Remove
   bool paused = false;
   bool disabled = false;
   bool showAcc = false;
@@ -55,6 +55,8 @@ private:
   void ScatterPass(const EffectInputData& in, float dt);
   void FillPass(const EffectInputData& in);
 
+  void BuildAccSeedMap(const EffectInputData& in);
+
 private:
   int scaledWidth = 0, scaledHeight = 0;
 
@@ -70,6 +72,11 @@ private:
 
   Shader scrollShader;
   Shader fillShader;
+
+  Shader seedInitShader;
+  Shader jfaStepShader;
+  Image seed[2];
+  int lastSeed = 0;
 
   StorageBuffer modelSSB;
 

@@ -11,6 +11,9 @@ void Effect::Init(int width, int height) {
   scrollShader.CreateCompute("assets/shaders/effect/scroll_move.comp.glsl");
   fillShader.CreateCompute("assets/shaders/effect/scroll_fill.comp.glsl");
 
+  seedInitShader.CreateCompute("assets/shaders/effect/acc_seed_init.comp.glsl");
+  jfaStepShader.CreateCompute("assets/shaders/effect/acc_seed_jfa_step.comp.glsl");
+
   scaledWidth = width / downscaleFactor;
   scaledHeight = height / downscaleFactor;
 
@@ -20,6 +23,8 @@ void Effect::Init(int width, int height) {
   }
 
   claimImg.Create(scaledWidth, scaledHeight, GL_R32UI, GL_NEAREST);
+
+  for (auto& s : seed) s.Create(scaledWidth, scaledHeight, GL_RGBA16I, GL_NEAREST);
 
   ClearBuffers();
 }
@@ -34,6 +39,10 @@ void Effect::Destroy() {
     img.acc.Destroy();
   }
   claimImg.Destroy();
+
+  seedInitShader.Destroy();
+  jfaStepShader.Destroy();
+  for (auto& s : seed) s.Destroy();
 }
 
 void Effect::UpdateImGui() {
@@ -112,19 +121,46 @@ void Effect::ScatterPass(const EffectInputData& in, float dt) {
 }
 
 void Effect::FillPass(const EffectInputData& in) {
+  BuildAccSeedMap(in);
+
   fillShader.Use();
 
   effectImgs[curr].noise.Bind(0, GL_READ_WRITE);
   effectImgs[prev].noise.Bind(1, GL_WRITE_ONLY);
   effectImgs[curr].acc.Bind(2, GL_READ_WRITE);
   effectImgs[prev].acc.Bind(3, GL_READ_WRITE);
+  seed[lastSeed].Bind(4, GL_READ_ONLY);
 
   in.currIdTex.Bind(0);
   in.prevIdTex.Bind(1);
 
   fillShader.SetUint("uSeed", util::RandomInt());
-
   fillShader.DispatchCompute(scaledWidth, scaledHeight, 16);
+}
+
+void Effect::BuildAccSeedMap(const EffectInputData& in) {
+  seedInitShader.Use();
+  seed[0].Bind(0, GL_WRITE_ONLY);
+  effectImgs[curr].noise.Bind(1, GL_READ_ONLY);
+  in.currIdTex.Bind(0);
+  seedInitShader.DispatchCompute(scaledWidth, scaledHeight, 16);
+
+  int maxDim = std::max(scaledWidth, scaledHeight);
+  int step = 1;
+  while (step < maxDim) step <<= 1;
+
+  int src = 0;
+  for (step >>= 1; step >= 1; step >>= 1) {
+    jfaStepShader.Use();
+    jfaStepShader.SetInt("uStep", step);
+    seed[src].Bind(0, GL_READ_ONLY);
+    seed[1 - src].Bind(1, GL_WRITE_ONLY);
+    in.currIdTex.Bind(0);
+    jfaStepShader.DispatchCompute(scaledWidth, scaledHeight, 16);
+    src = 1 - src;
+  }
+
+  lastSeed = src;
 }
 
 void Effect::ClearBuffers() {
@@ -147,6 +183,7 @@ void Effect::OnResize(int width, int height) {
     img.acc.Resize(scaledWidth, scaledHeight);
   }
   claimImg.Resize(scaledWidth, scaledHeight);
+  for (auto& s : seed) s.Resize(scaledWidth, scaledHeight);
 
   ClearBuffers();
 }

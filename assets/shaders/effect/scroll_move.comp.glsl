@@ -105,9 +105,6 @@ void main() {
   int targetId = texelFetch(uCurrIdTex, targetFullPx, 0).r;
   if (targetId != prevId) return;
 
-  //int asdf = texelFetch(uPrevIdTex, targetFullPx, 0).r;
-  //if (asdf != prevId) {}
-
   uint myKey = uint(prevPx.x) + (uint(prevPx.y) << 16);
   uint oldKey = imageAtomicMin(uClaimTex, targetPx, myKey);
   if (myKey <= oldKey) {
