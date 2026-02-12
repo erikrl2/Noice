@@ -17,8 +17,8 @@ namespace util {
 
   unsigned int RandomInt();
 
-  bool ReadFileBytes(const char* path, std::vector<unsigned char>& out);
-  std::string ReadFileString(const char* path);
+  bool ReadFileBytes(const std::string& path, std::vector<unsigned char>& out);
+  std::string ReadFileString(const std::string& path);
 
   bool IsMouseButtonPressed(int button);
   bool IsKeyPressed(int key);

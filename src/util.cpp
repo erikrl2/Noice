@@ -18,7 +18,7 @@ namespace util {
     return dist(engine);
   }
 
-  bool ReadFileBytes(const char* path, std::vector<unsigned char>& out) {
+  bool ReadFileBytes(const std::string& path, std::vector<unsigned char>& out) {
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     if (!file) return false;
 
@@ -31,7 +31,7 @@ namespace util {
     return file.good();
   }
 
-  std::string ReadFileString(const char* path) {
+  std::string ReadFileString(const std::string& path) {
     std::ifstream f(path);
     std::stringstream ss;
     ss << f.rdbuf();

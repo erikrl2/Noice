@@ -4,14 +4,11 @@ layout(local_size_x = 16, local_size_y = 16) in;
 
 layout(rg32f, binding = 2) uniform image2D uCurrAccTex;
 layout(rgba16i, binding = 4) uniform readonly iimage2D uSeedMap;
-layout(r32ui, binding = 5) uniform readonly uimage2D uNeedsJfaFlag;
 layout(r8ui, binding = 6) uniform readonly uimage2D uNeedsJfaMask;
 
 layout(binding = 0) uniform isampler2D uCurrIdTex;
 
 void main() {
-  if (imageLoad(uNeedsJfaFlag, ivec2(0, 0)).r == 0u) return;
-
   ivec2 px = ivec2(gl_GlobalInvocationID.xy);
   ivec2 size = imageSize(uCurrAccTex);
   if (px.x >= size.x || px.y >= size.y) return;

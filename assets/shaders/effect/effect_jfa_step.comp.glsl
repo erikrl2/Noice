@@ -4,15 +4,12 @@ layout(local_size_x = 16, local_size_y = 16) in;
 
 layout(rgba16i, binding = 0) uniform readonly  iimage2D uSeedIn;
 layout(rgba16i, binding = 1) uniform writeonly iimage2D uSeedOut;
-layout(r32ui, binding = 5) uniform readonly uimage2D uNeedsJfaFlag;
 
 layout(binding = 0) uniform isampler2D uCurrIdTex;
 
 uniform int uStep;
 
 void main() {
-  if (imageLoad(uNeedsJfaFlag, ivec2(0, 0)).r == 0u) return;
-
   ivec2 px = ivec2(gl_GlobalInvocationID.xy);
   ivec2 size = imageSize(uSeedIn);
   if (px.x >= size.x || px.y >= size.y) return;

@@ -8,12 +8,15 @@
 #include <imgui.h>
 
 void Effect::Init(int width, int height) {
-  scatterShader.CreateCompute("assets/shaders/effect/effect_scatter.comp.glsl");
-  fillShader.CreateCompute("assets/shaders/effect/effect_fill.comp.glsl");
-  fillJfaShader.CreateCompute("assets/shaders/effect/effect_fill_jfa.comp.glsl");
+  const std::string resourceDir = "assets/shaders/effect/";
 
-  jfaInitShader.CreateCompute("assets/shaders/effect/effect_jfa_init.comp.glsl");
-  jfaStepShader.CreateCompute("assets/shaders/effect/effect_jfa_step.comp.glsl");
+  scatterShader.CreateCompute(resourceDir + "effect_scatter.comp.glsl");
+  fillShader.CreateCompute(resourceDir + "effect_fill.comp.glsl");
+  fillJfaShader.CreateCompute(resourceDir + "effect_fill_jfa.comp.glsl");
+
+  jfaInitShader.CreateCompute(resourceDir + "effect_jfa_init.comp.glsl");
+  jfaStepShader.CreateCompute(resourceDir + "effect_jfa_step.comp.glsl");
+  jfaIndirectArgsShader.CreateCompute(resourceDir + "effect_jfa_indirect_args.comp.glsl");
 
   this->width = width;
   this->height = height;
@@ -24,11 +27,15 @@ void Effect::Init(int width, int height) {
   }
 
   claimImg.Create(width, height, GL_R32UI, GL_NEAREST);
-
   for (auto& s : seed) s.Create(width, height, GL_RGBA16I, GL_NEAREST);
 
   needsJfaFlag.Create(1, 1, GL_R32UI, GL_NEAREST);
   needsJfaMask.Create(width, height, GL_R8UI, GL_NEAREST);
+
+  struct Args {
+    unsigned gx, gy, gz;
+  } initArgs{0, 0, 0};
+  jfaIndirectArgsSSB.Create(sizeof(Args), &initArgs, GL_DYNAMIC_DRAW);
 
   ClearBuffers();
 }
@@ -52,6 +59,9 @@ void Effect::Destroy() {
 
   needsJfaFlag.Destroy();
   needsJfaMask.Destroy();
+
+  jfaIndirectArgsShader.Destroy();
+  jfaIndirectArgsSSB.Destroy();
 }
 
 void Effect::UpdateImGui() {
@@ -69,6 +79,8 @@ void Effect::UpdateImGui() {
 }
 
 Texture Effect::Apply(const EffectInputData& in, float dt) {
+  if (disabled && !showAcc) return in.prevFlowTex;
+
   std::swap(curr, prev);
 
   ScatterPass(in, dt);
@@ -119,6 +131,7 @@ void Effect::ScatterPass(const EffectInputData& in, float dt) {
   scatterShader.SetInt("uFlow", in.flow);
 
   scatterShader.DispatchCompute(width, height, 16);
+  scatterShader.SetMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 }
 
 void Effect::FillPass(const EffectInputData& in) {
@@ -139,10 +152,23 @@ void Effect::FillPass(const EffectInputData& in) {
   in.prevIdTex.Bind(1);
 
   fillShader.SetUint("uSeed", util::RandomInt());
-
   fillShader.DispatchCompute(width, height, 16);
+  fillShader.SetMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 
   if (accResetInterval > 0) return;
+
+  // ---
+  // Use Jump Flooding to fill large disocclusion holes in acc if needed.
+  // Only really useful for 2D scenes that require precise/consistent acc values.
+  // To avoid generating unnessary jfa seed maps, dispatch group sizes are conditionally set to zero if not needed.
+
+  jfaIndirectArgsShader.Use();
+  needsJfaFlag.Bind(5, GL_READ_ONLY);
+  jfaIndirectArgsSSB.Bind(1);
+  jfaIndirectArgsShader.SetUint("uGroupsX", (width + 16 - 1) / 16);
+  jfaIndirectArgsShader.SetUint("uGroupsY", (height + 16 - 1) / 16);
+  jfaIndirectArgsShader.DispatchCompute(1, 1, 1);
+  jfaIndirectArgsShader.SetMemoryBarrier(GL_COMMAND_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
 
   BuildAccSeedMap(in);
 
@@ -150,21 +176,21 @@ void Effect::FillPass(const EffectInputData& in) {
 
   effectImgs[curr].acc.Bind(2, GL_READ_WRITE);
   seed[lastSeed].Bind(4, GL_READ_ONLY);
-  needsJfaFlag.Bind(5, GL_READ_ONLY);
   needsJfaMask.Bind(6, GL_READ_ONLY);
 
   in.currIdTex.Bind(0);
 
-  fillJfaShader.DispatchCompute(width, height, 16);
+  fillJfaShader.DispatchComputeIndirect(jfaIndirectArgsSSB);
+  fillJfaShader.SetMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 }
 
 void Effect::BuildAccSeedMap(const EffectInputData& in) {
   jfaInitShader.Use();
   seed[0].Bind(0, GL_WRITE_ONLY);
   effectImgs[curr].noise.Bind(1, GL_READ_ONLY);
-  needsJfaFlag.Bind(5, GL_READ_ONLY);
   in.currIdTex.Bind(0);
-  jfaInitShader.DispatchCompute(width, height, 16);
+  jfaInitShader.DispatchComputeIndirect(jfaIndirectArgsSSB);
+  jfaInitShader.SetMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
 
   int maxDim = std::max(width, height);
   int step = 1;
@@ -175,10 +201,11 @@ void Effect::BuildAccSeedMap(const EffectInputData& in) {
     jfaStepShader.Use();
     seed[src].Bind(0, GL_READ_ONLY);
     seed[1 - src].Bind(1, GL_WRITE_ONLY);
-    needsJfaFlag.Bind(5, GL_READ_ONLY);
     in.currIdTex.Bind(0);
     jfaStepShader.SetInt("uStep", step);
-    jfaStepShader.DispatchCompute(width, height, 16);
+
+    jfaStepShader.DispatchComputeIndirect(jfaIndirectArgsSSB);
+    jfaStepShader.SetMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
     src = 1 - src;
   }
 

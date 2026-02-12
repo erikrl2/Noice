@@ -66,19 +66,21 @@ private:
 
   Image claimImg;
 
+  StorageBuffer modelSSB;
   Shader scatterShader;
   Shader fillShader;
 
-  Shader fillJfaShader;
   Image needsJfaFlag;
   Image needsJfaMask;
 
+  StorageBuffer jfaIndirectArgsSSB;
+  Shader jfaIndirectArgsShader;
   Shader jfaInitShader;
   Shader jfaStepShader;
   Image seed[2];
   int lastSeed = 0;
 
-  StorageBuffer modelSSB;
+  Shader fillJfaShader;
 
 private:
   inline static Effect* self = nullptr;

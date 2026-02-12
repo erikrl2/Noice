@@ -6,10 +6,12 @@
 #include <string>
 #include <unordered_map>
 
+class StorageBuffer;
+
 class Shader {
 public:
-  void CreateVertFrag(const char* vertFilepath, const char* FragFilepath);
-  void CreateCompute(const char* compFilepath);
+  void CreateVertFrag(const std::string& vertFilepath, const std::string& fragFilepath);
+  void CreateCompute(const std::string& compFilepath);
   void Destroy();
 
   void Use() const;
@@ -22,7 +24,9 @@ public:
   void SetMat4(const std::string& name, const glm::mat4& m) const;
   void SetMat4v(const std::string& name, GLsizei count, const glm::mat4* m) const;
 
-  void DispatchCompute(int width, int height, int groupSize, bool barrier = true) const;
+  void DispatchCompute(int width, int height, int groupSize) const;
+  void DispatchComputeIndirect(const StorageBuffer& indirectArgs) const;
+  void SetMemoryBarrier(GLbitfield barriers) const;
 
   operator bool() const { return program != 0; }
 
@@ -43,6 +47,7 @@ public:
   void Destroy();
 
   void Bind(GLuint binding) const;
+  void BindAsDispatchIndirect() const;
 
   template<typename T>
   void Upload(std::span<T> data) {

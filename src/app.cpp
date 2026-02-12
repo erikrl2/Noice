@@ -130,7 +130,7 @@ void App::UpdateImGui() {
   if (!showSettings) return;
   bool open = ImGui::Begin("Settings", &showSettings, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav);
   if (open) {
-#if 0
+#if 1
     ImGui::Text("FPS: %.1f (%.2f ms)", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate);
     if (ImGui::Checkbox("VSync", &vsync)) {
       glfwSwapInterval(vsync ? 1 : 0);

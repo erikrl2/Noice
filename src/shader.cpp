@@ -7,7 +7,7 @@
 static void printShaderLog(GLuint shader, const char* name);
 static void printProgramLog(GLuint prog, const char* name);
 
-void Shader::CreateVertFrag(const char* vertFilepath, const char* fragFilepath) {
+void Shader::CreateVertFrag(const std::string& vertFilepath, const std::string& fragFilepath) {
   Destroy();
 
   std::string vs = util::ReadFileString(vertFilepath);
@@ -18,12 +18,12 @@ void Shader::CreateVertFrag(const char* vertFilepath, const char* fragFilepath) 
   unsigned int vert = glCreateShader(GL_VERTEX_SHADER);
   glShaderSource(vert, 1, &vc, nullptr);
   glCompileShader(vert);
-  printShaderLog(vert, vertFilepath);
+  printShaderLog(vert, vertFilepath.c_str());
 
   unsigned int frag = glCreateShader(GL_FRAGMENT_SHADER);
   glShaderSource(frag, 1, &fc, nullptr);
   glCompileShader(frag);
-  printShaderLog(frag, fragFilepath);
+  printShaderLog(frag, fragFilepath.c_str());
 
   program = glCreateProgram();
   glAttachShader(program, vert);
@@ -35,7 +35,7 @@ void Shader::CreateVertFrag(const char* vertFilepath, const char* fragFilepath) 
   glDeleteShader(frag);
 }
 
-void Shader::CreateCompute(const char* compFilepath) {
+void Shader::CreateCompute(const std::string& compFilepath) {
   Destroy();
 
   std::string cs = util::ReadFileString(compFilepath);
@@ -44,12 +44,12 @@ void Shader::CreateCompute(const char* compFilepath) {
   unsigned int comp = glCreateShader(GL_COMPUTE_SHADER);
   glShaderSource(comp, 1, &cc, nullptr);
   glCompileShader(comp);
-  printShaderLog(comp, compFilepath);
+  printShaderLog(comp, compFilepath.c_str());
 
   program = glCreateProgram();
   glAttachShader(program, comp);
   glLinkProgram(program);
-  printProgramLog(program, compFilepath);
+  printProgramLog(program, compFilepath.c_str());
 
   glDeleteShader(comp);
 }
@@ -101,11 +101,20 @@ void Shader::SetMat4v(const std::string& name, GLsizei count, const glm::mat4* m
   glUniformMatrix4fv(GetUniformLocation(name), count, GL_FALSE, &m[0][0][0]);
 }
 
-void Shader::DispatchCompute(int width, int height, int groupSize, bool barrier) const {
+void Shader::DispatchCompute(int width, int height, int groupSize) const {
   int numGroupsX = (width + groupSize - 1) / groupSize;
   int numGroupsY = (height + groupSize - 1) / groupSize;
   glDispatchCompute(numGroupsX, numGroupsY, 1);
-  if (barrier) glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+}
+
+void Shader::DispatchComputeIndirect(const StorageBuffer& indirectArgs) const {
+  indirectArgs.BindAsDispatchIndirect();
+  glDispatchComputeIndirect(0);
+  glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, 0);
+}
+
+void Shader::SetMemoryBarrier(GLbitfield barriers) const {
+  glMemoryBarrier(barriers);
 }
 
 // ---
@@ -145,6 +154,10 @@ void StorageBuffer::Upload(GLsizeiptr newSizeBytes, const void* data) {
 
 void StorageBuffer::Bind(GLuint binding) const {
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, id);
+}
+
+void StorageBuffer::BindAsDispatchIndirect() const {
+  glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, id);
 }
 
 // ---
