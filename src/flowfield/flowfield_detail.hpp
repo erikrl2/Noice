@@ -6,6 +6,7 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <tiny_obj_loader.h>
+#include <stl_reader.h>
 
 #include <unordered_map>
 #include <unordered_set>
@@ -81,6 +82,9 @@ namespace flowfield::detail {
   };
 
   bool loadObjAsPolys(const std::string& objPath, ObjPolys& out);
+  bool loadStlAsPolys(const std::string& stlPath, ObjPolys& out, double weldEps = 1e-6);
+
+  bool ensureMeshHasUvs(ObjPolys& ioMesh);
 
   int getVT(const tinyobj::index_t& idx, int nVT_in);
 

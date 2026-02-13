@@ -12,9 +12,9 @@
 class ObjectMode: public Mode {
 public:
 #ifdef NDEBUG
-  enum class Model { Custom, Car, Interior, Dragon, Alien, Head, Count };
+  enum class Model { M0, M1, M2, M3, M4, M5, Count };
 #else
-  enum class Model { Custom, Quad, Count };
+  enum class Model { M0, M1, Count };
 #endif
 
   struct Transform {
@@ -56,7 +56,7 @@ private:
   int width = 0, height = 0;
   int curr = 0, prev = 1;
 
-  Model objectSelect = Model::Custom;
+  Model objectSelect = Model::M0;
 
   Transform transforms[(int)Model::Count];
   FlowfieldSettings flowSettings[(int)Model::Count];

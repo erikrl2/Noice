@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <queue>
 
 namespace flowfield::detail {
@@ -80,8 +81,8 @@ namespace flowfield::detail {
     out.nV_in = (int)(out.attrib.vertices.size() / 3);
     out.nVT_in = (int)(out.attrib.texcoords.size() / 2);
 
-    if (out.nV_in <= 0 || out.nVT_in <= 0) {
-      std::cerr << "OBJ must have positions and texcoords\n";
+    if (out.nV_in <= 0) {
+      std::cerr << "OBJ must have positions\n";
       return false;
     }
 

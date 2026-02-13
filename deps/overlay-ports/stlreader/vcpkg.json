@@ -1,0 +1,7 @@
+{
+  "name": "stlreader",
+  "version-string": "1.0",
+  "description": "A header-only STL reader library with CMake interface library support.",
+  "homepage": "https://github.com/sreiter/stl_reader",
+  "license": "BSD-2-Clause"
+}

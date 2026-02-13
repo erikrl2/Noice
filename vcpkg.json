@@ -16,6 +16,7 @@
     "glm",
     "libigl",
     "stb",
+    "stlreader",
     "tinyobjloader",
     "xatlas"
   ],

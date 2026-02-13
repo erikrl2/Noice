@@ -11,6 +11,15 @@
 
 #include <thread>
 
+static std::string meshNames[] = {
+#ifdef NDEBUG
+    "Quad", "Car", "Interior", "Dragon", "Alien", "Head"
+#else
+    "Quad",
+    "Quad",
+#endif
+};
+
 static std::string meshFilePaths[] = {
 #ifdef NDEBUG
     "assets/models/debug.obj",
@@ -64,10 +73,11 @@ void ObjectMode::Destroy() {
 static bool meshChanged = false;
 
 void ObjectMode::UpdateImGui() {
-  static const char* objects[] = {"Custom", "Car", "Interior", "Dragon", "Alien", "Head"};
   int o = (int)objectSelect;
 
-  if (ImGui::Combo("Object", &o, objects, (int)Model::Count)) {
+  if (ImGui::Combo(
+          "Object", &o, [](void* d, int i) { return ((std::string*)d)[i].c_str(); }, meshNames, (int)Model::Count
+      )) {
     objectSelect = (Model)o;
     meshChanged = true;
   }
@@ -192,53 +202,53 @@ void ObjectMode::OnMouseMoved(double xpos, double ypos) {
 void ObjectMode::OnKeyPressed(int key, int action) {}
 
 void ObjectMode::OnFileDrop(const std::string& path) {
-  if (path.size() > 4 && path.substr(path.size() - 4) == ".obj") {
-    if (objectSelect != Model::Custom) {
-      objectSelect = Model::Custom;
-      meshChanged = true;
-    }
-    meshFilePaths[(int)Model::Custom] = path;
-    LoadMeshAsync(Model::Custom);
+  if (path.size() <= 4) return;
+  std::string ext = path.substr(path.size() - 4);
+  if (ext == ".obj" || ext == ".stl") {
+    meshFilePaths[(int)objectSelect] = path;
+    meshNames[(int)objectSelect] = "Custom " + std::to_string((int)objectSelect);
+    transforms[(int)objectSelect].scale = 1.0f;
+    LoadMeshAsync(objectSelect);
   }
 }
 
 void ObjectMode::SetInitialObjectTransforms() {
 #ifdef NDEBUG
-  transforms[(int)Model::Custom].translation.x = -80.0f;
-  transforms[(int)Model::Custom].rotation.y = 90.0f;
-  transforms[(int)Model::Custom].scale = 0.5f;
-  transforms[(int)Model::Car].translation = {-11.3f, 0.0f, -35.9f};
-  transforms[(int)Model::Car].rotation.y = 27.5f;
-  transforms[(int)Model::Car].scale = 7.92f;
-  transforms[(int)Model::Interior].translation = {-30.6f, 5.4f, -8.5f};
-  transforms[(int)Model::Interior].rotation.y = 0.0f;
-  transforms[(int)Model::Interior].scale = 4.46f;
-  transforms[(int)Model::Dragon].translation = {1.9f, 0.2f, 43.2f};
-  transforms[(int)Model::Dragon].rotation.y = -195.0f;
-  transforms[(int)Model::Dragon].scale = 0.62f;
-  transforms[(int)Model::Alien].translation = {23.1f, 0.0f, -26.6f};
-  transforms[(int)Model::Alien].rotation.y = -85.5f;
-  transforms[(int)Model::Alien].scale = 1.0f;
-  transforms[(int)Model::Head].translation = {45.8f, -5.0f, 9.8f};
-  transforms[(int)Model::Head].rotation.x = -90.0f;
-  transforms[(int)Model::Head].rotation.y = 111.5f;
-  transforms[(int)Model::Head].scale = 1.82f;
+  transforms[(int)Model::M0].translation.x = -80.0f;
+  transforms[(int)Model::M0].rotation.y = 90.0f;
+  transforms[(int)Model::M0].scale = 0.5f;
+  transforms[(int)Model::M1].translation = {-11.3f, 0.0f, -35.9f};
+  transforms[(int)Model::M1].rotation.y = 27.5f;
+  transforms[(int)Model::M1].scale = 7.92f;
+  transforms[(int)Model::M2].translation = {-30.6f, 5.4f, -8.5f};
+  transforms[(int)Model::M2].rotation.y = 0.0f;
+  transforms[(int)Model::M2].scale = 4.46f;
+  transforms[(int)Model::M3].translation = {1.9f, 0.2f, 43.2f};
+  transforms[(int)Model::M3].rotation.y = -195.0f;
+  transforms[(int)Model::M3].scale = 0.62f;
+  transforms[(int)Model::M4].translation = {23.1f, 0.0f, -26.6f};
+  transforms[(int)Model::M4].rotation.y = -85.5f;
+  transforms[(int)Model::M4].scale = 1.0f;
+  transforms[(int)Model::M5].translation = {45.8f, -5.0f, 9.8f};
+  transforms[(int)Model::M5].rotation.x = -90.0f;
+  transforms[(int)Model::M5].rotation.y = 111.5f;
+  transforms[(int)Model::M5].scale = 1.82f;
 #else
-  transforms[(int)Model::Custom].translation.z = -20.0f;
-  transforms[(int)Model::Custom].scale = 0.75f;
-  transforms[(int)Model::Quad].translation = {0.0f, 4.0f, -19.0f};
-  transforms[(int)Model::Quad].scale = 0.3f;
+  transforms[(int)Model::M0].translation.z = -20.0f;
+  transforms[(int)Model::M0].scale = 0.75f;
+  transforms[(int)Model::M1].translation = {0.0f, 4.0f, -19.0f};
+  transforms[(int)Model::M1].scale = 0.3f;
 #endif
 }
 
 void ObjectMode::SetInitialFlowfieldSettings() {
-  flowSettings[(int)Model::Custom] = {'U', 0};
+  flowSettings[(int)Model::M0] = {'U', 0};
 #ifdef NDEBUG
-  flowSettings[(int)Model::Car] = {'A', 12};
-  flowSettings[(int)Model::Interior] = {'A', 80};
-  flowSettings[(int)Model::Dragon] = {'A', 15};
-  flowSettings[(int)Model::Alien] = {'A', 45};
-  flowSettings[(int)Model::Head] = {'A', 0};
+  flowSettings[(int)Model::M1] = {'A', 12};
+  flowSettings[(int)Model::M2] = {'A', 80};
+  flowSettings[(int)Model::M3] = {'A', 15};
+  flowSettings[(int)Model::M4] = {'A', 45};
+  flowSettings[(int)Model::M5] = {'A', 0};
 #endif
 }
 

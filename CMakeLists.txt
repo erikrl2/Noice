@@ -15,7 +15,6 @@ find_package(glad CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
-find_package(Stb REQUIRED)
 
 find_package(Eigen3 CONFIG REQUIRED)
 find_package(libigl CONFIG REQUIRED)
@@ -34,7 +33,6 @@ target_sources(Shaders INTERFACE ${SHADER_FILES})
 
 add_executable(Noice ${NOICE_SOURCES})
 target_link_libraries(Noice PRIVATE glfw glad::glad imgui::imgui glm::glm flowfield Shaders)
-target_include_directories(Noice PRIVATE ${Stb_INCLUDE_DIR})
 
 # Utility targets
 file(GLOB_RECURSE ASSETS CONFIGURE_DEPENDS "assets/*")

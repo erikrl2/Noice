@@ -1,6 +1,3 @@
-# xatlas overlay port for vcpkg (manifest mode)
-# Builds only the library (source/xatlas/xatlas.cpp) rather than the premake solution.
-
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO jpcy/xatlas
@@ -98,9 +95,6 @@ vcpkg_cmake_configure(
 
 vcpkg_cmake_install()
 
-# Fix up the installed CMake config files to vcpkg layout conventions.
 vcpkg_cmake_config_fixup(CONFIG_PATH lib/cmake/xatlas)
-
-# If natvis got installed into share/xatlas, that's fine; nothing to fix up.
 
 vcpkg_install_copyright(FILE_LIST "${SOURCE_PATH}/LICENSE")
