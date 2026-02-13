@@ -1,0 +1,27 @@
+{
+  "builtin-baseline": "544a4c5c297e60e4ac4a5a1810df66748d908869",
+
+  "dependencies": [
+    {
+      "name": "glad",
+      "features": [ "gl-api-44" ]
+    },
+    {
+      "name": "imgui",
+      "features": [ "glfw-binding", "opengl3-binding" ]
+    },
+
+    "eigen3",
+    "glfw3",
+    "glm",
+    "libigl",
+    "stb",
+    "tinyobjloader",
+    "xatlas"
+  ],
+
+  "configuration": {
+    "overlay-ports": [ "deps/overlay-ports" ],
+    "overlay-triplets": [ "deps/overlay-triplets" ]
+  }
+}

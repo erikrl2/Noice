@@ -11,38 +11,30 @@ set(CMAKE_CXX_STANDARD 20)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-add_subdirectory(external/glfw)
-add_subdirectory(external/glad)
-add_subdirectory(external/imgui)
-add_subdirectory(external/glm)
-add_subdirectory(external/stb)
+find_package(glad CONFIG REQUIRED)
+find_package(glfw3 CONFIG REQUIRED)
+find_package(glm CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
+find_package(Stb REQUIRED)
 
-add_subdirectory(external/eigen)
-add_subdirectory(external/libigl)
-add_subdirectory(external/tinyobjloader)
+find_package(Eigen3 CONFIG REQUIRED)
+find_package(libigl CONFIG REQUIRED)
+find_package(tinyobjloader CONFIG REQUIRED)
+find_package(xatlas CONFIG REQUIRED)
 
-add_library(compile_options INTERFACE)
-target_compile_options(compile_options INTERFACE
-  $<$<AND:$<CONFIG:Release>,$<CXX_COMPILER_ID:GNU>>:-march=native>
-  $<$<AND:$<CONFIG:Release>,$<CXX_COMPILER_ID:GNU>>:-mtune=native>
-  $<$<AND:$<CONFIG:Release>,$<CXX_COMPILER_ID:MSVC>>:/arch:AVX2>
-)
-
-file(GLOB CMAKE_FILES "external/*/CMakeLists.txt")
 file(GLOB NOICE_SOURCES "src/*.cpp" "src/*.hpp")
 file(GLOB_RECURSE SHADER_FILES "assets/shaders/*.glsl")
 file(GLOB FLOWFIELD_SOURCES "src/flowfield/*.cpp" "src/flowfield/*.hpp")
 
 add_library(flowfield STATIC ${FLOWFIELD_SOURCES})
-target_link_libraries(flowfield PRIVATE igl::core Eigen3::Eigen tinyobjloader compile_options)
+target_link_libraries(flowfield PRIVATE igl::igl_core Eigen3::Eigen tinyobjloader::tinyobjloader xatlas::xatlas)
 
-add_library(CMakeFiles INTERFACE)
-target_sources(CMakeFiles INTERFACE ${CMAKE_FILES})
 add_library(Shaders INTERFACE)
 target_sources(Shaders INTERFACE ${SHADER_FILES})
 
 add_executable(Noice ${NOICE_SOURCES})
-target_link_libraries(Noice PRIVATE glfw glad imgui glm::glm stb flowfield compile_options Shaders CMakeFiles)
+target_link_libraries(Noice PRIVATE glfw glad::glad imgui::imgui glm::glm flowfield Shaders)
+target_include_directories(Noice PRIVATE ${Stb_INCLUDE_DIR})
 
 # Utility targets
 file(GLOB_RECURSE ASSETS CONFIGURE_DEPENDS "assets/*")
@@ -65,7 +57,6 @@ set_target_properties(Noice PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_F
 source_group(TREE "${CMAKE_SOURCE_DIR}/src" PREFIX "Source" FILES ${NOICE_SOURCES})
 source_group(TREE "${CMAKE_SOURCE_DIR}/src/flowfield" PREFIX "Source" FILES ${FLOWFIELD_SOURCES})
 source_group(TREE "${CMAKE_SOURCE_DIR}/assets/shaders" PREFIX "Shaders" FILES ${SHADER_FILES})
-source_group(TREE "${CMAKE_SOURCE_DIR}/external" PREFIX "CMakeFiles" FILES ${CMAKE_FILES})
 
 set_property(TARGET Noice flowfield PROPERTY FOLDER "App")
 set_property(TARGET copy_assets format PROPERTY FOLDER "Tools")

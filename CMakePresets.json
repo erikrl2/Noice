@@ -2,9 +2,21 @@
   "version": 3,
   "configurePresets": [
     {
+      "name": "base",
+      "hidden": true,
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+      "cacheVariables": {
+        "VCPKG_INSTALLED_DIR": "${sourceDir}/deps/installed"
+      }
+    },
+    {
       "name": "vs",
+      "inherits": "base",
       "generator": "Visual Studio 18 2026",
       "binaryDir": "${sourceDir}/build/vs",
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "x64-windows-glcore"
+      },
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -13,8 +25,17 @@
     },
     {
       "name": "ninja",
+      "inherits": "base",
       "generator": "Ninja Multi-Config",
-      "binaryDir": "${sourceDir}/build/ninja"
+      "binaryDir": "${sourceDir}/build/ninja",
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "x64-linux-glcore"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
     }
   ]
 }

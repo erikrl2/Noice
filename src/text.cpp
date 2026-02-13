@@ -6,7 +6,7 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include <GLFW/glfw3.h>
 #include <imgui.h>
-#include <misc/cpp/imgui_stdlib.h>
+#include <imgui_stdlib.h>
 #include <stb_truetype.h>
 
 static const char* fontPath = "assets/fonts/courier-mon.ttf";

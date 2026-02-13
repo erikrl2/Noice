@@ -4,6 +4,7 @@
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <imgui_internal.h>
+#include <KHR/khrplatform.h>
 
 #include <fstream>
 #include <iostream>
@@ -211,11 +212,6 @@ namespace util {
   }
 
   void EnableOpenGLDebugOutput() {
-    if (!GLAD_GL_KHR_debug && !GLAD_GL_VERSION_4_3) {
-      std::cerr << "OpenGL debug output not available (need GL 4.3 or KHR_debug).\n";
-      return;
-    }
-
     glEnable(GL_DEBUG_OUTPUT);
     glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
     glDebugMessageCallback(OnOpenGLDebugMessage, nullptr);
