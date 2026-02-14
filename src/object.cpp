@@ -59,12 +59,17 @@ void ObjectMode::UpdateImGui() {
       )) {
     meshChanged = true;
   }
+  ImGui::SetItemTooltip("shortcut: right click on object");
+  ImGui::BeginDisabled(models.size() > 127);
   if (ImGui::Button("Add Slot")) {
     objectSelect = (int)models.size();
     models.emplace_back();
     models[objectSelect].name = std::to_string(objectSelect) + ": empty";
     meshChanged = true;
   }
+  ImGui::EndDisabled();
+  ImGui::SameLine();
+  ImGui::Text("Drag and drop obj/stl files");
   ImGui::SeparatorText("Transform");
   int flags = ImGuiSliderFlags_NoRoundToFormat;
   Transform& t = models[objectSelect].transform;

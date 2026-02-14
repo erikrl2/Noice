@@ -50,8 +50,10 @@ void Screenshot::UpdateImGui() {
   }
 
   if (!capturing) {
-    if (!hasResult)
+    if (!hasResult) {
       if (ImGui::Button("Start capture")) Begin();
+      ImGui::SetItemTooltip("shortcut: C");
+    }
   } else {
     if (ImGui::Button("Cancel capture")) Reset();
     ImGui::Text("Capturing: %d / %d", collectedFrames, options.targetFrames);
@@ -61,8 +63,10 @@ void Screenshot::UpdateImGui() {
     if (ImGui::Button("Save PNG")) SavePNG();
     ImGui::SameLine();
     if (ImGui::Button("Recapture")) Begin();
+    ImGui::SetItemTooltip("shortcut: C");
     ImGui::SameLine();
     if (ImGui::Button("Close preview")) Reset();
+    ImGui::SetItemTooltip("shortcut: ESC or right click");
   }
 }
 

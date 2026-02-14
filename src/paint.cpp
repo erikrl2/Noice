@@ -39,6 +39,7 @@ void PaintMode::Destroy() {
 void PaintMode::UpdateImGui() {
   ImGui::DragFloat("Brush Radius", &brushRadius, 0.1f, 1.0f, 100.0f, "%.0f", ImGuiSliderFlags_ClampOnInput);
   if (ImGui::Button("Clear Canvas")) canvasFB.Clear();
+  ImGui::SetItemTooltip("shortcut: right click");
 }
 
 void PaintMode::Update(float dt) {

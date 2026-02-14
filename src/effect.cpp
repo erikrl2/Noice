@@ -66,16 +66,22 @@ void Effect::Destroy() {
 
 void Effect::UpdateImGui() {
   ImGui::Checkbox("Disable", &disabled);
-  ImGui::SameLine();
-  ImGui::Checkbox("Pause", &paused);
+  ImGui::SetItemTooltip("shortcut: TAB or middle click");
   if (disabled) {
     ImGui::SameLine();
     ImGui::Checkbox("Show Acc", &showAcc);
   }
+  ImGui::SameLine();
+  ImGui::Checkbox("Pause Flow", &paused);
+  ImGui::SetItemTooltip("shortcut: F");
 
   ImGui::DragFloat("Speed", &scrollSpeed, 0.1f, 0.0f, 0.0f, "%.1f", ImGuiSliderFlags_NoRoundToFormat);
+  ImGui::SetItemTooltip("shortcut: mouse scroll");
   ImGui::DragInt("Acc Reset Rate", &accResetInterval, 0.1f, 0, 1000, "%d", ImGuiSliderFlags_ClampOnInput);
-  if (ImGui::Button("Clear Acc")) ClearAcc();
+  if (accResetInterval == 0) {
+    if (ImGui::Button("Clear Acc")) ClearAcc();
+    ImGui::SetItemTooltip("shortcut: R");
+  }
 }
 
 Texture Effect::Apply(const EffectInputData& in, float dt) {

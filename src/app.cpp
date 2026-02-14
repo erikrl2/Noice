@@ -149,10 +149,13 @@ void App::UpdateImGui() {
 
       bool changed = false;
       changed |= ImGui::RadioButton("Object##Mode", (int*)&modeSelect, (int)ModeType::Object);
+      ImGui::SetItemTooltip("shortcut: O");
       ImGui::SameLine();
       changed |= ImGui::RadioButton("Text##Mode", (int*)&modeSelect, (int)ModeType::Text);
+      ImGui::SetItemTooltip("shortcut: T");
       ImGui::SameLine();
       changed |= ImGui::RadioButton("Paint##Mode", (int*)&modeSelect, (int)ModeType::Paint);
+      ImGui::SetItemTooltip("shortcut: P");
       if (changed) OnModeChange();
 
       modePtr->UpdateImGui();
