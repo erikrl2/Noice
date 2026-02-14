@@ -35,6 +35,10 @@ public:
 
   Mesh() = default;
   Mesh(const Mesh&) = delete;
+  Mesh(Mesh&& o) noexcept: vao(o.vao), vbo(o.vbo), ebo(o.ebo), indexCount(o.indexCount), vertexCount(o.vertexCount) {
+    o.vao = o.vbo = o.ebo = 0;
+    o.indexCount = o.vertexCount = 0;
+  }
   ~Mesh() { assert(!*this); }
 
 private:

@@ -7,24 +7,27 @@
 #include "shader.hpp"
 #include "util.hpp"
 
+#include <array>
 #include <thread>
 
 class ObjectMode: public Mode {
 public:
-#ifdef NDEBUG
-  enum class Model { M0, M1, M2, M3, M4, M5, Count };
-#else
-  enum class Model { M0, M1, Count };
-#endif
-
   struct Transform {
     glm::vec3 translation = {0.0f, 0.0f, 0.0f};
     glm::vec3 rotation = {0.0f, 0.0f, 0.0f};
     float scale = 1.0f;
   };
 
+  struct Model {
+    std::string name;
+    std::string filepath;
+    Mesh mesh;
+    Transform transform;
+    FlowfieldSettings flowSettings;
+  };
+
   struct ModelLoadJob {
-    Model type;
+    int modelID;
     std::string path;
     FlowfieldSettings settings;
   };
@@ -49,19 +52,14 @@ private:
   void UpdateModelMatrices();
   void RenderObjects();
 
-  void SetInitialObjectTransforms();
-  void SetInitialFlowfieldSettings();
+  void SetInitialModelData();
 
 private:
   int width = 0, height = 0;
   int curr = 0, prev = 1;
 
-  Model objectSelect = Model::M0;
-
-  Transform transforms[(int)Model::Count];
-  FlowfieldSettings flowSettings[(int)Model::Count];
-
-  Mesh meshes[(int)Model::Count];
+  std::vector<Model> models;
+  int objectSelect = 0;
 
   Shader objectShader;
 
@@ -71,14 +69,14 @@ private:
   bool isOrtho = false;
   glm::mat4 projMat[2]{};
   glm::mat4 viewMat[2]{};
-  glm::mat4 modelMats[(int)Model::Count][2]{};
+  std::vector<std::array<glm::mat4, 2>> modelMats;
 
   std::thread meshLoaderThread;
 
   Queue<ModelLoadJob> meshJobQueue;
   Queue<MeshFlowfieldData> uploadQueue;
 
-  void LoadMeshAsync(Model type);
+  void LoadMeshAsync(int model);
 
   static void MeshLoaderThreadFunc(Queue<ModelLoadJob>& meshJobQueue, Queue<MeshFlowfieldData>& uploadQueue);
 };

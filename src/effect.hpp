@@ -2,6 +2,7 @@
 #include "framebuffer.hpp"
 #include "shader.hpp"
 
+#include <array>
 #include <span>
 
 struct EffectInputData {
@@ -12,7 +13,7 @@ struct EffectInputData {
   Texture prevDepthTex;
   glm::mat4* prevCurrProj = nullptr;
   glm::mat4* prevCurrView = nullptr;
-  std::span<glm::mat4[2]> modelMats;
+  std::span<std::array<glm::mat4, 2>> modelMats;
   int currInd = 0;
 
   bool flow = true;
