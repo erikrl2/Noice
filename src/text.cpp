@@ -9,7 +9,7 @@
 #include <imgui_stdlib.h>
 #include <stb_truetype.h>
 
-static const char* fontPath = "assets/fonts/courier-mon.ttf";
+static const std::string fontPath = util::AssetPath("fonts/courier-mon.ttf");
 
 void TextMode::Init(int width, int height) {
   textFB.CreateOrResize(width, height);
@@ -17,7 +17,9 @@ void TextMode::Init(int width, int height) {
   textFB.AttachColorTexture(GL_R8I, GL_NEAREST); // 1: id
   textFB.Finalize();
 
-  textShader.CreateVertFrag("assets/shaders/text/text.vert.glsl", "assets/shaders/text/text.frag.glsl");
+  textShader.CreateVertFrag(
+      util::AssetPath("shaders/text/text.vert.glsl"), util::AssetPath("shaders/text/text.frag.glsl")
+  );
 
   LoadFontAtlas();
 }

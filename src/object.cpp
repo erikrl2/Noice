@@ -21,7 +21,9 @@ void ObjectMode::Init(int width, int height) {
   meshLoaderThread = std::thread(MeshLoaderThreadFunc, std::ref(meshJobQueue), std::ref(uploadQueue));
   for (int id = 0; id < models.size(); id++) LoadMeshAsync(id);
 
-  objectShader.CreateVertFrag("assets/shaders/object/object.vert.glsl", "assets/shaders/object/object.frag.glsl");
+  objectShader.CreateVertFrag(
+      util::AssetPath("shaders/object/object.vert.glsl"), util::AssetPath("shaders/object/object.frag.glsl")
+  );
 
   for (auto& fb : objectFBs) {
     fb.CreateOrResize(width, height);
@@ -221,12 +223,12 @@ void ObjectMode::SetInitialModelData() {
   models[4].name = "4: alien";
   models[5].name = "5: head";
 
-  models[0].filepath = "assets/models/quad.obj";
-  models[1].filepath = "assets/models/car.obj";
-  models[2].filepath = "assets/models/interior.obj";
-  models[3].filepath = "assets/models/dragon.obj";
-  models[4].filepath = "assets/models/alien.obj";
-  models[5].filepath = "assets/models/head.obj";
+  models[0].filepath = util::AssetPath("models/quad.obj");
+  models[1].filepath = util::AssetPath("models/car.obj");
+  models[2].filepath = util::AssetPath("models/interior.obj");
+  models[3].filepath = util::AssetPath("models/dragon.obj");
+  models[4].filepath = util::AssetPath("models/alien.obj");
+  models[5].filepath = util::AssetPath("models/head.obj");
 
   models[0].transform = {{-80.0f, 0.0f, 0.0f}, {0.0f, 90.0f, 0.0f}, 0.5f};
   models[1].transform = {{-11.3f, 0.0f, -35.9f}, {0.0f, 27.5f, 0.0f}, 7.92f};
@@ -247,8 +249,8 @@ void ObjectMode::SetInitialModelData() {
   models[0].name = "0: quad";
   models[1].name = "1: quad";
 
-  models[0].filepath = "assets/models/quad.obj";
-  models[1].filepath = "assets/models/quad.obj";
+  models[0].filepath = util::AssetPath("models/quad.obj");
+  models[1].filepath = util::AssetPath("models/quad.obj");
 
   models[0].transform = {{0.0f, 0.0f, -20.0f}, {0.0f, 0.0f, 0.0f}, 0.75f};
   models[1].transform = {{0.0f, 4.0f, -19.0f}, {0.0f, 0.0f, 0.0f}, 0.3f};
@@ -267,7 +269,7 @@ void ObjectMode::LoadMeshAsync(int model) {
 void ObjectMode::MeshLoaderThreadFunc(Queue<ModelLoadJob>& meshJobQueue, Queue<MeshFlowfieldData>& uploadQueue) {
   while (meshJobQueue) {
     if (auto job = meshJobQueue.TryPop()) {
-      uploadQueue.Push(Mesh::CreateFlowfieldDataFromOBJ(job->modelID, job->path, job->settings));
+      uploadQueue.Push(Mesh::CreateFlowfieldDataFromFile(job->modelID, job->path, job->settings));
     } else {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }

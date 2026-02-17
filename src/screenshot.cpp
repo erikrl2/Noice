@@ -11,8 +11,8 @@
 #include <iostream>
 
 void Screenshot::Init(int width, int height) {
-  accumShader.CreateCompute("assets/shaders/screenshot/screenshot_accum.comp.glsl");
-  finalizeShader.CreateCompute("assets/shaders/screenshot/screenshot_finalize.comp.glsl");
+  accumShader.CreateCompute(util::AssetPath("shaders/screenshot/screenshot_accum.comp.glsl"));
+  finalizeShader.CreateCompute(util::AssetPath("shaders/screenshot/screenshot_finalize.comp.glsl"));
 
   accumImg.Create(width, height, GL_R16F, GL_NEAREST);
   prevImg.Create(width, height, GL_R8, GL_NEAREST);
@@ -70,8 +70,7 @@ void Screenshot::UpdateImGui() {
   }
 }
 
-void Screenshot::Update(int width, int height, Texture source) {
-  if (this->width != width || this->height != height) ResizeBuffers(width, height);
+void Screenshot::Update(Texture source) {
   if (!capturing) return;
 
   Accumulate(source);
@@ -133,8 +132,10 @@ void Screenshot::ClearBuffers() {
   outImg.Clear();
 }
 
-void Screenshot::ResizeBuffers(int width, int height) {
+void Screenshot::OnResize(int width, int height) {
   this->width = width, this->height = height;
+
+  std::cout << "resized to " << width << "x" << height << "\n"; // DEBUG
 
   accumImg.Resize(width, height);
   prevImg.Resize(width, height);
@@ -155,6 +156,11 @@ void Screenshot::OnKeyPressed(int key, int action) {
   }
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
     if (IsActive()) Reset();
+  }
+  if (key == GLFW_KEY_S && action == GLFW_PRESS) {
+    if (util::IsKeyPressed(GLFW_KEY_LEFT_CONTROL)) {
+      SavePNG();
+    }
   }
 }
 

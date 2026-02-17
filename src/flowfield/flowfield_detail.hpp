@@ -5,8 +5,8 @@
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
-#include <tiny_obj_loader.h>
 #include <stl_reader.h>
+#include <tiny_obj_loader.h>
 
 #include <unordered_map>
 #include <unordered_set>

@@ -77,7 +77,9 @@ void Mesh::Draw(int renderFlags) const {
   if (renderFlags & RenderFlag::DepthTest) glDisable(GL_DEPTH_TEST);
 }
 
-MeshFlowfieldData Mesh::CreateFlowfieldDataFromOBJ(int id, const std::string& path, const FlowfieldSettings& settings) {
+MeshFlowfieldData Mesh::CreateFlowfieldDataFromFile(
+    int id, const std::string& path, const FlowfieldSettings& settings
+) {
   MeshFlowfieldData data;
 
   bool ok = ComputeUvFlowfieldFromOBJ(path, data.verts, data.indices, settings);

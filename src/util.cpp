@@ -1,17 +1,50 @@
 #include "util.hpp"
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
+#elif defined(__linux__)
+#include <unistd.h>
+
+#include <climits>
+#endif
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <KHR/khrplatform.h>
 
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <random>
 #include <sstream>
 
 namespace util {
+
+  std::string AssetPath(const std::string& relative) {
+    static std::string assetsDir = []() -> std::string {
+      std::filesystem::path exePath;
+#ifdef _WIN32
+      wchar_t buf[MAX_PATH];
+      GetModuleFileNameW(nullptr, buf, MAX_PATH);
+      exePath = buf;
+#elif defined(__linux__)
+      char buf[PATH_MAX];
+      ssize_t len = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+      if (len != -1) {
+        buf[len] = '\0';
+        exePath = buf;
+      }
+#endif
+      return exePath.parent_path().string() + "/assets";
+    }();
+
+    if (assetsDir.empty()) return relative;
+    return (std::filesystem::path(assetsDir) / relative).string();
+  }
 
   unsigned int RandomInt() {
     static std::mt19937 engine{std::random_device{}()};

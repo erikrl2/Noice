@@ -9,6 +9,8 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 App::App() {
   InitWindow();
@@ -68,6 +70,21 @@ void App::InitWindow() {
   glfwMakeContextCurrent(win);
   glfwSwapInterval(1);
 
+  {
+    std::string iconPaths[] = {
+        util::AssetPath("icon/noice16.png"), util::AssetPath("icon/noice32.png"), util::AssetPath("icon/noice48.png")
+    };
+    GLFWimage icons[3] = {};
+    int count = 0;
+    for (const auto& path : iconPaths) {
+      GLFWimage img;
+      img.pixels = stbi_load(path.c_str(), &img.width, &img.height, nullptr, 4);
+      if (img.pixels) icons[count++] = img;
+    }
+    if (count > 0) glfwSetWindowIcon(win, count, icons);
+    for (int i = 0; i < count; i++) stbi_image_free(icons[i].pixels);
+  }
+
   glfwSetWindowUserPointer(win, this);
 
   glfwSetFramebufferSizeCallback(win, OnFramebufferResized);
@@ -103,7 +120,7 @@ void App::InitImGui() {
 void App::SetupResources() {
   quadMesh.CreateFullscreenQuad();
 
-  postShader.CreateVertFrag("assets/shaders/post.vert.glsl", "assets/shaders/post.frag.glsl");
+  postShader.CreateVertFrag(util::AssetPath("shaders/post.vert.glsl"), util::AssetPath("shaders/post.frag.glsl"));
 
   effect.Init(width, height);
 
@@ -179,7 +196,7 @@ void App::Update(float dt) {
 
   Texture effectTex = effect.Apply(modePtr->GetEffectInputData(), dt);
 
-  if (screenshot.IsCapturing()) screenshot.Update(width, height, effectTex);
+  screenshot.Update(effectTex);
 
   RenderToScreen(effectTex);
 }
@@ -215,6 +232,7 @@ void App::OnFramebufferResized(GLFWwindow* window, int w, int h) {
 
   app.effect.OnResize(w, h);
   app.modePtr->OnResize(w, h);
+  app.screenshot.OnResize(w, h);
 }
 
 void App::OnMouseMoved(GLFWwindow* window, double xpos, double ypos) {

@@ -24,7 +24,7 @@ public:
 
   void Draw(int renderFlags = 0) const;
 
-  static MeshFlowfieldData CreateFlowfieldDataFromOBJ(
+  static MeshFlowfieldData CreateFlowfieldDataFromFile(
       int id, const std::string& path, const FlowfieldSettings& settings
   );
 

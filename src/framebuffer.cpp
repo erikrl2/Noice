@@ -230,6 +230,7 @@ std::vector<unsigned char> Image::Download() const {
   std::vector<unsigned char> data(width * height * 4);
   glBindTexture(GL_TEXTURE_2D, tex.id);
   FormatInfo info = util::GetFormatInfo(internalFormat);
+  glPixelStorei(GL_PACK_ALIGNMENT, (info.format == GL_RGBA) ? 4 : 1);
   glGetTexImage(GL_TEXTURE_2D, 0, info.format, info.type, data.data());
   return data;
 }

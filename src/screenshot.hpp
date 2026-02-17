@@ -24,8 +24,9 @@ public:
   void Destroy();
 
   void UpdateImGui();
-  void Update(int width, int height, Texture source);
+  void Update(Texture source);
 
+  void OnResize(int width, int height);
   void OnMouseClicked(int button, int action);
   void OnKeyPressed(int key, int action);
 
@@ -40,7 +41,6 @@ private:
   void Accumulate(Texture source);
   void Finalize();
   void ClearBuffers();
-  void ResizeBuffers(int width, int height);
 
   void SavePNG();
 

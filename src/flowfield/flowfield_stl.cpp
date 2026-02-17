@@ -4,142 +4,142 @@
 #include <stl_reader.h>
 
 #include <array>
-#include <cstdint>
 #include <cmath>
+#include <cstdint>
 #include <iostream>
 #include <unordered_map>
 
 namespace flowfield::detail {
 
-struct QuantKey {
-  int64_t x, y, z;
-  bool operator==(const QuantKey& o) const noexcept { return x == o.x && y == o.y && z == o.z; }
-};
-
-struct QuantKeyHash {
-  size_t operator()(const QuantKey& k) const noexcept {
-    // simple 64-bit mix
-    uint64_t a = (uint64_t)k.x;
-    uint64_t b = (uint64_t)k.y;
-    uint64_t c = (uint64_t)k.z;
-    uint64_t x = a * 0x9E3779B185EBCA87ULL ^ b * 0xC2B2AE3D27D4EB4FULL ^ c * 0x165667B19E3779F9ULL;
-    x ^= (x >> 33);
-    x *= 0xff51afd7ed558ccdULL;
-    x ^= (x >> 33);
-    x *= 0xc4ceb9fe1a85ec53ULL;
-    x ^= (x >> 33);
-    return (size_t)x;
-  }
-};
-
-static inline int64_t qcoord(double v, double invEps) {
-  // round to nearest grid point
-  return (int64_t)std::llround(v * invEps);
-}
-
-bool loadStlAsPolys(const std::string& stlPath, ObjPolys& out, double weldEps) {
-  if (weldEps <= 0.0) weldEps = 1e-9;
-  const double invEps = 1.0 / weldEps;
-
-  std::vector<float> coords;
-  std::vector<float> normals;
-  std::vector<uint32_t> tris;
-  std::vector<uint32_t> solidRanges;
-
-  try {
-    const bool ok = stl_reader::ReadStlFile(stlPath.c_str(), coords, normals, tris, solidRanges);
-    if (!ok) {
-      std::cerr << "Failed to read STL: " << stlPath << "\n";
-      return false;
-    }
-  } catch (const std::exception& e) {
-    std::cerr << "Failed to read STL: " << stlPath << " (" << e.what() << ")\n";
-    return false;
-  }
-
-  if (tris.empty() || coords.empty()) {
-    std::cerr << "STL is empty: " << stlPath << "\n";
-    return false;
-  }
-  if (tris.size() % 3 != 0) {
-    std::cerr << "STL triangle index buffer not divisible by 3: " << stlPath << "\n";
-    return false;
-  }
-  if (coords.size() % 3 != 0) {
-    std::cerr << "STL coord buffer not divisible by 3: " << stlPath << "\n";
-    return false;
-  }
-
-  out = ObjPolys{};
-  out.attrib.vertices.clear();
-  out.attrib.texcoords.clear(); // STL has none
-  out.polys.clear();
-
-  // Weld map: quantized position -> new vertex index
-  std::unordered_map<QuantKey, int, QuantKeyHash> weld;
-  weld.reserve(tris.size());
-
-  auto getOrCreate = [&](uint32_t srcIndex) -> int {
-    const size_t base = (size_t)srcIndex * 3;
-    if (base + 2 >= coords.size()) return -1;
-
-    const double x = (double)coords[base + 0];
-    const double y = (double)coords[base + 1];
-    const double z = (double)coords[base + 2];
-
-    QuantKey key{qcoord(x, invEps), qcoord(y, invEps), qcoord(z, invEps)};
-
-    auto it = weld.find(key);
-    if (it != weld.end()) return it->second;
-
-    const int newIndex = (int)(out.attrib.vertices.size() / 3);
-    out.attrib.vertices.push_back((tinyobj::real_t)x);
-    out.attrib.vertices.push_back((tinyobj::real_t)y);
-    out.attrib.vertices.push_back((tinyobj::real_t)z);
-    weld.emplace(key, newIndex);
-    return newIndex;
+  struct QuantKey {
+    int64_t x, y, z;
+    bool operator==(const QuantKey& o) const noexcept { return x == o.x && y == o.y && z == o.z; }
   };
 
-  const size_t triCount = tris.size() / 3;
-  out.polys.reserve(triCount);
+  struct QuantKeyHash {
+    size_t operator()(const QuantKey& k) const noexcept {
+      // simple 64-bit mix
+      uint64_t a = (uint64_t)k.x;
+      uint64_t b = (uint64_t)k.y;
+      uint64_t c = (uint64_t)k.z;
+      uint64_t x = a * 0x9E3779B185EBCA87ULL ^ b * 0xC2B2AE3D27D4EB4FULL ^ c * 0x165667B19E3779F9ULL;
+      x ^= (x >> 33);
+      x *= 0xff51afd7ed558ccdULL;
+      x ^= (x >> 33);
+      x *= 0xc4ceb9fe1a85ec53ULL;
+      x ^= (x >> 33);
+      return (size_t)x;
+    }
+  };
 
-  for (size_t ti = 0; ti < triCount; ++ti) {
-    const uint32_t ia = tris[ti * 3 + 0];
-    const uint32_t ib = tris[ti * 3 + 1];
-    const uint32_t ic = tris[ti * 3 + 2];
-
-    int a = getOrCreate(ia);
-    int b = getOrCreate(ib);
-    int c = getOrCreate(ic);
-    if (a < 0 || b < 0 || c < 0) continue;
-    if (a == b || b == c || c == a) continue; // degenerate after welding
-
-    std::vector<tinyobj::index_t> poly(3);
-    poly[0].vertex_index = a;
-    poly[1].vertex_index = b;
-    poly[2].vertex_index = c;
-
-    // No UVs in STL:
-    poly[0].texcoord_index = -1;
-    poly[1].texcoord_index = -1;
-    poly[2].texcoord_index = -1;
-
-    poly[0].normal_index = -1;
-    poly[1].normal_index = -1;
-    poly[2].normal_index = -1;
-
-    out.polys.push_back(std::move(poly));
+  static inline int64_t qcoord(double v, double invEps) {
+    // round to nearest grid point
+    return (int64_t)std::llround(v * invEps);
   }
 
-  out.nV_in = (int)(out.attrib.vertices.size() / 3);
-  out.nVT_in = 0;
+  bool loadStlAsPolys(const std::string& stlPath, ObjPolys& out, double weldEps) {
+    if (weldEps <= 0.0) weldEps = 1e-9;
+    const double invEps = 1.0 / weldEps;
 
-  if (out.nV_in <= 0 || out.polys.empty()) {
-    std::cerr << "STL produced no valid geometry after welding: " << stlPath << "\n";
-    return false;
+    std::vector<float> coords;
+    std::vector<float> normals;
+    std::vector<uint32_t> tris;
+    std::vector<uint32_t> solidRanges;
+
+    try {
+      const bool ok = stl_reader::ReadStlFile(stlPath.c_str(), coords, normals, tris, solidRanges);
+      if (!ok) {
+        std::cerr << "Failed to read STL: " << stlPath << "\n";
+        return false;
+      }
+    } catch (const std::exception& e) {
+      std::cerr << "Failed to read STL: " << stlPath << " (" << e.what() << ")\n";
+      return false;
+    }
+
+    if (tris.empty() || coords.empty()) {
+      std::cerr << "STL is empty: " << stlPath << "\n";
+      return false;
+    }
+    if (tris.size() % 3 != 0) {
+      std::cerr << "STL triangle index buffer not divisible by 3: " << stlPath << "\n";
+      return false;
+    }
+    if (coords.size() % 3 != 0) {
+      std::cerr << "STL coord buffer not divisible by 3: " << stlPath << "\n";
+      return false;
+    }
+
+    out = ObjPolys{};
+    out.attrib.vertices.clear();
+    out.attrib.texcoords.clear(); // STL has none
+    out.polys.clear();
+
+    // Weld map: quantized position -> new vertex index
+    std::unordered_map<QuantKey, int, QuantKeyHash> weld;
+    weld.reserve(tris.size());
+
+    auto getOrCreate = [&](uint32_t srcIndex) -> int {
+      const size_t base = (size_t)srcIndex * 3;
+      if (base + 2 >= coords.size()) return -1;
+
+      const double x = (double)coords[base + 0];
+      const double y = (double)coords[base + 1];
+      const double z = (double)coords[base + 2];
+
+      QuantKey key{qcoord(x, invEps), qcoord(y, invEps), qcoord(z, invEps)};
+
+      auto it = weld.find(key);
+      if (it != weld.end()) return it->second;
+
+      const int newIndex = (int)(out.attrib.vertices.size() / 3);
+      out.attrib.vertices.push_back((tinyobj::real_t)x);
+      out.attrib.vertices.push_back((tinyobj::real_t)y);
+      out.attrib.vertices.push_back((tinyobj::real_t)z);
+      weld.emplace(key, newIndex);
+      return newIndex;
+    };
+
+    const size_t triCount = tris.size() / 3;
+    out.polys.reserve(triCount);
+
+    for (size_t ti = 0; ti < triCount; ++ti) {
+      const uint32_t ia = tris[ti * 3 + 0];
+      const uint32_t ib = tris[ti * 3 + 1];
+      const uint32_t ic = tris[ti * 3 + 2];
+
+      int a = getOrCreate(ia);
+      int b = getOrCreate(ib);
+      int c = getOrCreate(ic);
+      if (a < 0 || b < 0 || c < 0) continue;
+      if (a == b || b == c || c == a) continue; // degenerate after welding
+
+      std::vector<tinyobj::index_t> poly(3);
+      poly[0].vertex_index = a;
+      poly[1].vertex_index = b;
+      poly[2].vertex_index = c;
+
+      // No UVs in STL:
+      poly[0].texcoord_index = -1;
+      poly[1].texcoord_index = -1;
+      poly[2].texcoord_index = -1;
+
+      poly[0].normal_index = -1;
+      poly[1].normal_index = -1;
+      poly[2].normal_index = -1;
+
+      out.polys.push_back(std::move(poly));
+    }
+
+    out.nV_in = (int)(out.attrib.vertices.size() / 3);
+    out.nVT_in = 0;
+
+    if (out.nV_in <= 0 || out.polys.empty()) {
+      std::cerr << "STL produced no valid geometry after welding: " << stlPath << "\n";
+      return false;
+    }
+
+    return true;
   }
-
-  return true;
-}
 
 } // namespace flowfield::detail

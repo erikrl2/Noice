@@ -31,7 +31,11 @@ target_link_libraries(flowfield PRIVATE igl::igl_core Eigen3::Eigen tinyobjloade
 add_library(Shaders INTERFACE)
 target_sources(Shaders INTERFACE ${SHADER_FILES})
 
-add_executable(Noice ${NOICE_SOURCES})
+if(WIN32)
+  set(NOICE_RC src/noice.rc)
+endif()
+
+add_executable(Noice ${NOICE_SOURCES} ${NOICE_RC})
 target_link_libraries(Noice PRIVATE glfw glad::glad imgui::imgui glm::glm flowfield Shaders)
 
 # Utility targets

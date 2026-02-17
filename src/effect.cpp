@@ -8,7 +8,7 @@
 #include <imgui.h>
 
 void Effect::Init(int width, int height) {
-  const std::string resourceDir = "assets/shaders/effect/";
+  const std::string resourceDir = util::AssetPath("shaders/effect/");
 
   scatterShader.CreateCompute(resourceDir + "effect_scatter.comp.glsl");
   fillShader.CreateCompute(resourceDir + "effect_fill.comp.glsl");
