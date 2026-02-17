@@ -90,6 +90,8 @@ void ObjectMode::UpdateImGui() {
   if (ImGui::RadioButton("V", edit.axis == 'V')) edit.axis = 'V';
   ImGui::SameLine();
   if (ImGui::RadioButton("Auto", edit.axis == 'A')) edit.axis = 'A';
+  ImGui::SameLine();
+  if (ImGui::RadioButton("Mikk", edit.axis == 'M')) edit.axis = 'M';
 
   ImGui::DragFloat("Crease Deg", &edit.creaseThresholdAngle, 0.1f, 0.0f, 90.0f, "%.0f", ImGuiSliderFlags_ClampOnInput);
 
@@ -208,6 +210,8 @@ void ObjectMode::OnFileDrop(const std::string& pathStr) {
   model.filepath = path.string();
   model.name = std::to_string(objectSelect) + ": " + path.stem().string();
   model.transform.scale = 1.0f;
+  model.transform.rotation = {-90.0f, 0.0f, 0.0f};
+  model.flowSettings = {};
 
   LoadMeshAsync(objectSelect);
 }

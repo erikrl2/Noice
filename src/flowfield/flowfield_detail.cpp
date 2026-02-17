@@ -5,8 +5,8 @@
 #include <cmath>
 #include <cstdint>
 #include <iostream>
-#include <limits>
 #include <queue>
+#include <vector>
 
 namespace flowfield::detail {
 
@@ -235,7 +235,6 @@ namespace flowfield::detail {
         const auto& poly = m.polys[(size_t)faceid];
         int fv = (int)poly.size();
 
-        // Fan triangulation for scoring
         for (int i = 1; i < fv - 1; ++i) {
           int v[3], vt[3];
           v[0] = poly[0].vertex_index;
@@ -562,7 +561,7 @@ namespace flowfield::detail {
   std::vector<std::vector<int>> buildAdjacencyVec(const std::vector<std::vector<int>>& outFaces, int nV_out) {
     std::vector<std::vector<int>> adj((size_t)nV_out);
 
-    for (auto& v : adj) v.reserve(8); // estimate average valence
+    for (auto& v : adj) v.reserve(8);
 
     std::vector<int> stamp((size_t)nV_out, -1);
     int curStamp = 0;
@@ -625,6 +624,10 @@ namespace flowfield::detail {
     vTangent.assign((size_t)nV_out, Eigen::Vector3d(0, 0, 0));
     vWeight.assign((size_t)nV_out, 0.0);
 
+    // Only used for axisSetting == 'M'
+    std::vector<double> vHand;
+    if (axisSetting == 'M') vHand.assign((size_t)nV_out, 0.0);
+
     for (size_t ti = 0; ti < tris.size(); ++ti) {
       const Tri& t = tris[ti];
       const double area = triA[ti];
@@ -666,8 +669,8 @@ namespace flowfield::detail {
       if (std::abs(denom) < 1e-20) continue;
 
       const double r = 1.0 / denom;
-      const Eigen::Vector3d dPdu = (e1 * d2.y() - e2 * d1.y()) * r;
-      const Eigen::Vector3d dPdv = (e2 * d1.x() - e1 * d2.x()) * r;
+      Eigen::Vector3d dPdu = (e1 * d2.y() - e2 * d1.y()) * r;
+      Eigen::Vector3d dPdv = (e2 * d1.x() - e1 * d2.x()) * r;
 
       char usedAxis = axisSetting;
       if (axisSetting == 'A') {
@@ -676,11 +679,7 @@ namespace flowfield::detail {
         usedAxis = (iid >= 0 && iid < (int)islands.size()) ? islands[(size_t)iid].chosenAxis : 'V';
       }
 
-      Eigen::Vector3d tdir = (usedAxis == 'U') ? dPdu : dPdv;
-      tdir = safeNormalize(projectToTangent(tdir, n));
-      if (tdir.squaredNorm() < 1e-24) continue;
-
-      const auto add = [&](int ov) {
+      auto addSimple = [&](int ov, const Eigen::Vector3d& tdir) {
         Eigen::Vector3d& acc = vTangent[(size_t)ov];
         if (acc.squaredNorm() > 1e-24 && acc.dot(tdir) < 0.0)
           acc -= area * tdir;
@@ -689,9 +688,57 @@ namespace flowfield::detail {
         vWeight[(size_t)ov] += area;
       };
 
-      add(ov0);
-      add(ov1);
-      add(ov2);
+      if (axisSetting == 'M') {
+        // Mikk-like mode: accumulate dP/du with handedness sign
+        Eigen::Vector3d T = projectToTangent(dPdu, n);
+        Eigen::Vector3d B = projectToTangent(dPdv, n);
+        if (T.squaredNorm() < 1e-24 || B.squaredNorm() < 1e-24) continue;
+
+        const double sgn = (n.dot(T.cross(B)) < 0.0) ? -1.0 : +1.0;
+
+        auto addMikk = [&](int ov) {
+          vTangent[(size_t)ov] += area * T;
+          vHand[(size_t)ov] += area * sgn;
+          vWeight[(size_t)ov] += area;
+        };
+
+        addMikk(ov0);
+        addMikk(ov1);
+        addMikk(ov2);
+      } else {
+        // Original behavior: choose U or V direction
+        Eigen::Vector3d tdir = (usedAxis == 'U') ? dPdu : dPdv;
+        tdir = safeNormalize(projectToTangent(tdir, n));
+        if (tdir.squaredNorm() < 1e-24) continue;
+
+        addSimple(ov0, tdir);
+        addSimple(ov1, tdir);
+        addSimple(ov2, tdir);
+      }
+    }
+
+    if (axisSetting == 'M') {
+      // Finalize tangent: orthonormalize vs normal and apply dominant handedness (flip if needed)
+      for (int ov = 0; ov < nV_out; ++ov) {
+        if (vWeight[(size_t)ov] <= 0.0) continue;
+
+        Eigen::Vector3d N = safeNormalize(vNormal[(size_t)ov]);
+        if (N.squaredNorm() < 1e-24) continue;
+
+        Eigen::Vector3d T = vTangent[(size_t)ov] / vWeight[(size_t)ov];
+        T = projectToTangent(T, N);
+        if (T.squaredNorm() < 1e-24) {
+          vTangent[(size_t)ov] = Eigen::Vector3d(0, 0, 0);
+          continue;
+        }
+        T.normalize();
+
+        const double s = (vHand[(size_t)ov] >= 0.0) ? +1.0 : -1.0;
+        if (s < 0.0) T = -T;
+
+        // Store back scaled so buildFlowFromAccum() can remain unchanged
+        vTangent[(size_t)ov] = vWeight[(size_t)ov] * T;
+      }
     }
   }
 

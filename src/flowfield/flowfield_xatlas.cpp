@@ -6,6 +6,7 @@
 #include <cassert>
 #include <cstdint>
 #include <iostream>
+#include <vector>
 
 namespace flowfield::detail {
 
@@ -20,7 +21,6 @@ namespace flowfield::detail {
   }
 
   static bool generateUvWithXAtlas(const ObjPolys& inMesh, ObjPolys& outMesh) {
-    // Triangulate input (xatlas expects triangles)
     const std::vector<Tri> tris = triangulate(inMesh);
     if (tris.empty()) {
       std::cerr << "xatlas UV gen: no triangles\n";
@@ -33,9 +33,9 @@ namespace flowfield::detail {
     xatlas::Atlas* atlas = xatlas::Create();
     if (!atlas) return false;
 
-    // Build index buffer (triangles)
     std::vector<uint32_t> indices;
     indices.reserve(tris.size() * 3);
+
     for (const Tri& t : tris) {
       const int a = t.v0(), b = t.v1(), c = t.v2();
       if (a < 0 || b < 0 || c < 0 || a >= nV || b >= nV || c >= nV) continue;
@@ -43,17 +43,11 @@ namespace flowfield::detail {
       indices.push_back((uint32_t)b);
       indices.push_back((uint32_t)c);
     }
-    if (indices.size() < 3) {
-      xatlas::Destroy(atlas);
-      std::cerr << "xatlas UV gen: no valid triangle indices\n";
-      return false;
-    }
 
     xatlas::MeshDecl decl{};
     decl.vertexCount = (uint32_t)nV;
     decl.vertexPositionData = inMesh.attrib.vertices.data();
     decl.vertexPositionStride = sizeof(tinyobj::real_t) * 3;
-
     decl.indexCount = (uint32_t)indices.size();
     decl.indexData = indices.data();
     decl.indexFormat = xatlas::IndexFormat::UInt32;
@@ -66,12 +60,9 @@ namespace flowfield::detail {
     }
 
     xatlas::ChartOptions chartOpts{};
-    // Middle-ground defaults: leave mostly default. (We can tune later.)
-
     xatlas::PackOptions packOpts{};
-    packOpts.padding = 2; // pixels
-    packOpts.texelsPerUnit = 0.0f; // let xatlas choose scale; we just want [0,1] normalized UVs
-    packOpts.resolution = 1024; // only affects padding/scaling heuristics
+    packOpts.padding = 2;
+    packOpts.resolution = 1024;
     packOpts.bilinear = true;
 
     xatlas::Generate(atlas, chartOpts, packOpts);
@@ -84,9 +75,6 @@ namespace flowfield::detail {
 
     const xatlas::Mesh& xm = atlas->meshes[0];
 
-    // Build output ObjPolys as a fully-triangulated mesh where:
-    // - each output vertex has a unique UV
-    // - vertex_index == texcoord_index (1:1) for simplicity
     outMesh = ObjPolys{};
     outMesh.attrib.vertices.clear();
     outMesh.attrib.texcoords.clear();
@@ -95,14 +83,11 @@ namespace flowfield::detail {
     outMesh.attrib.vertices.reserve((size_t)xm.vertexCount * 3);
     outMesh.attrib.texcoords.reserve((size_t)xm.vertexCount * 2);
 
-    // xatlas provides normalized UV in [0,1] after packing.
     for (uint32_t vi = 0; vi < xm.vertexCount; ++vi) {
       const xatlas::Vertex& xv = xm.vertexArray[vi];
-
-      // Position comes from original vertex referenced by xv.xref
       const uint32_t src = xv.xref;
+
       if (src >= (uint32_t)nV) {
-        // Shouldn't happen, but be safe.
         outMesh.attrib.vertices.push_back(0);
         outMesh.attrib.vertices.push_back(0);
         outMesh.attrib.vertices.push_back(0);
@@ -120,11 +105,10 @@ namespace flowfield::detail {
     outMesh.nV_in = (int)xm.vertexCount;
     outMesh.nVT_in = (int)xm.vertexCount;
 
-    // Faces: xatlas outputs triangles, indices refer to xm.vertexArray
     const uint32_t* outIdx = xm.indexArray;
     const uint32_t outIndexCount = xm.indexCount;
-    outMesh.polys.reserve(outIndexCount / 3);
 
+    outMesh.polys.reserve(outIndexCount / 3);
     for (uint32_t i = 0; i + 2 < outIndexCount; i += 3) {
       const uint32_t a = outIdx[i + 0];
       const uint32_t b = outIdx[i + 1];
@@ -136,6 +120,7 @@ namespace flowfield::detail {
       tri[1].vertex_index = (int)b;
       tri[2].vertex_index = (int)c;
 
+      // 1:1 mapping
       tri[0].texcoord_index = (int)a;
       tri[1].texcoord_index = (int)b;
       tri[2].texcoord_index = (int)c;
@@ -149,12 +134,7 @@ namespace flowfield::detail {
 
     xatlas::Destroy(atlas);
 
-    if (!meshHasCompleteTexcoords(outMesh)) {
-      std::cerr << "xatlas UV gen: output mesh still missing UVs\n";
-      return false;
-    }
-
-    return true;
+    return meshHasCompleteTexcoords(outMesh);
   }
 
   bool ensureMeshHasUvs(ObjPolys& ioMesh) {
