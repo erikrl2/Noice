@@ -63,11 +63,19 @@ void ObjectMode::UpdateImGui() {
   }
   ImGui::SetItemTooltip("shortcut: right click on object");
   ImGui::BeginDisabled(models.size() > 127);
-  if (ImGui::Button("Add Slot")) {
+  if (ImGui::Button("New")) {
     objectSelect = (int)models.size();
     models.emplace_back();
     models[objectSelect].name = std::to_string(objectSelect) + ": empty";
     meshChanged = true;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Clear")) {
+    models[objectSelect].mesh.Destroy();
+    models[objectSelect].filepath.clear();
+    models[objectSelect].flowSettings = {};
+    models[objectSelect].transform = {};
+    models[objectSelect].name = std::to_string(objectSelect) + ": empty";
   }
   ImGui::EndDisabled();
   ImGui::SameLine();
