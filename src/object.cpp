@@ -218,7 +218,8 @@ void ObjectMode::OnFileDrop(const std::string& pathStr) {
   model.filepath = path.string();
   model.name = std::to_string(objectSelect) + ": " + path.stem().string();
   model.transform.scale = 1.0f;
-  model.transform.rotation = {-90.0f, 0.0f, 0.0f};
+  model.transform.translation = {0.0f, 0.0f, -20.0f};
+  model.transform.rotation = {ext == ".stl" ? -90.0f : 0.0f, 0.0f, 0.0f};
   model.flowSettings = {};
 
   LoadMeshAsync(objectSelect);
