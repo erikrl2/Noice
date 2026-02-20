@@ -155,7 +155,7 @@ void Screenshot::OnResize(int width, int height) {
 }
 
 void Screenshot::OnMouseClicked(int button, int action) {
-  if (action == GLFW_PRESS) {
+  if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
     if (hasResult) Reset();
   }
 }
@@ -187,7 +187,9 @@ void Screenshot::SavePNG() {
   std::string filename = options.baseName + ".png";
 
   stbi_flip_vertically_on_write(1);
-  int ok = stbi_write_png(filename.c_str(), outImg.GetWidth(), outImg.GetHeight(), 4, pixels.data(), outImg.GetWidth() * 4);
+  int ok = stbi_write_png(
+      filename.c_str(), outImg.GetWidth(), outImg.GetHeight(), 4, pixels.data(), outImg.GetWidth() * 4
+  );
 
   if (!ok) {
     std::cerr << "Screenshot: failed to write png: " << filename << "\n";

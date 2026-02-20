@@ -145,6 +145,7 @@ void App::DestroyResources() {
 
 void App::UpdateImGui() {
   if (!showSettings) return;
+  ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
   bool open = ImGui::Begin("Settings", &showSettings, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav);
   if (open) {
 #if 0
