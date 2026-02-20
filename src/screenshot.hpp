@@ -2,6 +2,8 @@
 #include "framebuffer.hpp"
 #include "shader.hpp"
 
+#include <glm/glm.hpp>
+
 #include <string>
 
 class Screenshot {
@@ -14,6 +16,7 @@ public:
     bool continuous = false;
     float gain = 1.0f;
     float gamma = 1.0f;
+    glm::vec3 color = {1.0f, 1.0f, 1.0f};
     std::string baseName = "capture";
   };
 

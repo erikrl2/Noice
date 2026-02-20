@@ -3,12 +3,13 @@
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 layout(r16f, binding = 0) uniform readonly image2D uAccumTex;
-layout(r8, binding = 1) uniform writeonly image2D uOutTex;
+layout(rgba8, binding = 1) uniform writeonly image2D uOutTex;
 
 uniform int uMethod;
 uniform int uFrames;
 uniform float uGain;
 uniform float uGamma;
+uniform vec3 uColor;
 
 float applyGamma(float x, float g) {
   x = clamp(x, 0.0, 1.0);
@@ -32,5 +33,5 @@ void main() {
   v = clamp(v, 0.0, 1.0);
   v = applyGamma(v, uGamma);
 
-  imageStore(uOutTex, px, vec4(v, 0, 0, 0));
+  imageStore(uOutTex, px, vec4(v * uColor, 1.0));
 }

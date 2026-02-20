@@ -17,7 +17,7 @@ void Screenshot::Init(int width, int height) {
 
   accumImg.Create(width, height, GL_R16F, GL_NEAREST);
   prevImg.Create(width, height, GL_R8, GL_NEAREST);
-  outImg.Create(width, height, GL_R8, GL_NEAREST);
+  outImg.Create(width, height, GL_RGBA8, GL_NEAREST);
 
   this->width = width;
   this->height = height;
@@ -45,6 +45,7 @@ void Screenshot::UpdateImGui() {
   }
   ImGui::DragFloat("Gain", &options.gain, 0.01f, 0.0f, 5.0f, "%.2f", ImGuiSliderFlags_ClampOnInput);
   ImGui::DragFloat("Gamma", &options.gamma, 0.01f, 0.1f, 5.0f, "%.2f", ImGuiSliderFlags_ClampOnInput);
+  ImGui::ColorEdit3("Color", &options.color[0]);
 
   static char baseNameBuf[128] = "capture";
   if (hasResult) {
@@ -57,7 +58,7 @@ void Screenshot::UpdateImGui() {
       ImGui::SetItemTooltip("shortcut: C");
     }
   } else {
-    if (ImGui::Button("Cancel capture")) End();
+    if (ImGui::Button("End capture")) End();
     ImGui::SetItemTooltip("shortcut: C");
     ImGui::Text("Capturing: %d / %d", std::min(collectedFrames, options.targetFrames), options.targetFrames);
   }
@@ -111,6 +112,7 @@ void Screenshot::Finalize() {
   finalizeShader.SetInt("uFrames", std::min(collectedFrames, options.targetFrames));
   finalizeShader.SetFloat("uGain", options.gain);
   finalizeShader.SetFloat("uGamma", options.gamma);
+  finalizeShader.SetVec3("uColor", options.color);
 
   finalizeShader.DispatchCompute(width, height, 16);
 }
@@ -185,7 +187,7 @@ void Screenshot::SavePNG() {
   std::string filename = options.baseName + ".png";
 
   stbi_flip_vertically_on_write(1);
-  int ok = stbi_write_png(filename.c_str(), outImg.GetWidth(), outImg.GetHeight(), 1, pixels.data(), outImg.GetWidth());
+  int ok = stbi_write_png(filename.c_str(), outImg.GetWidth(), outImg.GetHeight(), 4, pixels.data(), outImg.GetWidth() * 4);
 
   if (!ok) {
     std::cerr << "Screenshot: failed to write png: " << filename << "\n";
