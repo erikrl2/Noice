@@ -8,6 +8,7 @@
 #include <imgui.h>
 #include <stb_image_write.h>
 
+#include <algorithm>
 #include <iostream>
 
 void Screenshot::Init(int width, int height) {
@@ -35,14 +36,15 @@ void Screenshot::UpdateImGui() {
   const char* methods[] = {"AVG", "SAD"};
   int m = (int)options.method;
 
-  ImGui::BeginDisabled(capturing);
   if (ImGui::Combo("Method", &m, methods, (int)Method::Count)) {
     options.method = (Method)m;
   }
   ImGui::DragInt("Frames", &options.targetFrames, 0.25f, 1, 1000, "%d", ImGuiSliderFlags_ClampOnInput);
+  if (ImGui::Checkbox("Continuous", &options.continuous)) {
+    if (!options.continuous && capturing) End();
+  }
   ImGui::DragFloat("Gain", &options.gain, 0.01f, 0.0f, 5.0f, "%.2f", ImGuiSliderFlags_ClampOnInput);
   ImGui::DragFloat("Gamma", &options.gamma, 0.01f, 0.1f, 5.0f, "%.2f", ImGuiSliderFlags_ClampOnInput);
-  ImGui::EndDisabled();
 
   static char baseNameBuf[128] = "capture";
   if (hasResult) {
@@ -55,12 +57,14 @@ void Screenshot::UpdateImGui() {
       ImGui::SetItemTooltip("shortcut: C");
     }
   } else {
-    if (ImGui::Button("Cancel capture")) Reset();
-    ImGui::Text("Capturing: %d / %d", collectedFrames, options.targetFrames);
+    if (ImGui::Button("Cancel capture")) End();
+    ImGui::SetItemTooltip("shortcut: C");
+    ImGui::Text("Capturing: %d / %d", std::min(collectedFrames, options.targetFrames), options.targetFrames);
   }
 
   if (hasResult) {
     if (ImGui::Button("Save PNG")) SavePNG();
+    ImGui::SetItemTooltip("shortcut: Ctrl+S");
     ImGui::SameLine();
     if (ImGui::Button("Recapture")) Begin();
     ImGui::SetItemTooltip("shortcut: C");
@@ -78,10 +82,7 @@ void Screenshot::Update(Texture source) {
 
   Finalize();
 
-  if (collectedFrames >= options.targetFrames) {
-    capturing = false;
-    hasResult = true;
-  }
+  if (!options.continuous && collectedFrames >= options.targetFrames) End();
 }
 
 void Screenshot::Accumulate(Texture source) {
@@ -94,6 +95,8 @@ void Screenshot::Accumulate(Texture source) {
 
   accumShader.SetInt("uMethod", (int)options.method);
   accumShader.SetInt("uFrameIndex", collectedFrames);
+  accumShader.SetInt("uRolling", (options.continuous && collectedFrames >= options.targetFrames));
+  accumShader.SetFloat("uDecay", (options.targetFrames - 1.0f) / options.targetFrames);
 
   accumShader.DispatchCompute(width, height, 16);
 }
@@ -105,7 +108,7 @@ void Screenshot::Finalize() {
   outImg.Bind(1, GL_WRITE_ONLY);
 
   finalizeShader.SetInt("uMethod", (int)options.method);
-  finalizeShader.SetInt("uFrames", collectedFrames);
+  finalizeShader.SetInt("uFrames", std::min(collectedFrames, options.targetFrames));
   finalizeShader.SetFloat("uGain", options.gain);
   finalizeShader.SetFloat("uGamma", options.gamma);
 
@@ -118,6 +121,11 @@ void Screenshot::Begin() {
   collectedFrames = 0;
 
   ClearBuffers();
+}
+
+void Screenshot::End() {
+  capturing = false;
+  hasResult = true;
 }
 
 void Screenshot::Reset() {
@@ -146,13 +154,18 @@ void Screenshot::OnResize(int width, int height) {
 
 void Screenshot::OnMouseClicked(int button, int action) {
   if (action == GLFW_PRESS) {
-    if (IsActive()) Reset();
+    if (hasResult) Reset();
   }
 }
 
 void Screenshot::OnKeyPressed(int key, int action) {
   if (key == GLFW_KEY_C && action == GLFW_PRESS) {
-    if (!util::IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT)) Begin();
+    if (!util::IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT)) {
+      if (!capturing)
+        Begin();
+      else
+        End();
+    }
   }
   if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
     if (IsActive()) Reset();

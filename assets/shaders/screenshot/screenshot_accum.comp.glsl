@@ -9,6 +9,8 @@ layout(binding = 0) uniform sampler2D uSourceTex;
 
 uniform int uMethod;
 uniform int uFrameIndex;
+uniform bool uRolling;
+uniform float uDecay;
 
 float srcR(ivec2 px) {
   return texelFetch(uSourceTex, px, 0).r;
@@ -19,6 +21,8 @@ void main() {
 
   float cur = texelFetch(uSourceTex, px, 0).r;
   float acc = imageLoad(uAccumTex, px).r;
+
+  if (uRolling) acc *= uDecay;
 
   if (uMethod == 0) {
     imageStore(uAccumTex, px, vec4(acc + cur, 0, 0, 0));

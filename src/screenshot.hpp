@@ -11,6 +11,7 @@ public:
   struct Options {
     Method method = Method::AbsDiffSum;
     int targetFrames = 30;
+    bool continuous = false;
     float gain = 1.0f;
     float gamma = 1.0f;
     std::string baseName = "capture";
@@ -31,11 +32,14 @@ public:
   void OnKeyPressed(int key, int action);
 
   bool IsCapturing() const { return capturing; }
+  bool HasResult() const { return hasResult; }
   bool IsActive() const { return hasResult || capturing; }
   Texture GetResult() const { return outImg; }
+  Options GetOptions() const { return options; }
 
 private:
   void Begin();
+  void End();
   void Reset();
 
   void Accumulate(Texture source);

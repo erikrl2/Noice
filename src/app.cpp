@@ -156,13 +156,13 @@ void App::UpdateImGui() {
 #endif
 
     if (ImGui::CollapsingHeader("Effect", ImGuiTreeNodeFlags_DefaultOpen)) {
-      ImGui::BeginDisabled(screenshot.IsCapturing());
+      ImGui::BeginDisabled(screenshot.HasResult());
       effect.UpdateImGui();
       ImGui::EndDisabled();
     }
 
     if (ImGui::CollapsingHeader("Mode", ImGuiTreeNodeFlags_DefaultOpen)) {
-      ImGui::BeginDisabled(screenshot.IsCapturing());
+      ImGui::BeginDisabled(screenshot.HasResult());
 
       bool changed = false;
       changed |= ImGui::RadioButton("Object##Mode", (int*)&modeSelect, (int)ModeType::Object);
@@ -188,10 +188,9 @@ void App::UpdateImGui() {
 }
 
 void App::Update(float dt) {
-  if (!screenshot.IsCapturing()) {
-    modePtr->Update(!screenshot.IsActive() ? dt : 0.0f);
-  } else {
-    effect.disabled = false;
+  if (screenshot.IsCapturing()) effect.disabled = false;
+  if (!screenshot.HasResult()) {
+    modePtr->Update(dt);
   }
 
   Texture effectTex = effect.Apply(modePtr->GetEffectInputData(), dt);
@@ -239,7 +238,7 @@ void App::OnMouseMoved(GLFWwindow* window, double xpos, double ypos) {
   if (ImGui::GetIO().WantCaptureMouse) return;
   App& app = *(App*)glfwGetWindowUserPointer(window);
 
-  if (!app.screenshot.IsActive()) {
+  if (!app.screenshot.HasResult()) {
     app.modePtr->OnMouseMoved(xpos, ypos);
   }
 }
@@ -248,7 +247,7 @@ void App::OnMouseScroll(GLFWwindow* window, double xoffset, double yoffset) {
   if (ImGui::GetIO().WantCaptureMouse) return;
   App& app = *(App*)glfwGetWindowUserPointer(window);
 
-  if (!app.screenshot.IsActive()) {
+  if (!app.screenshot.HasResult()) {
     app.effect.OnMouseScrolled((float)yoffset);
     app.modePtr->OnMouseScrolled((float)yoffset);
   }
@@ -258,7 +257,7 @@ void App::OnMouseClicked(GLFWwindow* window, int button, int action, int mods) {
   if (ImGui::GetIO().WantCaptureMouse) return;
   App& app = *(App*)glfwGetWindowUserPointer(window);
 
-  if (!app.screenshot.IsActive()) {
+  if (!app.screenshot.HasResult()) {
     app.effect.OnMouseClicked(button, action);
     app.modePtr->OnMouseClicked(button, action);
   }
@@ -296,7 +295,7 @@ void App::OnKeyPressed(GLFWwindow* window, int key, int scancode, int action, in
     break;
   }
 
-  if (!app.screenshot.IsActive()) {
+  if (!app.screenshot.HasResult()) {
     app.effect.OnKeyPressed(key, action);
     app.modePtr->OnKeyPressed(key, action);
   }
